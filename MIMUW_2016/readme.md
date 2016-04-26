@@ -11,7 +11,7 @@ Schedule MIM UW:
 * 5-6 IV    [Exploration], Cluster analysis, [k-means](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/kmeans.html), [PAM](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/pam.html), [agnes](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/agnes.html),  [Lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/lab4.R)
 * 12-13 IV  [Exploration], [Multidimensional scaling](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/mds.html), [Project 1 phase 2],   [Lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/lab5.Rmd)
 * 19-20 IV  [Exploration], [Decision rules](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/rules.html), [Lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/lab6.Rmd)
-* 26-27 IV  [Prediction], Regression, kNN, trees, model quality measures, [Project 1 phase 3]
+* 26-27 IV  [Prediction], [Regression, kNN, trees, model quality measures, pages 9-32 from EoSL](http://statweb.stanford.edu/~tibs/ElemStatLearn/), [Project 1 phase 3]
 * 10-11 V   [Prediction], Regression with many variables, model selection,
 * 17-18 V   [Prediction], Regularisation, feature extraction, [Project 2 phase 1]
 * 24-25 V   [Prediction], Classification LDA, QDA, logistic regression
