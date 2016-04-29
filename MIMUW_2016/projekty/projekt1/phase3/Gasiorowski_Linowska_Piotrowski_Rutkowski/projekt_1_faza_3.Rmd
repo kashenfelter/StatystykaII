@@ -1,0 +1,199 @@
+---
+title: "Projekt 1 - Faza 3"
+author: "Adrian Gąsiorowski, Agnieszka Linowska, Bartosz Piotrowski, Krzysztof Rutkowski"
+date: 12.04.2016r.
+output: 
+  html_document:
+  toc: TRUE
+---
+  
+  
+W poniższej prezentacji pokażemy, jak znaleźliśmy strukturę w zbiorze odwiedzających pod kątem czasu przebywania przy eksponatach, przy użyciu własnej metryki.
+
+# Przygotowanie danych
+
+```{r, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(cluster)
+library(factoextra)
+library(MASS)
+library(ggrepel)
+```
+
+```{r, warning=FALSE, message=FALSE, include=FALSE}
+load("station_manual_clustering_good.rda")
+#load("distances_station_manual_clustering_good.rda")
+load("distances_station_manual_clustering_good_reduced.rda")
+load("shp_r.rda")
+shp_r <- as.data.frame(shp_r)
+load("distances_station_manual_clustering_good_2d.rda")
+load("clst_pam.rda")
+load("clst_pam_r.rda")
+```
+
+Korzystamy z oczyszczonych danych z poprzedniej fazy projektu.
+
+```{r, warning=FALSE, message=FALSE, cache=TRUE}
+load("station_times_reshaped.rda")
+load("station_bool_reshaped.rda")
+load("station_times_normal.rda")
+
+head(station_times_normal, 20)
+station_times_reshaped[1:20, 1:10]
+station_bool_reshaped[1:20,1:10]
+```
+
+# Selekcja eksponatów
+
+Aby klastrowanie mogło się udać, wybraliśmy do analizy te eksponaty, które wprowadzają rozróżnienie na grupy wśród odwiedzających.
+Na przykład eksponat *cnk19a*, czyli *Kim jesteś* nie daje nadziei na dostarczenie danych do klastrowania, gdyż nie ma wyraźnego podziału na grupy czasowe:
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+show_hist <- function(station_name){
+  q <- quantile(station_times_reshaped[, station_name][station_times_reshaped[, station_name] > 0], .98)
+  a <- station_times_reshaped[, station_name][station_times_reshaped[, station_name] > 0 & station_times_reshaped[, station_name] < q]
+  ggplot() +aes(a) + geom_histogram(binwidth = 2) + ggtitle(station_name)
+}
+```
+
+```{r, message=FALSE, warning=FALSE}
+show_hist("cnk18")
+```
+
+Ale jest wiele eksponatów, których histogramy wyglądają obiecująco i ciekawie. Np. na histogramie eksponatu *cnk23*, czyli *Flirt czy fiasko*, wyraźnie widać trzy grupy:
+
+```{r, message=FALSE, warning=FALSE}
+show_hist("cnk23")
+```
+
+Z kolei dla eksponatu *cnk07* (*Sprzeczne informacje*), możemy wyróżnić dwie grupy (rozkład bimodalny):
+
+```{r, message=FALSE, warning=FALSE}
+show_hist("cnk07")
+```
+
+Eksponatów tego typu, jak dwa powyższe, jest 21. Dla każdego z tych eksponatów podzieliliśmy użytkowników na trzy/cztery grupy i zapisaliśmy to w tabeli:
+
+```{r, message=FALSE, warning=FALSE}
+station_manual_clustering_good[1:20, 1:10]
+```
+
+# Nasza metryka
+
+Do obliczania odległości pomiędzy odwiedzającymi stworzyliśmy naszą własną metrykę:
+
+```{r, message=FALSE, warning=FALSE}
+distance <- function(x, y) {
+  vis_intersection <- x*y != 0
+  manhattan <- abs(x-y)
+  nz <- vis_intersection * manhattan
+  nz_sum <- sum(vis_intersection)
+  return(sum(nz) / (nz_sum*nz_sum)) 
+}
+```
+
+Liczy ona odległość manhattan pomiędzy wektorami, ale mnoży jeszcze przez indykator części wspólnej 
+stacji, na których byli obaj odwiedzający. W efekcie wkład do odległości mają jedynie te stacje, na 
+których byli obaj odwiedzający, gdyż tylko tam możemy zdefiniować między nimi jakieś zależności
+(nie wiemy do końca jak zachowaliby się zwiedzający gdyby byli na innych stacjach). Wyliczoną odległość
+dzielimy przez kwadrat sumy liczności stacji, na których byli obaj zwiedzający. Premiuje to bardziej
+te pary odwiedzających (tj są oni sobie bliżsi), którzy przy takich samych średnich różnicach byli razem na większej liczbie stacji.
+
+I przy pomocy tejże metryki stworzyliśmy macierz odległości:
+
+```{r, message=FALSE, warning=FALSE}
+distances_station_manual_clustering_good_reduced[1:10, 1:10]
+```
+
+# Rzutowanie 2D
+
+Przy pomocy funkcji *isoMDS* zrzutowaliśmy nasze dane z przestrzeni 19-wymiarowej na przestrzeń 2-wymiarową:
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+distances_station_manual_clustering_good[distances_station_manual_clustering_good==0] <- 0.0001
+distances_station_manual_clustering_good_2d <- isoMDS(distances_station_manual_clustering_good)
+```
+
+Wykres Sheparda dla tego rzutowania:
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(shp_r, aes(x=x, y=y)) + geom_point(size = 1.5, alpha = .01) + ggtitle("Wykres Sheparda")
+```
+
+Rzutowanie prezentuje się bardzo ładnie:
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(as.data.frame(distances_station_manual_clustering_good_2d), aes(x=points.1, y=points.2)) + geom_point(size = 1, alpha=.2) + ggtitle("Rzutowanie na 2D")
+```
+
+#Klastrowanie
+
+Do klastrowania zastosowaliśmy metodę *PAM*. Z wykresu w 2D możemy oczekiwać 4 wyraźnych klastrów, ale zbadajmy to jeszcze precyzyjniej metodą Silhouette:
+
+```{r, message=FALSE, warning=FALSE}
+fviz_nbclust(as.dist(distances_station_manual_clustering_good_reduced), pam, method = "silhouette")
+```
+
+Wykonujemy klastrowanie PAM dla 4 klastrów:
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+clst_pam <- pam(as.dist(distances_station_manual_clustering_good), 4)
+```
+
+Znajdujemy medoidy:
+```{r, message=FALSE, warning=FALSE}
+med <- clst_pam$medoids
+med
+```
+
+Rysujemy wykres z zaznaczonymi medoidami:
+
+```{r, message=FALSE, warning=FALSE}
+distances_station_manual_clustering_good_2d$clusters <- factor(clst_pam$clustering)
+centra <- distances_station_manual_clustering_good_2d[rownames(distances_station_manual_clustering_good_2d) %in% med,]
+
+ggplot(distances_station_manual_clustering_good_2d, aes(x=points.1, y=points.2, colour=clusters)) + geom_point(size = 1.5, alpha=.2) +
+  geom_point(data=centra, size=6) + ggtitle("PAM")
+```
+
+Kim są odwiedzający będący medoidami?
+
+```{r, message=FALSE, warning=FALSE}
+station_times_normal[station_times_normal$visitor == med[1],]
+station_times_normal[station_times_normal$visitor == med[2],]
+station_times_normal[station_times_normal$visitor == med[3],]
+station_times_normal[station_times_normal$visitor == med[4],]
+```
+
+Sylwetki dla 4 klastrów:
+```{r, message=FALSE, warning=FALSE}
+fviz_silhouette(silhouette(clst_pam_r$clustering, distances_station_manual_clustering_good_reduced))
+```
+
+A więc poza wglądem wizualnym, widzimy z miar silhouette, że klastry są wyraźne.
+
+#Jakie zmienne są skorelowane z takim ładnym klastrowaniem?
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(distances_station_manual_clustering_good_2d, aes(x=points.1, y=points.2, colour = mean_times)) + geom_point(size = 1, alpha=.2) + 
+  scale_colour_gradient2(low="blue", mid="green", high="red", midpoint = 180) + ggtitle("Średni czas przebywania przy jednym eksponacie")
+
+ggplot(distances_station_manual_clustering_good_2d, aes(x=points.1, y=points.2, colour = min_time)) + geom_point(size = 1, alpha=.2) + 
+  scale_colour_gradient2(low="blue", mid="green", high="red", midpoint = 13) + ggtitle("Godzina rozpoczęcia zwiedzania")
+
+ggplot(distances_station_manual_clustering_good_2d, aes(x=points.1, y=points.2, colour = count)) + geom_point() + 
+  scale_colour_gradient2(low="blue", mid="green", high="red", midpoint = 10) + ggtitle("Ilość odwiedzonych eksponatów")
+
+ggplot(distances_station_manual_clustering_good_2d, aes(x=points.1, y=points.2, colour = week_day)) + geom_point(size = 1, alpha=.2) + ggtitle("Dzień tygodnia")
+
+ggplot(distances_station_manual_clustering_good_2d, aes(x=points.1, y=points.2, colour = weekend)) + geom_point(size = 1, alpha=.2) + ggtitle("Weekend v nieweekend")
+
+ggplot(distances_station_manual_clustering_good_2d, aes(x=points.1, y=points.2, colour = month)) + geom_point(size = 1, alpha=.2) + ggtitle("Miesiąc")
+```
+
+# Podsumowanie
+
+Widzimy, że dla tak zdefiniowanej metryki, wyraźnie zarysowują się 4 grupy odwiedzających. Z
+definicji metryki te grupy muszę mieć coś wspólnego z czasem przebywania przy stacjach. Z przeprowadzonych analiz widać, że zachodzi jakaś korelacja między średnim czasem zwiedzania lub godziną rozpoczęcia, wyraźny podział na klastry daje nadzieję, że istnieją wielkości, które jeszcze bardziej są skorelowane
+z podziałem na klastry, jednak muszą one być bardziej ukryte.
+
+
+
