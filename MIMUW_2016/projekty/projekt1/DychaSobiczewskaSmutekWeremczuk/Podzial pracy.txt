@@ -1,0 +1,38 @@
+﻿Poniżej zamieszczamy informacje o wkładzie pracy.
+poszczególnych członków zespołu przy projekcie:
+
+Przemysław Dycha
+Wstępna obróbka danych (tak aby możliwe były dalsze analizy)
+Wykres: Liczba odwiedzeń poszczególnych stacji
+Wykres: Średni czas spędzony na stacji
+Wykres: Średni czas a liczba odwiedzin
+Wykres: Boxploty uzyskanych grup
+Część: Podział ze względu na liczbę odwiedzonych stacji
+Część:Reguły odwiedzeń eksponatów
+Stworzenie plakatu
+Łączenie całości w knic-ie
+
+Krzysztof Smutek 
+Wstępna obróbka danych (tak aby możliwe były dalsze analizy)
+Część: "Grupowanie stacji i odwiedzajacych" (poza Odległość MANHATTAN) (wykresy 15,16,18)
+Część: "Porównywanie klastrów" indeks Randa
+Pomoc przy części: Reguły odwiedzeń eksponatów
+Pisanie komentarzy + korekta
+Podsumowanie
+Prezentacja w trakcie zajęć
+Informacja o wkładzie pracy
+
+Magda Sobiczewska
+Wstępna obróbka danych (tak aby możliwe były dalsze analizy)
+Przygotowanie raportu (rozdziału, spis treści itp.)
+Wykres: Średnia liczba odwiedzających w danym dniu
+Część: "Grupowanie stacji i odwiedzajacych" (Odległość MANHATTAN) (wykres 17)
+Część: "Porównywanie klastrów" mapy ciepła
+Stworzenie plakatu
+Korekta komentarzy
+
+Piotr Weremczuk
+Wstępna obróbka danych (tak aby możliwe były dalsze analizy)
+Wykres: Średnia liczba odwiedzających w danym dniu
+Wykes: Czas spędzony przy maszynie przez użytkownika
+Korekta komentarzy
