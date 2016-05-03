@@ -128,4 +128,8 @@ boxplot(t(rr))
 
 ```
 
+Inne materiały o caret
+
+https://www.r-project.org/nosvn/conferences/useR-2013/Tutorials/kuhn/user_caret_2up.pdf
+
 
