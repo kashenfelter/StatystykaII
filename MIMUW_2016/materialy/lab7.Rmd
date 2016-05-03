@@ -50,7 +50,7 @@ So:
 
 Which method has the lowest SS?
 
-## Model comparison
+## Model comparisons
 
 Check which model has the lowest SS for:
 
