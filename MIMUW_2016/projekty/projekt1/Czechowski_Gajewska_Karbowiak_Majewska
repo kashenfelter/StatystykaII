@@ -17,3 +17,24 @@ Na oko te rozkłady wyglądają bardzo podobnie, jakieś liczbowe statystyki są
 Wykresy punktowe też trudno porównać ponieważ mają zupełnie inne zakresy osi (a co gorsze, lewy wykres na osi ‘number of visitors’ są wartości ujemne)
 
 Brakuje wniosków! Plakat powinien krzyczeć odpowiedź na pytanie ‘i co z tego wynika?’
+
+
+
+## -------------------------
+## Phase 2
+
+Tym razem są wnioski (i dobrze, choć się z nimi nie zgadzam, ale przynajmniej jest się do czego odnieść)
+
+Nie rozumiem pomysłu z dopasowywaniem klastrów do siebie ('matching').
+Nie rozumiem dlaczego wybrali państwo metodę k-średnich? Brakuje tutaj głębszej eksploracji danych i dyskusji dlaczego tak je analizować a nie inaczej.
+Mamy kilak klastrowań dla różnej liczby klastrów. 
+Zgodność jest niewielka, sylwetka jest słaba.
+Moim zdaniem świadczy to o tym, że odległość jest źle dobrana (euklidesowa na czasach interakcji).
+Przy takiej niedobrej odległości (a jeżeli dobra, to co mierzy?) klastry wychodzą mało stabilne. - dlaczego miałoby być inaczej.
+
+Co do wniosku: 'Próby grupowania danych najczęściej prowadzą do otrzymania jednego klastra istotnie większego od innych. Sugeruje to trudności w wyróżnianiu grup zwiedzających.' 
+może i tak jest. Ale te trudności muszą państwo jakoś pokonać, a nie ograniczyć się do stwierdzenia, że są trudności.
+
+Na fazę 3 jest dużo prac do wykonania aby bliżej poznać te dane i zawarte w nich wzorce. Sugeruję przyjrzeć się wynikom innych grup, może będą inspirujące.
+
+

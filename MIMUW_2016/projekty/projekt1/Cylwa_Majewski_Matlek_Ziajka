@@ -19,3 +19,43 @@ Na prawym wykresie u góry, zamiast liczb na osi OX przydałyby się daty. Wida�
 Jeżeli chodzi o dystrybuantę empiryczną, to przy tak narysowanej nie sposób nic odczytać, bo zakrywa ona linie pomocnicze
 
 Generalnie: Obrazki są dobre, prze przydałoby się więcej informatywnych liczb.
+
+
+
+
+## -------------------------
+## Faza 2
+
+Ogólnie:
+- niewielkim kosztem mogą Państwo dodać spis treści. Bardzo ułatwiłby on czytanie tego raportu.
+
+Zamiast pozostawiać takie zadania dla czytelnika 'We would like to encourage you to compare results with the actual map of stations in CNK' należy samemu porównać wyniki z mapą i podzielić się wnioskami.
+
+Analiza z medianą jest zupełnie oderwana od dalszej części.
+Dlaczego na wykresie pokazywane są tylko mediany? To duża strata informacji, a przecież można pokazać cały rozkład - na której pozycji był dany eksponat.
+
+Proszę numerować wykresy i tabele, będzie się łatwiej do nich odwoływać.
+
+Jeżeli chodzi o reguły decyzyjne - z pewnością dobrze że próbują Państwo rzeczy których nie było jeszcze na wykładzie.
+
+
+Przedstawianie typowych ścieżek - bardzo krótkich ścieżek jest mało ciekawe.
+Ciekawsze byłoby pokazanie ile jest ścieżek określonej długości (np. ile jest długości 1, ile jest długości 2 itp.).
+A jeżeli już robić analizę reguł to ograniczyć się tylko do ścieżek długości >= k.
+
+Brakuje wniosków w tej analizie.
+Trochę wygląda ona na zasadzie: a zróbmy reguły asocjacyjne. Widzimy wyniki. W sumie nie są zaskakujące ale też niewiele wnoszą.
+I co dalej?
+
+Mając te wszystkie obserwacje proszę się zastanowić jak scharakteryzować ścieżki odwiedzających CNK. 
+Warto się przyjrzeć i długościom ścieżek i tym które eksponaty są najczęściej na końcach ścieżek, może na czasy.
+Reguły asocjacyjne z pewnością też mogą być przydatne, choć obecna analiza wciąż czeka na uzupełnienie.
+
+
+Na plus: Używanie reguł asocjacyjnych, wizualizacja tych reguł.
+
+Na minus: Brak wniosków i planów na kolejny krok (tzn. może i są, ale nie w raporcie)
+
+
+
+

@@ -20,3 +20,54 @@ Na środkowym wykresie osie są źle podpisane (odwrotnie)
 Po lewej stronie są dwa wykresy, takie same. Po co umieszczać oba?
 
 Informacja o liczbie odwiedzających osób powinna być unormowana do liczby dni gdy CNK było otwarte.
+
+
+
+## -------------------------
+## Faza 2
+
+W łatwy sposób do raportu knitr można dodać spis treści. Bardzo ułatwi on czytanie raportu. Podobnie dobrze jest numerować wykresy i rozdziały - ułatwi to mi odnoszenie się do nich.
+
+Słowo 'visitorów' wygląda okropnie. Zwiedzających?
+
+Używają panie haseł typu 'Macierz ostatnich przejść visitorów' ale bez wyjaśnienia co jest w tej macierzy - trudno być pewnym. A przecież nie chodzi o to bym zgadywał co mogło być zrobione.
+
+W samym raporcie mają Panie minimalną ilość komentarzy. 
+To źle.
+Bez wniosków i wyjaśnień ta sekwencja obrazków wygląda na dosyć przypadkową.
+
+Na wykresie w rozdziale 'Liczby odwiedzonych eksponatów' osie są chyba błędnie podpisane.
+
+Przedstawianie pierwszych dziesięciu par w rozdziale 'Popularność poszczególnych przejść' niewiele mówi.
+Może pokazać macierz przejść każdy do każdego?
+
+56 eksponatów to za dużo? więc może wybrać z nich tylko podzbiór np. 10/20 najczęściej odwiedzanych?
+Obecnie pokazywanie najczęstszych par przejść nie niesie z sobą żadnej wiadomości.
+A ponieważ w żaden sposób nie komentują Panie tego wyniku więc pojawia się pytanie po co go zamieszczać?
+
+Mapy z rozdziału 'Analiza pod ścieżek' są ciekawe. 
+Ale 1. czarną mapę można zamienić na szarą, by się tak nie rzucała w oczy. Ciekawsze są te kolorowe oznaczenia.
+2. tę opisową statystykę uzupełniłbym modelem, testem, czymś co wyjdzie poza wyłącznie rysunek z częstymi parami.
+
+Analiza z rozdziału 'Analiza podobieństwa odwiedzających' wygląda jak zrobiona na siłę. Co z niej wynika?
+Moim zdaniem wyłącznie, że odległość nie jest najlepsza.
+
+Po co nam prezentacja liści - zwiedzających, skoro nie jesteśmy w stanie ich z niczym skojarzyć.
+O ile rysunek z mapą miał za sobą jakąś treść i odpowiadał na jakieś pytanie, tak ta analiza dendrogramów wydaje się przypadkowa.
+
+Hipotezę z parami zwiedzających najłatwiej zweryfikować sprawdzając, czy osoby o podobnych profilach faktycznie zwiedzały centrum jednego dnia. Nie ma takiej weryfikacji.
+Stwierdzenie 'Tylko metoda Warda pozwoliła na sensowny podział odwiedzających na klastry' nie broni się. Dlaczego te klastry byłyby lepsze od innych?
+
+Później jeszcze skalowanie MDS, też oderwane od poprzednich wyników.
+
+Podsumowując:
+W całym raporcie są pewnie ciekawe wyniki, ale toną one w morzu często przypadkowych analiz.
+Proszę usunąć 80% niepotrzebnych wyników (lub przenieść je do załącznika) i dopracować te 20% wartościowych.
+Połączenie MDS i analizy ścieżek może być wartościowe.
+Ale jeżeli wierzą Panie że to klastrowanie jest sensowne to warto 1. zrobić diagnostykę, 2. opisać każdy ze znalezionych klastrów (profile czasów odwiedzin, coś więcej niż tylko medoidy)
+I przyda się uzasadnienie, dlaczego odległość na parach jest dobra,
+
+
+
+
+

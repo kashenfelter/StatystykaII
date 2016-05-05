@@ -26,3 +26,38 @@ Są pokazane podstawowe statystyki, ale brakuje dalszego pociągnięcia przedsta
 Czy naprawdę różnica pomiędzy kwietniem a styczniem jest mniejsza niż pomiędzy wtorkiem a niedzielą? Nie widać tego.
 Generalnie, wykresy są bardzo podstawowe i nie widać związku pomiędzy nimi a wnioskami.
 
+
+
+## -------------------------
+## Phase 2
+
+Nie ma żadnej potrzeby by korzystać z power pointa do prezentacji. Ten sam efekt a może i lepszy można uzyskać w knitrze (np. z prezentacjami w HTML5).
+
+Z tej kolorowej chmury słów niewiele wynikać. Widać które słowo jest największe, bo jest innym kolorem. Ale pozostałe trudno uporządkować.
+
+Podział na grupy w zależności od liczby odwiedzonych stacji to dobry pomysł. Ale jak uzasadnić wybór granic tych grup 6/10/20? To nie powinny być przypadkowe liczby. Jak liczne są poszczególne grupy?
+
+Wykresy ze slajdu 4 pokazują że coś poszło nie tak.
+W danych ewidentnie widać trzy grupy. To wręcz budzi podejrzenie, że jakaś zmienna nie została unormowana.
+Skąd pomysł by widząc taki wykres szukać 2 klas?
+I gdy widać że te dwie klasy nie pasują do ewidentnych chmur punktów jest to wyraźny znak że złe jest albo skalowanie albo grupowanie i jedną z tych rzeczy trzeba poprawić.
+
+Dlaczego na typowej ścieżce ze slajdu 5 są węzły 3 kolorów? I dlaczego ten wykres jest taki mały?
+
+Klastrowanie ze strony 6 powinno mieć klaster oznaczony jako zmienna factor a nie numeric.
+
+Bez komentarzy trudno cokolwiek odczytać z tego power pointa.
+Proszę już z niego nie korzystać.
+W knitrze można robić prezentacje.
+A w czym by ich nie robić, każdy wynik powinien być szeroko opisany.
+Na razie są ładne kolorowe wykresy, ale gdzie wnioski?
+
+Jak chcą mnie państwo przekonać że grup jest 2-3 a nie 40-50?
+
+Slajd 10 wprowadza całkowity zamęt ponieważ nie wiadomo czy kastrowane sa eksponaty (na slajdzie 10 tak) czy wizytujące wystawę osoby (na wcześniejszych slajdach).
+
+
+
+Z pliku 'Rmd' przed wyłąniem należałoby uzunąć zbędne opisy - pozostałość po szablonie.
+Nie mówiąc już o tym, że należałoby dodać wnioski lub koemntarze tak by dało się zrozumieć co i po co w tym pliku się dzieje.
+

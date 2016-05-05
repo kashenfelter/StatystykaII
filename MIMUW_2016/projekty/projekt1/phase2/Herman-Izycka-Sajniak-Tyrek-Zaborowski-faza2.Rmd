@@ -1,0 +1,259 @@
+---
+title: "projekt 1, faza 2"
+author: "Julia Herman-Iżycka, Bartosz Sajniak, Jakub Tyrek, Rafał Zaborowski"
+date: "April 11, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library('ggplot2')
+library('tidyr')
+library('dplyr')
+library('Biostrings')
+library('cluster')
+library('MASS')
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+
+load("smallLogs.rda")
+
+```
+
+##Data preparation:
+* filter non-valid visitors
+* count interaction time of each user with each station
+* filter unusually long times - possible mistakes
+
+
+```{r, cache=TRUE, warning=FALSE}
+smallLogs <- smallLogs %>% filter(visitor != -1)
+smallLogs$visitor_change <- smallLogs$visitor != lag(smallLogs$visitor) | as.Date(smallLogs$date) != as.Date(lag(smallLogs$date)) | smallLogs$station != lag(smallLogs$station)
+
+smallLogs$visitor_change[1] <- FALSE
+smallLogs$visit_id <- cumsum(smallLogs$visitor_change)
+
+time_diffs <- smallLogs %>% group_by(visit_id, station, visitor) %>% summarise(enter_time = first(date), leave_time = last(date), time_spent = leave_time - enter_time)
+
+time_diffs$station <- factor(time_diffs$station)
+time_diffs <- time_diffs %>% as_data_frame() %>% mutate(visitor_id = paste(visitor,  as.Date(enter_time), sep='_')) 
+
+hist(log10(time_diffs$time_spent))
+#filter unusually long times
+upper_limit <- 10^4
+time_diffs <- time_diffs  %>% filter(time_spent <= upper_limit)
+
+```
+
+##Compare time spent on different stations
+
+We analyze distribution of time spent by visitors on visited stations
+```{r, cache=TRUE, fig.width=9, fig.height=8}
+time_spent <- aggregate(time_diffs$time_spent,list(time_diffs$visitor),median)
+
+colnames(time_spent) <- c('visitor','mean_time_spent_visiting')
+
+ggplot(time_diffs,aes(time_spent)) + geom_histogram(aes(y=..ncount..,colour=station, guided=FALSE),bins=70) + stat_ecdf() + facet_wrap(~ station,ncol=6) + coord_cartesian(xlim=c(0,1000)) + guides(colour=FALSE)
+```
+
+##Distances between stations
+
+To create a similarity matrix of stations according to time spent by visitors, we use Kolmogorov-Smirnov test statistic to calculate similarity between two empirical cdf's of visiting time distribution on given station.
+```{r, cache=TRUE, warning=FALSE}
+visit_time_range <- range(time_diffs$time_spent)
+min_vt <- visit_time_range[[1]]
+max_vt <- visit_time_range[[2]]
+range_vt <- seq(min_vt,max_vt,by = 1)
+
+by_station <- split(time_diffs$time_spent,time_diffs$station,drop=TRUE)
+by_station_ecdf <- lapply(by_station, function(x){return(ecdf(x)(range_vt));})
+
+dist_KS_mtx <- Vectorize(function(i,j){
+  v1 <- by_station_ecdf[[i]];
+  v2 <- by_station_ecdf[[j]];
+  kst <- ks.test(v1,v2);
+  s <- kst$statistic;
+  names(s) <- NULL;
+  return(s);
+})
+
+dist_mtx <- outer(1:length(by_station_ecdf),1:length(by_station_ecdf),dist_KS_mtx)
+
+station_names <- time_diffs %>% distinct(station) %>% dplyr::select(station)
+```
+
+##Determine number of clusters
+We now want to cluster stations based on distance matrix. To establish proper number of cluters we may use:
+
+1. Mean silhouetes:
+```{r, cache=TRUE}
+sils <- data.frame()
+for(i in 2:(nrow(dist_mtx)/2)){
+  paths_pam <- pam(dist_mtx, i);
+  sil <- silhouette(paths_pam$clustering,dist_mtx);
+  sils <- rbind(sils,data.frame(group=i,mean_silhouette=mean(sil[,"sil_width"]),std_silhouette=sd(sil[,"sil_width"])));
+}
+
+ggplot(sils,aes(group,mean_silhouette)) + geom_bar(stat="identity") + scale_x_continuous(breaks = seq(2,29,1)) + ylab("mean silhouette")
+```
+
+2. Gap statistic:
+```{r, cache=TRUE}
+library("factoextra")
+
+clusters_eclust <- eclust(dist_mtx,"agnes",graph=FALSE)
+data.frame(station=station_names$station, cluster=clusters_eclust$cluster)
+fviz_gap_stat(clusters_eclust$gap_stat)
+```
+
+Both mean silhouete barplot and gap statistic suggest k (number of clusters) equal to 3, however after visual inspection of dendrogram and gap statistic barplot (almost no difference between k = 3 and k = 4) we decided to fix k = 4 as optimal.
+```{r, cache=TRUE}
+clusters <- agnes(dist_mtx)
+fviz_dend(clusters, k = 4, rect = TRUE, main = "Dendrogram (k = 4)")
+```
+
+##Stations distances
+Let's visualise the stations' distances using PCA. First, let's compute the variance preserved, then cluster the points using hierarchical clustering and pam.
+```{r, cache=TRUE}
+station_pca <- cmdscale(dist_mtx, eig = TRUE)
+print((station_pca$eig[1] ^ 2 + station_pca$eig[2] ^ 2) / (sum(sapply(station_pca$eig, function(x) x ^ 2))))
+
+station_pam <- pam(dist_mtx, 4)
+station_clusters <- sapply(station_pam$clustering, toString)
+ggplot(as.data.frame(station_pca$points), aes(V1, V2)) + geom_point(aes(color = station_clusters))
+```
+
+The distance is computed from the spent time distribution only. Next plots presents how these distributions differ.
+```{r, cache=TRUE}
+
+station_names <- station_names %>% mutate(cluster = station_clusters)
+time_diffs <- time_diffs %>% mutate(station_cluster = plyr::mapvalues(station, as.vector(station_names$station), as.vector(station_names$cluster)))
+
+ggplot(time_diffs, aes(time_spent, color = station_cluster, fill = station_cluster)) + geom_histogram(aes(y = ..density..), bins = 500) + facet_wrap(~station_cluster) + coord_cartesian(xlim = c(0, 500))
+
+ggplot(time_diffs, aes(time_spent, color = station_cluster, fill = station_cluster)) + geom_histogram(aes(y = ..density..), bins = 500, position = 'fill') + coord_cartesian(xlim = c(0, 500))
+
+```
+
+#Analysis of paths - how people move around exhibition?
+
+##Paths preparation.  
+For string distance, such as Levenstein distance, we need to denote names of stations using one letter.
+We also exclude paths shorter than 10. We do not use Levenstein (or any other similar), since 
+paths are too different
+```{r,  cache=TRUE, warning=FALSE}
+station_names <- time_diffs %>% distinct(station) %>% dplyr::select(station)
+station_names <- station_names %>% mutate(station_char = c(letters, LETTERS, 1:7)) #na sztywno
+
+time_diffs <- time_diffs %>% ungroup() %>% arrange(visitor, enter_time)
+time_diffs <- time_diffs %>% mutate(station_char = plyr::mapvalues(station, as.vector(station_names$station), as.vector(station_names$station_char)))
+
+paths <- time_diffs %>% group_by(visitor, date = as.Date(enter_time)) %>% summarise(path = paste(station_char, collapse = ''))
+paths <- paths %>% mutate(n = nchar(path))
+paths <- paths %>% filter(n >= 10)
+
+```
+
+We use similarity of station visit profile as a distance between paths. Count distance using substitution matrix = similarity of cdf of times spent at station. We sample 1000 paths with length equal to 10 
+because distance matrix is otherwise too big.
+
+```{r,  cache=TRUE, warning=FALSE}
+paths2 <- paths %>%  filter(n == 10) %>% ungroup() %>% sample_n(size=1000)
+
+row.names(dist_mtx) <- station_names$station_char
+colnames(dist_mtx) <- station_names$station_char
+
+paths_dists <- stringDist(paths2$path,method="substitutionMatrix",
+  substitutionMatrix = dist_mtx
+)
+
+hist(paths_dists)
+```
+
+
+##Frequent connections in paths
+Single step probability - we count most frequent connections between stations, conditioning on 
+frequency of first station from pair (we estimate conditional probability). 
+```{r, cache=TRUE}
+time_diffs$day_or_visitor_changed <- as.Date(time_diffs$enter_time) != as.Date(lag(time_diffs$enter_time)) | time_diffs$visitor != lag(time_diffs$visitor)
+time_diffs$day_or_visitor_changed[1] <- FALSE
+
+time_diffs$prev_station <- lag(time_diffs$station)
+time_diffs <- time_diffs %>% mutate(prev_station = replace(prev_station, day_or_visitor_changed, NA))
+
+vis_seq <- time_diffs %>% filter(!is.na(prev_station)) %>% group_by(prev_station, station) %>% summarise(n = n()) %>% mutate(freq = n / sum(n))
+vis_seq <- vis_seq %>% ungroup() %>% dplyr::arrange(desc(freq)) %>% dplyr::slice(1:5)
+vis_seq <- vis_seq %>% transmute(step = paste(prev_station, station, sep = ' -> '), freq = freq)
+vis_seq <- vis_seq %>% mutate(step = factor(step, levels = vis_seq$step[order(freq, decreasing = TRUE)]))
+
+ggplot(vis_seq, aes(step, freq)) + geom_bar(stat = 'identity')
+```
+
+
+##MDS
+```{r, eval=FALSE, include = FALSE}
+#metric MDS
+cmd <- cmdscale(paths_dists)
+plot(cmd)
+shep <- Shepard(paths_dists, cmd)
+plot(shep)
+
+df1 <- data.frame(x = cmd[,1], y = cmd[,2])
+
+```
+
+We perform non-metric Multidimensional Scaling and plot Shepard plot.
+```{r, cache=TRUE}
+newcoord <- isoMDS(as.dist(paths_dists))
+#plot(newcoord$points)
+
+shep <- Shepard(paths_dists, newcoord$points)
+plot(shep)
+
+df2 <- data.frame(x = newcoord$points[,1], y = newcoord$points[,2])
+```
+
+##Cluster paths
+We try to cluster using k-medoids as well as hierarchical clustering, although we don't see clusters on plots after transforming into 2D. But Shepard plots look bad, so transformation is not informative.
+```{r, cache=TRUE}
+#k-medoids
+kmedoids <- pam(paths_dists, 4)
+df2$cluster <- as.factor(kmedoids$clustering)
+
+print(paths2[kmedoids$medoids,])
+
+ggplot(df2, aes(x=x, y=y)) + geom_point(aes(color=cluster))
+
+#hierarchical clustering
+tree1 <- agnes(paths_dists, method = "ward")
+clusters <- factor(cutree(tree1, 4))
+
+summary(clusters)
+df2$cluster <- clusters
+ggplot(df2, aes(x=x, y=y)) + geom_point(aes(color=cluster))
+```
+
+##Stations in path clusters
+We analyze clusters from k-medoids clustering - how often each station occurs in paths from clusters.
+```{r, cache=TRUE}
+
+
+get_freq_ch <- function(st_ch){
+  paths2 <- paths2 %>% mutate(got_st_ch = grepl(st_ch, path), cluster = kmedoids$clustering)
+  paths2_sum <- paths2 %>% group_by(cluster) %>% summarise(ch_freq = sum(got_st_ch) / n())
+  return(paths2_sum$ch_freq)
+}
+
+ch_freqs <- c()
+for(i in 1:dim(station_names)[1]){
+  t1 <- c(get_freq_ch(station_names[i,2]))
+  ch_freqs <- rbind(ch_freqs, t1)
+}
+
+colnames(ch_freqs) <- 1:4
+ch_freqs <- as.data.frame(ch_freqs)
+ch_freqs$station <- station_names$station
+ch_freqs <- gather(ch_freqs, cluster, freq, 1:4)
+
+ggplot(ch_freqs, aes(station, freq)) + geom_bar(position = 'fill', stat = 'identity', aes(fill = cluster)) + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```

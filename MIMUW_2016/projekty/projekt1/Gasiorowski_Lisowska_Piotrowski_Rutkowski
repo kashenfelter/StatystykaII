@@ -19,3 +19,40 @@ Przez obserwacje odstające te boxploty trudno porównać. Między sobą.
 Obcięcie wszystkiego do 500 sekund to dobry pomysł, ale być może należałoby by tez przedstawić to na innych osiach (np. pierwiastkowych)?
 
 Brakuje też komentarzy. Przez to nie wiadomo jaki jest główny wniosek płynący z tych wykresów?
+
+
+
+
+## -------------------------
+## Phase 2
+
+
+Czasem nie widzę związku pomiędzy opisem a kodem.
+Np. 'Znajdujemy aktywnych zwiedzających, tzn. takich, którzy odwiedzili min. 6 eksponatów, ale nie więcej niż 40:'
+a pod spodem kod pokazujący jak wyglądają kwartyle.
+Dopiero 4 linie niżej jest odpowiedni filtr.
+
+W komentarzach piszą państwo co państwo robią, np. 'Patrzymy przy pomocy funkcji Shepard, czy zredukowane dane dobrze zachowują odległości pomiędzy obiektami.'.
+Jest to zupełnie zbędne, bo kod tłumaczy co państwo robią.
+Ale brakuje informacji co udało się państwu odczytać z tych wykresów.
+Jest 'Patrzymy...' a powinno być 'Widzimy że...'
+
+
+Piszą państwo 'Z wykresu dla danych ze zredukowanej przestrzeni możemy określić liczbę możliwych klastrów.'
+ale nie ma informacji ile jest tych klastrów.
+Co więcej, z wykresu w żaden sposób to nie wynika.
+
+Dlaczego 5 klastrów? Dlaczego metodą k-średnich?
+
+Później jest PAM ale bez żadnych komentarzy.
+
+Podsumowując
+Ten skrypt wygląda jak zbiór notatek bez komentarzy.
+nie sposób nazwać do raportem.
+Nie ma w nim żadnych wniosków,
+z przeprowadzonych analiz nic nie wynika.
+
+W pierwszej fazie pisałem 'Brakuje też komentarzy.'
+Do tej fazy mam tą samą uwagę. 
+Jeżeli w raporcie państwo nie interpretują wyników, nie stawiają i weryfikują hipotez to sam raport nie ma wartości, jest tylko zbiorem przypadkowych obrazków i tabel. 
+Proszę poświęcić znaczeni więcej uwagi temu co i po co państwo analizują.

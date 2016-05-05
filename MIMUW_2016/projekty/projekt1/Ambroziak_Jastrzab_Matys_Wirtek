@@ -21,3 +21,51 @@ Na wykresach z godzinami czasem jest godzina8 a czasem nie, czasem jest 2 a czas
 Jest opis czasu interakcji i godziny interakcji. Ale brakuje wniosków wynikających z porównania stacji. 
 
 Co wynika z tych analiz?
+
+
+## -------------------------
+## Faza 2
+
+
+Początek trochę dziwny 'Nasze rozważania podzieliliśmy na dwie części: 1. oraz 2..' Masło maślane.
+
+Podoba mi się pomysł podziału wizytujących pod względem na liczbę odwiedzonych eksponatów. 
+Ale skąd ten wybór punktów podziału (1/5/10/)? Czy to kwartyle? Jakie są liczebności tych grup?
+
+
+Porównanie tych grup w punkcie 'Popularność stacji' mogłoby być ciekawe, ale z obecnego wykresu nie sposób cokolwiek odczytać.
+Tym bardziej, że na wykresach z kolorami nie ma już opisów osi. 
+Potencjalnie ten punkt może mieć ciekawe wnioski, ale proszę temat zgłębić. Obecnie nie sposób porównać te kolorowe wykresy.
+
+
+Podobnie z podziałem na sfery ja/my/oni. Jest potencjał na naprawdę ciekawe pytania, ale same wykresy nic nam nie pokazują.
+Tutaj idealnie nadawałaby się analiza korespondencji. Proszę ją koniecznie przeprowadzić.
+
+
+W przypadku klastrowania k-średnich trzeba przemyśleć dobór odległości.
+Obecnie jak patrzę na te 3 klastry to widzę - klaster osób które spędzają dużo czasu w sumie (1), mało (2) i średni (3).
+Jeżeli to ma być profil to trzeba jakoś unormować te czasy.
+
+Tabela z profila klastrów (pod tym kolorowym barplotem z ggplota) jest interesująca. Pojawia się pytanie na ile przedstawione tam wyniki są stabilne. Może jakaś diagnostyka tego klastrowania?
+
+
+Wykres '10 najczęściej odwiedzanych stacji' jest tak sobie czytelny. A gdyby użyć zamiast niego diagramu Venna?
+
+Co do stacji '29a' to jest to robot rysujący obraz. Nie można go zatrzymać po wystartowaniu. 
+
+Wykres pod 'Powyższy wykres sugeruje, żeby bardziej szczegółowo przyjrzeć się rozkładowi liczby odwiedzanych stacji w rozróżnieniu na grupy.' byłby znacznie bardziej czytelny, gdyby na osi OX przedstawiać te same skale.
+
+Ostatni wykres byłby ciekawy gdyby był czytelniejszy.
+Mapę można wyszarzać lub zrobić półprzezroczystą. Kropki większe.
+Grypa 4 wygląda ciekawie.
+
+
+Podsumowując:
+
+Na plus: zadają Państwo ciekawe i właściwe pytania. To rzadkie. Podejście jest sensowne i widać dobrą intuicję. To jest silna strona.
+
+Na minus: narzędziowo jest tutaj wiele rzeczy do poprawienia. Wykresy robiłbym wyłącznie w ggplot2, z początku będzie ciężko ale warto. Za dużo tych zwykłych słupków. Gdzie wykresy warunkowe, gdzie analiza korespondencji
+
+
+
+ 

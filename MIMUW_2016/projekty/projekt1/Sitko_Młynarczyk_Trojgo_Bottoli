@@ -15,3 +15,24 @@ Left plots are nice. It is good a idea to present only the stations with highest
 
 Right plots are interesting. It’s clear that by comparing distributions you can see how large are differences between stations.
 But note, that after these two plots, you should their distributions. There are presented as vioplots for each station (sorted along average number of interactions / number of activities)
+
+
+
+
+## -------------------------
+## Phase 2
+
+I like your presentation. It has clear question and one can follow your approach and understand results.
+
+So now, after we were discussing EM algorithm and mixtures of distributions, I expect that you will model the interaction time via mixtures. Maybe more than 2 clusters can be identified? Trey to use BIC to find the best number of components.
+
+The 6-th slide is interesting, but again, you can look for some deep relations.
+E.g. If there is an correlation between time spend with CNK07 and average, that about correlation with number of visited stations/total time of interaction.
+(kind of obvious, since the average has the CNK07 as one component, co maybe it should be average among all but CNK07).
+
+Maybe you can find which station is the most 'correlated' with station CNK07. If someone is playing with CNK07 then will be playing longer with XXX.
+
+Comments on slides 8-9 are too short. Much more interesting things are happening there. Add more comments, more notes. Do not be afraid that it will not fit into a single page. Just make sure that all important comments are there. 
+
+In the third phase I will look forward analyses of mixtures and possible: analyses of other stations.
+

@@ -1,0 +1,217 @@
+---
+title: "Projekt 1 faza 2"
+author: "Gabriela Jaworska, Micha³ Jaworski, Jan Rosa"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+#install.packages("lubridate")
+library(lubridate)
+#install.packages("ggplot2")
+library(ggplot2)
+#install.packages("wordcloud")
+library(wordcloud)
+install.packages("igraph")
+
+
+#wybieranie podzbioru 
+
+data1<-subset(smallLogs, smallLogs$scene!="<Scene:CustomSplash sceneId=Splash>")
+data2<-subset(data1, month(data1$date)==3)
+data3<-subset(data2, data2$visitor!=-1)
+splash14<-subset(data3, data3$type=="Entering")
+
+#po³¹czono dzien z gosciem w celu jednoznacznej idtentyfikacji 
+k11<-c(paste(splash14$visitor,mday(splash14$date)))
+k112<-as.data.frame(k11)
+splash14$visitor<-k112$k11
+
+splash24<-splash14
+splash24$date<-NULL
+splash24$visitorstac<-NULL
+splash24$type<-NULL
+splash24$scene<-1
+splash24<-aggregate(.~visitor + station,splash24,sum)
+
+stacja<-as.data.frame(table(B$station))
+stacja<-subset(stacja, stacja$Freq!=0)
+
+B<-splash24
+
+#do³o¿ono kolumny stacji, w celu zbadania gdzie by³ dany visitor 
+for (i in 1:59){
+  B[as.character(stacja$Var1[i])]<-as.numeric(B$station==as.character(stacja$Var1[i]))
+}
+B$station<-NULL
+B$scene<-NULL
+
+tt1<-aggregate(.~visitor,B,sum)
+
+for (i in 2:60){
+  tt1[as.character(stacja$Var1[i-1])]<-sign(tt1[i])
+}
+
+
+tt1$visitor<-NULL
+
+c22<-rowSums(tt1)
+c22<-as.data.frame(c22)
+tt1$liczba<-c22
+tts<-tt1
+#wybieranie grupy goœci (10,20)
+tts<-subset(tts,tts$liczba<=20 & tts$liczba>=10)
+tts<-as.data.frame(tts)
+tts$liczba<-NULL
+tts1<-dist(tts)
+#skalowanie
+y1<-cmdscale(tts1)
+plot(y1)
+
+#klastrowanie
+d2<-hclust(tts1, method="ward")
+kt<-cutree(d2,2)
+kt1<-as.vector(kt)
+kt<-as.factor(kt)
+
+y2<-as.data.frame(y2)
+
+y2$clus<-kt
+ggplot(y2,aes(V1,V2,color=clus))+geom_point() 
+
+
+ttss<-tts
+ttss$clus<-kt1
+table(ttss$clus)
+
+#wybieranie najpopularniejszych stacji
+sss1<-aggregate(.~clus,ttss,sum)
+sss1$clus<-NULL
+sss1[1,]<-sss1[1,]/5525
+sss1[2,]<-sss1[2,]/3181
+sss1[3,]<-sss1[1,]-sss1[2,]
+
+ttss$clus<-NULL
+ttss$liczba<-rowSums(ttss)
+ttss$clus<-kt
+sss3<-aggregate(.~clus,ttss,mean)
+
+c<-sss1[1,]
+cd<-sort(c,partial=59)[46:59]
+c<-sss1[2,]
+cd2<-sort(c,partial=59)[47:59]
+
+#stacje charakterystyczne
+sss1[3,]<-sss1[1,]-sss1[2,]
+c<-sss1[3,]
+cd3<-cd2<-sort(c,partial=47)
+cd3[1:8]
+
+#tworzenie chmury s³ów
+install.packages("wordcloud")
+library(wordcloud)
+View(xxx1)
+xxx1<-colSums(tt1)
+wordcloud(names(xxx1),as.numeric(xxx1),rot.per =0)
+names(xxx1)
+
+# podzbiór goœci 6:9
+tss<-tt1
+tss<-subset(tss,tss$liczba<=9 & tss$liczba>=6)
+tss<-as.data.frame(tss)
+tss$liczba<-NULL
+tss1<-dist(tss)
+
+
+d2<-hclust(tss1, method="ward")
+ktt<-cutree(d2,2)
+kt1<-as.factor(ktt)
+kt2<-as.vector(ktt)
+
+
+ttss<-tss
+
+ttss$clus<-kt2
+table(ttss$clus)
+
+sss2<-aggregate(.~clus,ttss,sum)
+sss2$clus<-NULL
+sss2[1,]<-sss2[1,]/2769
+sss2[2,]<-sss2[2,]/5374
+sss2[3,]<-sss2[1,]-sss2[2,]
+
+ttss$clus<-NULL
+ttss$liczba<-rowSums(ttss)
+ttss$clus<-kt2
+sss3<-aggregate(.~clus,ttss,mean)
+
+c<-sss2[1,]
+cd<-sort(c,partial=47)[53:59]
+c<-sss2[2,]
+cd2<-sort(c,partial=47)[53:59]
+
+sss2[3,]<-sss2[1,]-sss2[2,]
+c<-sss2[3,]
+cd3<-sort(c,partial=47)
+cd3[1:8]
+
+#+21
+tst<-tt1
+tst<-subset(tst,tst$liczba>=21)
+tst<-as.data.frame(tst)
+tst$liczba<-NULL
+tst1<-dist(tst)
+y3<-cmdscale(tst1)
+plot(y3)
+y3<-as.data.frame(y3)
+ggplot(y3,aes(V1,V2))+geom_point()
+
+sss3<-colSums(tst)
+ttss<-tst     
+ttss$liczba<-rowSums(ttss)
+sss4<-colMeans(ttss)
+sss4<-as.data.frame(sss4)
+
+sss3<-sss3/1443
+sss3<-as.data.frame(sss3)
+sss3<-t(sss3)
+c<-sss3
+cd<-sort(c,partial=59)[35:59]
+
+#tworzenie klastrów stacji pod wzglêdem podobieñstwa pod wzglêdem typów odwiedzaj¹cych je klientóW
+s<-sss1
+s[3:5,]<-sss2
+s[5,]<-sss3
+
+s<-t(s)
+s<-as.data.frame(s)
+ss<-dist(s)
+s1<-hclust(ss, method="ward")
+
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+library(ggplot2)
+
+ggplot(y2,aes(V1,V2,color=factor(clus)))+geom_point() 
+ggplot(y1,aes(V1,V2,color=clus))+geom_point() 
+ggplot(y3,aes(V1,V2))+geom_point() 
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
