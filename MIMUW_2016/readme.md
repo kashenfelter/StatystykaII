@@ -26,7 +26,7 @@ Both projects should be executed in teams. Each team should have 3 or 4 people. 
 
 Projects should be presented during each phase. Projects that are not presented will not be scored.
 
-* Project 1 - 
+### Project 1
 
 Exploration and segmentation for data from CNK Science Center.
 
@@ -48,9 +48,31 @@ For the second phase please choose one from following topics (during lectures we
 
 
 
-* Project 2 - 
+### Project 2 
 
 Exploration and prediction for epidemiological data.
+
+We are going to work with extremely interesting dataset – number of cancer cases for different regions, genders, age groups. Find the data description [here](https://www.dropbox.com/s/pk27k65b6co2lu0/desc?dl=0), and the first dataset [here](https://www.dropbox.com/s/a46zo0ra6d4fi1w/dane_BRCA.csv?dl=0).
+
+*The ultimate goal:*
+
+Find and present the predictions for number of cancer cases in different regions of Poland.
+Identify outliers. Compare results for knn and linear regression or two others approaches.
+
+
+*The goal for the phase 1:*
+
+Work only on Breast cancer cases. Perform exploratory analysis. Prepare a knitr presentation with key result. The presentation should be shorter than 10 pages (if the presentation is in html, check the size by the ‘print’ option).
+
+Things to consider in the phase 1:
+
+-	Explore the distribution of cases in different regions.
+-	Try to normalize cases over the size of population (how to find it? Try GUS or other publicly available databases),
+-	Plot the cartogram for these  cases. Here: https://github.com/pbiecek/teryt you can find shape files for counties, here http://www.kevjohnson.org/making-maps-in-r/ you will find instructions how to plot maps with ggplot2
+-	Note that you can work on the level of voivodeship or level of county – it’s up to you. 
+-	Note that you can work on single gender or both genders – it’s up to you,
+-	Note that you can work on all age groups combined or do analyses for them independently – up to you.
+
 
 Grade:
 ------
