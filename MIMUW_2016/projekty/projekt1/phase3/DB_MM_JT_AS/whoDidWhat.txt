@@ -4,7 +4,7 @@ Davide Bottoli:
 
 Magda M³ynarczyk:
 	- other stations vs. CNK07 (not included),
-	- two clusters analysis (clustering by scenes counts vectors),
+	- two clusters results analysis (clustering by scenes counts vectors),
 	- association rules (not included).
 
 Jakub Trojgo:
