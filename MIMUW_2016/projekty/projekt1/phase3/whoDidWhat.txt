@@ -1,0 +1,20 @@
+Davide Bottoli:
+	- the Stroop effect analysis - is it proven by data?
+	- association rules (not included).
+
+Magda M³ynarczyk:
+	- other stations vs. CNK07 (not included),
+	- two clusters analysis (clustering by scenes counts vectors),
+	- association rules (not included).
+
+Jakub Trojgo:
+ 	- two clusters results analysis (clustering by scenes counts vectors),
+	- five clusters results analysis.
+
+Agnieszka Sitko:
+	- the Stroop effect analysis - is it proven by data?
+	- EM algorithm clustering (Comment: Yes, when I apply some 
+		transformation to the data, clusters look much better),
+	- presentation.
+
+
