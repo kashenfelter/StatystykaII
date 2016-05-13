@@ -68,6 +68,37 @@ Ale jeżeli wierzą Panie że to klastrowanie jest sensowne to warto 1. zrobić 
 I przyda się uzasadnienie, dlaczego odległość na parach jest dobra,
 
 
+## -------------------------
+## Phase 3
+
+1. Proficiency in tools	
+
+Wykorzystano większość omawianych metod.
+Pojawiły się reguly, pam, agnes, isoMDS, shepard, odległości z użyciem pakietu vegan, którego nie omawialiśmy.
+Więc pod tym względem jest dobrze.
+
+2. Structure and conclusions	
+
+Czytelna struktura, sensownie opisane wyniki, dobrze doprane statystyki.
+
+Dobrze, że wyniki dot. skalowania są w załączniku.
+
+Dobra proporcja opisów do umieszczonych wyników.
+
+3. Adequacy
+
+Generalnie dobrze. 
+Jest dyskusja i uzasadnienie metod, wybierane są metody z właściwych pakietów.
+
+Wykonywanie reguł asocjacyjnych na przejściach pomiędzy parami eksponatów pozwala na umieszczenie na mapie strzałek.
+O ile grupowanie na przejściach jest moim zdaniem słabym pomysłem, to dla arules jest to dobre rozwiązanie.
+
+Najsłabiej opisana jest część 'Analiza składowych głównych dla klastrów'. 
+Nie jest dla mnie jasne co ta analiza PCA miałaby dać / dała do analizy ścieżek. 
+Dodatkowo, jeżeli potrzeba 6 składowych by wyjaśnić 20% zmienności, to raczej jest to sygnał, że PCA żadnej struktury nie oddaje w niskim wymiarze. A przedstawić wszystkich 6 składowych jest trudno (ta próba z kropkami jest ciekawa, ale moim zdaniem nieczytelna).
 
 
+Punkty:
+
+100% / 100% / 90%
 
