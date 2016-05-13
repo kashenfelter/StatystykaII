@@ -37,4 +37,50 @@ może i tak jest. Ale te trudności muszą państwo jakoś pokonać, a nie ogran
 
 Na fazę 3 jest dużo prac do wykonania aby bliżej poznać te dane i zawarte w nich wzorce. Sugeruję przyjrzeć się wynikom innych grup, może będą inspirujące.
 
+## -------------------------
+## Phase 3
+
+1. Proficiency in tools	
+
+Wykorzystano wiele technik arules, pca, pam, shilouette, shepard (choć trudno cokolwiek odczytać), ggplot2.
+Kod jest zwięzły, z punktu widzenia narzędziowego jest to całkowicie dobre i poprawne rozwiązanie.
+
+2. Structure and conclusions	
+
+Struktura przyzwoita, choć wyjaśnienia i komentarze bardzo skromne i właściwie nieczytelne dla zewnętrznego czytelnika
+
+Z niektórymi komentarzami nie potrafię się zgodzić, np: "Na podstawie uzyskanych rezultatów wnioskować też możemy, że jeśli doszło do interakcji z eksponatem CNK25, wówczas na ogół nie dochodziło do interakcji z innymi eksponatami, w szczególności z eksponatem CNK11, CNK02, CNK19."
+Ja takiego wykluczenia nie widzę.
+
+Wnioski bardzo ubogie, pojedyncze zdania, które toną pomiędzy wykresami i tabelami.
+
+Tabele i wykresy są umieszczane czasem niepotrzebnie, brakuje selekcji, są umieszczne nic nieznaczące wyniki z R, np.
+## initial  value 40.106331 
+## iter   5 value 21.103210
+## iter  10 value 14.572723
+## iter  15 value 13.842236
+## final  value 13.793723 
+## converged
+
+W tabelach 'Klastrowanie odwiedzających' jest morze liczb, ale bez dodatkowego komentarza są one nieczytelne.
+
+Wnioski i selekcja wyników to najsłabsza strona tego raportu. 
+
+3. Adequacy
+
+Podział stacji na obszary to dobry pomysł, choć można by było kolejne wyniki przedstawiać dla podobszarów nie poszczególnych eksponatów.
+
+W całym raporcie brakuje uzasadnień, jest komentarz "Jednak podział zwiedzających na grupy nie jest w pełni czytelny." ale nie ma uzasadnienia dlaczego nie jest.
+
+Na wykresie korelacji jest na legendzie 'lift' więc w sumie trudno odgadnąć co to do końca jest przedstawione na tym wykresie.
+
+Przy grupowaniu i klastrowaniu zabrakło dyskusji dlaczego akurat isoMDS i dlaczego akurat pam, dlaczego akurat taka odległość.
+
+Zbudowano kilka alternatywnych grupowań, w oparciu o reguły asocjacyjne, o PCA i o pam, ale te grupowania nie są porównane 
+
+Są wyniki, ale brakuje uzasadnienia że są one dobre.
+
+
+Oceny za kryteria
+100%, 50%, 60%
 

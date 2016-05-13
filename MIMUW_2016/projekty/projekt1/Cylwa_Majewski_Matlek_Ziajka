@@ -57,5 +57,32 @@ Na plus: Używanie reguł asocjacyjnych, wizualizacja tych reguł.
 Na minus: Brak wniosków i planów na kolejny krok (tzn. może i są, ale nie w raporcie)
 
 
+## -------------------------
+## Phase 3
 
+1. Proficiency in tools	
+
+Ładnie wykonane, ale tylko reguły arules i analiza ścieżek.
+Nie ma ani grupowania, ani skalowania, a nie nawet przedstawiania rozkładów czy statystyki opisowej.
+
+2. Structure and conclusions	
+
+Brakuje postawionych pytań, nie ma do nich odpowiedzi. 
+Są wyniki ale niewystarczająco skomentowane. Z raportu trudno odgadnąć co wyszło i dlaczego. 
+Pierwszy wykres jest mało czytelny ponieważ jest kilkukrotnie za mały, więc komentarz 'It can be easily seen that the majority of visitors is very active ' nie pasuje - nic nie widać.
+
+Przedstawione wyniki powinny być znacząco rozbudowane - uzupełnione.
+
+3. Adequacy
+
+Ładne obrazki, ale mało R.
+Wybór arules jest uzasadniony, ale nie było żadnej dyskusji nt. doboru parametrów.
+
+Generalnie za mało jest w tym raporcie! 
+Poprzednia faza wyglądała równie dobrze i niewiele ciekawych rzeczy przybyło.
+
+
+Punktacja:
+
+60% / 40% / 60%
 

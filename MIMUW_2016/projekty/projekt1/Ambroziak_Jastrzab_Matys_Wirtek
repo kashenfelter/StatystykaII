@@ -46,7 +46,7 @@ W przypadku klastrowania k-średnich trzeba przemyśleć dobór odległości.
 Obecnie jak patrzę na te 3 klastry to widzę - klaster osób które spędzają dużo czasu w sumie (1), mało (2) i średni (3).
 Jeżeli to ma być profil to trzeba jakoś unormować te czasy.
 
-Tabela z profila klastrów (pod tym kolorowym barplotem z ggplota) jest interesująca. Pojawia się pytanie na ile przedstawione tam wyniki są stabilne. Może jakaś diagnostyka tego klastrowania?
+Tabela z profilami klastrów (pod tym kolorowym barplotem z ggplota) jest interesująca. Pojawia się pytanie na ile przedstawione tam wyniki są stabilne. Może jakaś diagnostyka tego klastrowania?
 
 
 Wykres '10 najczęściej odwiedzanych stacji' jest tak sobie czytelny. A gdyby użyć zamiast niego diagramu Venna?
@@ -67,5 +67,47 @@ Na plus: zadają Państwo ciekawe i właściwe pytania. To rzadkie. Podejście j
 Na minus: narzędziowo jest tutaj wiele rzeczy do poprawienia. Wykresy robiłbym wyłącznie w ggplot2, z początku będzie ciężko ale warto. Za dużo tych zwykłych słupków. Gdzie wykresy warunkowe, gdzie analiza korespondencji
 
 
+## -------------------------
+## Phase 3
+
+1. Proficiency in tools	
+
+Wykorzystane narzędzia to analiza korespondencji, k-średnich, wykres sylwetki, statystyka opisowa w ggplot2.
+Zabrakło mi i skalowania wielowymiarowego, które można by wykorzystać i dyskusji dlaczego k-średniach a nie coś innego (pam/agnes).
+
+
+2. Structure and conclusions	
+
+Jest sporo wyników, ale piszą państwo co zrobili 'Sprawdziliśmy ilość odwiedzin poszczególnych ....' a nie jakie są wyniki.
+A to drugie jest znacznie ważniejsze.
+
+Bardzo trudno było mi uchwycić ciągłość w prezentowanych działaniach. 
+Najpierw jakiś podział na grupy, później ca, nie wiadomo do końca jasne było po co to ca i po co wstęp teoretyczny (dla innych metod go nie ma), później inny podział na grupy.
+
+W niektórych miejscach opisują państwo wykres językiem naturalnym np. 'Niskie wartości na tej osi osiągają stacje, które są charakterystyczne dla osób z podgrupy (0,2].' ale nie piszą jakie są wnioski z tych obserwacji, co wynika z tych analiz.
+
+Są wnioski 'Podobne potwierdzenie znajdujemy dla stref: w porównaniu do innych podgrup, dla podgrupy (0,2] obserwujemy, że strefa JA_TY przyjmuje większe wartości, a strefa JA_MY_ONI mniejsze. Oraz dla podgrupy (9,51] widzimy, że strefa JA_MY_ONI przyjmuje zbliżony wynik do najpopularniejszej strefy JA.' 
+ale nie wiadomo co ten opis znaczy. 
+Coś przyjmuje większe wartości lub mniejsze. Ale nie ma tu syntezy!
+
+Druga część pod tym względem wygląda lepiej, ale rodzi pytanie dlaczego całość jest taka niespójna
+
+Co to za słowo 'Klastracja'?
+
+
+
+3. Adequacy
+
+Wykorzystano wiele metod, ale zabrakło ich porównania. Zestawienia wyników kończą się opisem 'wyniki obu metod są podobne, w rezultacie trudno ocenić, która jest lepsza. '
+Jeżeli na jednym przykładzie trudno porównać która jest lepsza, to trzeba było wykonać inne zestawienie.
+
+Podział zwiedzających pod kątem kwartyli liczby odwiedzonych eksponatów wydaje się dobrym pomysłem, ale w trakcie raportu został chyba porzucony.
+
+Dla grupowania zabrakło dyskusji jaką metrykę/odległość wybrać i jaką metodę grupowania wybrać (pam/k-średnich/agnes)
 
  
+
+Punktacja:
+
+80% / 40% / 45%
+
