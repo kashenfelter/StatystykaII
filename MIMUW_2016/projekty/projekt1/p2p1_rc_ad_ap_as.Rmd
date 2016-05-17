@@ -1,0 +1,442 @@
+---
+title: "Project 2 - phase 1"
+author: "Cylwa, D¹browska, Paluszyñska, Sitko"
+date: "15 maja 2016"
+output: 
+    html_document: 
+        toc: true
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+remove(list = ls())
+setwd("C:/Users/Rafal/Documents/Statystyka II/Projekt2")
+library(ggplot2)
+library(rgdal)
+library(scales)
+library(dplyr)
+library(data.table)
+library(maptools)
+library(maps)
+library(RColorBrewer)
+library(classInt) 
+library(reshape)
+library(knitr)
+library(gridExtra)
+```
+## Introduction
+In this report we present some explanatory analysis of the data concerning breast cancer (BRCA) detection in Poland in years 2010, 2011, 2012. The data contains information about number of new cases of BRCA along with information about gender, age group, and region of detection. We divided our analysis into parts by analysing each feature separately.
+
+
+We load geographical data about Polish subregions from https://github.com/pbiecek/teryt. During the analyzed period 'Wa³brzych' subregion (TERYT4: 265) was a part of 'wa³brzyski' subregion (TERYT4: 221), so we decided to merge areas of those subregions.
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# Wczytujemy dane do rysowania mapy powiat?w.
+setwd("C:/Users/Rafal/Documents/Statystyka II/Projekt2")
+tract <- readOGR("raw_data", layer = "powiaty")
+tract <- fortify(tract, region = "jpt_kod_je")
+tract <- data.table(tract)
+tract$id <- as.integer(tract$id)
+colnames(tract)[6] <- "TERYT4"
+tract$TERYT4[tract$TERYT4 == 265] <- 221
+```
+
+```{r}
+setwd("C:/Users/Rafal/Documents/Statystyka II/Projekt2")
+load("brca_uzupelnione.rda")
+
+# Data for density plots
+data <- brca
+data$new <- rowSums(data[,8:11])
+data[,8:11] <- data[,8:11]/data[,17]
+temp <- melt(data, id.vars = c("TERYT4", "ICD10", "GENDER", "AGE_GROUP", "region", "subregion", "year", "all", "male", "female", "powiat", "city", "new")) # it's convenient to have all stages in one column for using ggplot2
+
+# Data for maps: we calculate the mean over years as we show that the years do not differ
+brca <- brca %>% group_by(GENDER, AGE_GROUP, TERYT4, region, subregion, all, male, female, powiat, city) %>%
+      summarise(Stage1 = sum(Stage1) / 3,
+                Stage2 = sum(Stage2) / 3,
+                Stage3 = sum(Stage3) / 3, 
+                Stage4 = sum(Stage4) / 3)
+
+brca <- data.table(brca)
+brca[, new := Stage1 + Stage2 + Stage3 + Stage4]
+```
+
+##Distribution of cancer stages across time
+
+First of all we would like to see whether there is any difference between the distributions of stages of cancer across time. Each of the examined year had the following number of breast cancer cases:
+```{r, fig.align = 'center'}
+library(Hmisc)
+table(temp$year)
+ggplot(temp, aes(factor(year), value, color = factor(year), fill = factor(year),  weight=new)) + geom_violin() + ylim(0,1) + xlab("Year") + ylab("Density, dot marks the mean") + theme(legend.position="none") + ggtitle("Distribution of canser stages across years") + facet_wrap(~variable) + stat_summary(fun.data = "mean_cl_boot", colour = "black", size = 1)
+```
+
+From the above plot it is clear, that the distributions of breast cancer stages is persistent throughout the years for which we have data. Therefore, in the rest of our analysis we ignore the time dimension (to do that we first average out the time dimension in our database).
+
+##General distribution of cancer stages
+
+###Basic analysis
+
+Now let us look at the distribution of breast cancer stages for all cases in the database. In the plot below we can see that:
+
+- the mean is greatest for Stage 2 and smallest for Stage 1,
+- the mass of the distribution of Stage 1 is mainly around small values, which can mean that if a person is diagnosed fith cancer early on (Stage 1) it usually develops to further stages, so that the share of Stage 1 is small,
+- the distribution of Stage 2 is the least peaked of all: there are a lot of cases that have a share of Stage 2 greater than half; this suggests that Stage 2 does not proceed to further stages (or retreat to Stage 1) fast,
+- the distribution of Stage 3 is concentrated around a quarter - this is also the case for Stage 4 but the two distrigutions are very much different: the second one is highly skewed with some proportion of cases that are fully Stage 4.
+
+```{r, fig.align = 'center'}
+ggplot(temp, aes(variable, value, color = variable, fill = variable,  weight=new)) + geom_violin() + xlab("Stage of breast cancer") + ylab("Density, dot marks the mean") + theme(legend.position="none") + ylim(0,1) + ggtitle("Distribution of stages of breast cancer") + stat_summary(fun.data = "mean_cl_boot", colour = "black", size = 1)
+```
+
+So now let us visualise the distribution of stages on the map. We plot the distribution of new breast cancer cases in Polish subregions. The cartogram below shows numbers of new cases for each 100 000 people in a given subregion.
+```{r, fig.width = 8, fig.height = 7, fig.align = 'center'}
+plotData <- left_join(tract, brca %>% group_by(TERYT4, all) %>% 
+                            summarise(Stage1 = sum(Stage1),
+                                      Stage2 = sum(Stage2),
+                                      Stage3 = sum(Stage3),
+                                      Stage4 = sum(Stage4),
+                                      new = sum(new)))
+plotData <- data.table(plotData)
+attach(plotData)
+
+colors <- brewer.pal(3, "YlOrRd")
+
+
+theme <- theme_bw() + 
+      theme(axis.text = element_blank(), plot.title = element_text(face="bold"), axis.title = element_blank())
+
+createCartogram <- function(variable, breaks, title, legend){
+      ggplot() +
+      geom_polygon(data = plotData, aes(x = long, 
+                                        y = lat, 
+                                        group = group,
+                                        fill = factor(findInterval(variable, breaks, all.inside = TRUE))), 
+                   color = "black", size = 0.25) + 
+      scale_fill_manual(labels = c("low", "medium", "high"),
+                        values = colors,
+                        name = legend) +
+      ggtitle(title) +
+      theme
+}
+
+stages <- brca %>% group_by(TERYT4) %>% 
+                            summarise(Stage1 = sum(Stage1),
+                                      Stage2 = sum(Stage2),
+                                      Stage3 = sum(Stage3),
+                                      Stage4 = sum(Stage4),
+                                      new = sum(new), 
+                                      pop = mean(all))
+M <- 100000
+
+breaks <- classIntervals(M * stages$new / stages$pop, n = 3, style = "quantile")$brks
+
+createCartogram(M * new / all, 
+                breaks, 
+                "Number of new breast-cancer-cases\nper 100 000 inhabitants\nby subregions (2010-2012)",
+                "Number of\nnew cases")
+```
+
+In the graphic above regions are divided into three categories:
+<ul>
+ <li> low - between 22.8 and 38.3 new cases per 100 000 in a year, </li>
+ <li> medium - between 38.3 and 46.9 new cases per 100 000 in a year,</li>
+ <li> high - between 46.9 and 105 new cases per 100 000 in a year.</li>
+</ul>
+
+###Analysis of stages by voivodship
+
+Now let us look at the differences between means of the stages between voivodeships. In the plot below we can see three voivodeships that stand out:
+
+- Dolnoœl¹skie has the highest share of Stage 1, so probably does a good job in diagnosing the cancer fast; it seems to only offset the share of Stage 2 as other stages are not much smaller in this voivodeship than in others,
+- Œwiêtokrzyskie and Opolskie have a very high share of Stage 2 and small of Stage 3 - it seems like for some reason the cancer cases stay longer in Stage 2; only in Opolskie this also translates to a smaller share of Stage 4 so we can suspect that this voivodeship does a good job in stopping the development of breast cancer.
+
+```{r, fig.align = 'center'}
+df_woj <- aggregate(cbind(Stage1, Stage2, Stage3, Stage4) ~ region, data, mean)
+wykres1 <- melt(df_woj, id.vars = "region")
+wykres1$region <- factor(wykres1$region, levels = 2*(1:16), labels = c("Dolno?l?skie", "Kujawsko-pomorskie", "Lubelskie", "Lubuskie", "??dzkie", "Ma?opolskie", "Mazowieckie", "Opolskie", "Podkarpackie", "Podlaskie", "Pomorskie", "?l?skie", "?wi?tokrzyskie", "Warmi?sko-mazurskie", "Wielkopolskie", "Zachodniopomorskie"))
+wykres1 <- within(wykres1, region <- factor(region, levels=wykres1[order(wykres1[wykres1$variable == "Stage1", "value"], decreasing = TRUE), "region"]))
+ggplot(wykres1, aes(x = region, y = value, fill = variable)) + geom_bar(stat = "identity") + theme(axis.text.x=element_text(angle = 45, hjust = 1)) + guides(fill=guide_legend(title="Stage of cancer")) + ylab("Mean fraction of a case") + xlab("Voivodeship") + ggtitle("Mean profile of the disease by voivodeship")
+```
+
+###Analysis of stages by subregion
+
+Now we plot distribution of diagnosis in subregions according to the stage. 
+
+We look for regions where cancer cases are detected during their earier stages. It turns out that Lower Silesia is an area with the high percentage of the first stage diagnosis, Pomeranian Lakeland with the second stage diagnosis.
+```{r, fig.align = 'center', cache = TRUE}
+stage1 <- createCartogram(Stage1 / new, classIntervals(stages$Stage1 / stages$new, n = 3, 
+                                                    style = "quantile")$brks,
+                                     paste0("Fraction of stage", 1, "\nin all new cases"),
+                                     "Fraction in\nnew cases")
+
+stage2 <- createCartogram(Stage2 / new, classIntervals(stages$Stage2 / stages$new, n = 3, 
+                                                    style = "quantile")$brks,
+                                     paste0("Fraction of stage", 2, "\nin all new cases"),
+                                     "Fraction in\nnew cases")
+
+stage3 <- createCartogram(Stage3 / new, classIntervals(stages$Stage3 / stages$new, n = 3, 
+                                                    style = "quantile")$brks,
+                                     paste0("Fraction of stage", 3, "\nin all new cases"),
+                                     "Fraction in\nnew cases")
+
+stage4 <- createCartogram(Stage4 / new, classIntervals(stages$Stage4 / stages$new, n = 3, 
+                                                    style = "quantile")$brks,
+                                     paste0("Fraction of stage", 4, "\nin all new cases"),
+                                     "Fraction in\nnew cases")
+
+
+grid.arrange(stage1, stage2, stage3, stage4, ncol = 2, nrow = 2)
+```
+
+In the cartograms above we let the scale free to see regional differences. In different maps colors are selected independently, according to quantiles of a variable presented in the map. Intervals for groups "low", "medium" and "high" may be found below. 
+```{r}
+intervals <- matrix(, 4,4)
+
+for(i in 1:4){
+      intervals[i,] <- round(classIntervals(get(paste0("Stage", i)) / new, n = 3, style = "quantile")$brks, 2)
+}
+rownames(intervals) <- c("Stage1", "Stage2", "Stage3", "Stage4")
+intervals <- data.frame(intervals)
+
+for(i in 1:3){
+      intervals[,i] <- paste0(intervals[,i], " - ", intervals[,i+1])
+}
+intervals <- intervals[,-4]
+colnames(intervals) <- c("low", "medium", "high")
+kable(intervals)
+
+rm(stage1, stage2, stage3, stage4, stages)
+```
+
+
+### Shares of BRCA stages in all new cases cities versus non cities
+```{r, echo = FALSE, warnings = FALSE}
+stages_by_age_city <- brca %>% 
+  mutate(all_cases = Stage1 + Stage2 + Stage3 + Stage4) %>% group_by(city) %>% 
+  summarise("1" = sum(Stage1 / sum(all_cases)),
+            "2" = sum(Stage2 / sum(all_cases)), 
+            "3" = sum(Stage3 / sum(all_cases)), 
+            "4" = sum(Stage4 / sum(all_cases)))
+
+# porownanie miast i nie-miast
+
+long_stages_by_age_city <- 
+  reshape(as.data.frame(stages_by_age_city), direction="long", varying=list(names(stages_by_age_city)[2:5]), v.names="Value", 
+          idvar=c("city"), timevar="Stage", times=c("1", "2", "3", "4"))
+
+stages_in_cities_plot <- ggplot(long_stages_by_age_city, aes(x = city, y = Value)) +   
+  geom_bar(aes(fill = Stage), position = "dodge", stat="identity") + 
+  labs(title = "Stages in cities (right) vs non-cities (left)")
+
+stages_in_cities_plot
+```
+
+We observe almost no difference between cities and non-cities which may seem a bit counterintuitive.
+
+
+
+### Ranking of cities with respect to number of new BRCA cases
+```{r, echo = FALSE}
+# Ranking of cities with respect to number of new cases
+stages_in_city <- brca %>% 
+  filter(city == 1) %>%
+  mutate(all_cases = Stage1 + Stage2 + Stage3 + Stage4, new_relative = all_cases/all) %>% 
+  group_by(powiat) %>%
+  summarise(new_perc = sum(new_relative)) %>%
+  arrange(desc(new_perc))
+
+stages_in_cities_plot <- ggplot(stages_in_city[1:10, ], aes(x = powiat, y = new_perc)) + 
+  geom_bar(stat = "identity", fill = "skyblue") + coord_flip() + labs(x= "Top 10 cities", y = "Relative number of new BRCA cases")
+  
+stages_in_cities_plot
+```
+
+We chose top 10 cities and Sopot clearly stands out from all others - interesting.
+
+##Distribution of cancer stages by gender
+
+###Basic analysis
+
+Let us continue by dividing our observations by gender. It is not surprising that there are many more (aroung 6 times more) breast cancer cases among women than men.
+```{r, fig.align = 'center'}
+table(temp$GENDER)
+# Calculate proper weights - otherwise the density plot for men is not going to be visible
+temp_sums <- aggregate(new ~ GENDER + variable, temp, sum)
+temp <- merge(temp, temp_sums, by = c("GENDER", "variable"))
+temp$weight <- temp$new.x/temp$new.y
+ggplot(temp, aes(GENDER, value, color = GENDER, fill = GENDER,  weight=weight)) + geom_violin() + xlab("Gender") + ylab("Density, dot marks the mean") + theme(legend.position="none") + ylim(0,1) + ggtitle("Distribution of stages depending on gender") + stat_summary(fun.data = "mean_cl_boot", colour = "black", size = 1) + facet_wrap(~variable)
+```
+
+The above plot shows a fundamental difference between breast cancer among men an women: the density for the first three stages is concentrated around values less than 10%, whereas for the fourth stage it is trimodal: the greatest mass is around one, then there is a bump near zero and an even smaller one around 0.6. This implies that
+
+- a lot of men do not get diagnosed in an early stage, and even if they are the cancer develops fast into further stages,
+- there is an alarming number of men that get diagnosed with full stage four, this may be due to big differences in symptoms of breast cancer in men and women or (more convincigly) due to a lack of periodical check ups for this type of cancer among men,
+- although the distribution of the stages among women are similar to those in the whole sample (due to an overwhelming majority of women), there appears to be a bimodality in the distribution of Stage 4, which was not visible in the plot for the whole sample - there seems to be a significant fraction of women that do not get to Stage 4 (or the cancer retreats).
+
+###Analysis of stages by subregion
+
+Now let us see how the diagnostics vary geographically. Below we present number of a given stage diagnosis per 100 000 inhabitants of a particular gender. This time we set scale fixed to see global differences. 
+
+Categories for men are:
+<ul>
+ <li> low - regions with no male breast cancer cases, </li>
+ <li> medium - between 0.01 and 0.8 new cases per 100 000 in a year,</li>
+ <li> high - between 0.8 and 13.1 new cases per 100 000 in a year.</li>
+</ul>
+
+Categories for women are:
+<ul>
+ <li> low - between 0 and 12.4 new cases per 100 000 in a year, </li>
+ <li> medium - between 12.4 and 26.7 new cases per 100 000 in a year,</li>
+ <li> high - between 26.7 and 88.2 new cases per 100 000 in a year.</li>
+</ul>
+
+
+```{r, fig.align = 'center', cache = TRUE}
+men <- filter(brca, GENDER == "M") 
+men <- men %>% group_by(TERYT4) %>% 
+                            summarise(Stage1 = sum(Stage1),
+                                      Stage2 = sum(Stage2),
+                                      Stage3 = sum(Stage3),
+                                      Stage4 = sum(Stage4),
+                                      new = sum(new),
+                                      male = mean(male))
+men <- data.table(men)
+
+
+men[,s1 := M * Stage1 / male]
+men[,s2 := M * Stage2 / male]
+men[,s3 := M * Stage3 / male]
+men[,s4 := M * Stage4 / male]
+
+men <- men[,-(2:6), with = FALSE]
+
+plotData <- left_join(tract, men, by = "TERYT4", all.x = TRUE)
+
+plotData <- data.table(plotData)
+plotData[is.na(plotData)] <- 0
+attach(plotData)
+
+tmp <- c(men$s1, men$s2, men$s3, men$s4)
+br <- c(0, classIntervals(tmp[tmp > 0], n = 2, style = "quantile")$brks)
+
+stage1 <- createCartogram(s1, br, paste0("Male stage", 1, "-cases\nper 100 000 men"),
+                                     "Number of\nnew cases")
+
+stage2 <- createCartogram(s2, br, paste0("Male stage", 2, "-cases\nper 100 000 men"),
+                                     "Number of\nnew cases")
+
+stage3 <- createCartogram(s3, br, paste0("Male stage", 3, "-cases\nper 100 000 men"),
+                                     "Number of\nnew cases")
+
+stage4 <- createCartogram(s4, br, paste0("Male stage", 4, "-cases\nper 100 000 men"),
+                                     "Number of\nnew cases")
+
+
+grid.arrange(stage1, stage2, stage3, stage4, ncol = 2, nrow = 2)
+rm(stage1, stage2, stage3, stage4, men)
+```
+
+Majority of men are diagnosed with the fourth-stage breast cancer.
+
+```{r, fig.align = 'center', cache = TRUE}
+women <- filter(brca, GENDER == "K")
+women <- women %>% group_by(TERYT4) %>% 
+                            summarise(Stage1 = sum(Stage1),
+                                      Stage2 = sum(Stage2),
+                                      Stage3 = sum(Stage3),
+                                      Stage4 = sum(Stage4),
+                                      new = sum(new),
+                                      female = mean(female))
+
+women <- data.table(women)
+
+women[,s1 := M * Stage1 / female]
+women[,s2 := M * Stage2 / female]
+women[,s3 := M * Stage3 / female]
+women[,s4 := M * Stage4 / female]
+
+women <- women[, -(2:7), with = FALSE]
+
+tmp <- c(women$s1, women$s2, women$s3, women$s4)
+br <- classIntervals(tmp, n = 3, style = "quantile")$brks
+
+plotData <- left_join(tract, women)
+attach(plotData)
+stage1 <- createCartogram(s1, br, paste0("Female stage", 1, "-cases\nper 100 000 women"),
+                                     "Number of\nnew cases")
+
+stage2 <- createCartogram(s2, br, paste0("Female stage", 2, "-cases\nper 100 000 women"),
+                                     "Number of\nnew cases")
+
+stage3 <- createCartogram(s3, br, paste0("Female stage", 3, "-cases\nper 100 000 women"),
+                                     "Number of\nnew cases")
+
+stage4 <- createCartogram(s4, br, paste0("Female stage", 4, "-cases\nper 100 000 women"),
+                                     "Number of\nnew cases")
+
+
+grid.arrange(stage1, stage2, stage3, stage4, ncol = 2, nrow = 2)
+rm(women)
+```
+
+Majority of women are diagnosed with the third-stage breast cancer.
+
+##Distribution of cancer stages by age group
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(reshape)
+library(raster)
+library(sp)
+library(rgdal)
+library(rgeos)
+library(maptools)
+library(ggplot2)
+
+setwd("C:/Users/Rafal/Documents/Statystyka II/Projekt2")
+brca <- read.table("dane_BRCA.csv", h=T, sep=";", dec=",")
+
+brca <- brca %>% 
+  group_by(ICD10, GENDER, AGE_GROUP, TERYT4, region, subregion, year) %>%
+  summarise(Stage1 = sum(Stage1), 
+            Stage2 = sum(Stage2), 
+            Stage3 = sum(Stage3), 
+            Stage4 = sum(Stage4))
+```
+
+```{r, echo = FALSE}
+# Let's see what are the shares of cancer stages in all new cases in distinct age groups
+stages_by_age <- brca %>% 
+  mutate(all_cases = Stage1 + Stage2 + Stage3 + Stage4) %>% group_by(AGE_GROUP) %>% 
+  summarise("1" = sum(Stage1 / sum(all_cases)),
+            "2" = sum(Stage2 / sum(all_cases)), 
+            "3" = sum(Stage3 / sum(all_cases)), 
+            "4" = sum(Stage4 / sum(all_cases)))
+
+# Changing to long format
+long_stages_by_age <- 
+  reshape(as.data.frame(stages_by_age), direction="long", varying=list(names(stages_by_age)[2:5]), v.names="Value", 
+        idvar=c("AGE_GROUP"), timevar="Stage", times=c("1", "2", "3", "4"))
+
+# Plot "Stages in age groups"
+stages_in_groups_plot <- ggplot(long_stages_by_age, aes(x = AGE_GROUP, y = Value)) +   
+  geom_bar(aes(fill = Stage), position = "dodge", stat="identity") + labs(title = "Stages in age groups")
+```
+
+
+### Shares of BRCA stages in all new cases in distinct age groups
+
+```{r, echo = FALSE}
+stages_in_groups_plot
+```
+
+We observe from the plot that:
+
+- the share of Stage 4 in all new cases increases along with the age
+
+- the share of Stage 1 does not differ significantly between age groups
+
+- shares of Stage 2 and 3 rather tend to decrease along with age
