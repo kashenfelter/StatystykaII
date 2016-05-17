@@ -13,10 +13,10 @@ Schedule MIM UW:
 * 19-20 IV  [Exploration], [Decision rules](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/rules.html), [Lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/lab6.Rmd)
 * 26-27 IV  [Prediction], [Regression, kNN, trees, model quality measures, pages 9-32 from EoSL](http://statweb.stanford.edu/~tibs/ElemStatLearn/), [Project 1 phase 3], [Lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/lab7.Rmd)
 * 10-11 V   [Prediction], [Regression with many variables, model selection, chapters 7.1-7.5, 7.7](http://statweb.stanford.edu/~tibs/ElemStatLearn/),
-* 17-18 V   [Prediction], [Regularisation, feature extraction, chapter 3.4](http://statweb.stanford.edu/~tibs/ElemStatLearn/), [Project 2 phase 1]
+* 17-18 V   [Prediction], [Regularisation, feature extraction, chapter 3.4](http://statweb.stanford.edu/~tibs/ElemStatLearn/), [Project 2 phase 1], [Lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/lab8.Rmd)
 * 24-25 V   [Prediction], Classification LDA, QDA, logistic regression
-* 31-1 V    [Prediction], SVM [Project 2 phase 2]
-* 7-8 VI    [Prediction], Bagging, boosting, random forest 
+* 31-1 V    [Prediction], Bagging, boosting, random forest [Project 2 phase 2]
+* 7-8 VI    [Prediction], SVM 
 * 14-15 VI  [Verification], Multiple hypotheses testing, [Project 2 phase 3]
 
 Projects:
