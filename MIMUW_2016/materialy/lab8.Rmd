@@ -1,0 +1,53 @@
+---
+title: "Lab8"
+author: "put your name here"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Real data example
+
+Wine Quality Data Set is quite interesting dataset with 12 variables. The goal is to predict the quality of wine based on some physicochemical properties.
+
+Read more about this dataset from here: https://archive.ics.uci.edu/ml/datasets/Wine+Quality
+
+Load the dataset to R.
+
+```{r}
+url <- 'https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv'
+wine <- read.table(url, sep=";", header=TRUE)
+head(wine)
+```
+
+## Fitting
+
+Now, let's fit following models (most of them can be fitted with caret):
+
+* standard linear regression with all variables (with `caret` or function `lm`),
+* choose best models according to AIC/BIC criteria (useful functions: `bincombinations{e1071}` for all subsets, `AIC`/`BIC`/`logLik` for calculation of BIC/AIC, `step` for stepwise regression),
+* choose best models according to ridge regression/lasso methods (try `glmnet{glmnet}` and `cv.glmnet` for cross validation. Find more about these functions here: https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html),
+* choose best model with PCR regression (try `pcr{pls}`).
+
+Note that for some of these modes you need to do some parameter tuning.
+Do this!
+Write a function that will automate this parameter tuning for you.
+
+## Performance on the training set
+
+For each model calculate the MSE (mean square error) on the test set.
+
+## Performance on the test set
+
+It's time to assess the performance of these models. 
+Let's divide the dataset into two groups: training (3/4 of data) and testing (1/4) dataset. You can try different proportions, the data is large so it should not matter. The splitting can be done with  `createDataPartition{caret}`.
+
+1. Fit all models listed above on the training dataset.
+2. Test their performance on test dataset. Calculate MSE (mean square error) on test set.
+3. Repeat the splitting 10 - 100 times (depending on how fast is your solution. Maybe it's feasible to do this 100 times). 
+4. Plot the distribution of MSE for different methods (vioplots/boxplots/histograms). 
+
+Which method gives the lowest average MSE in this case?
+
