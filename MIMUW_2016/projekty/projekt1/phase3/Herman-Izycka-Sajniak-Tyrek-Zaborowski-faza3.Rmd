@@ -1,0 +1,492 @@
+---
+title: "Projekt 1, faza 3"
+author: "Julia Herman-I¿ycka, Bartosz Sajniak, Jakub Tyrek, Rafa³ Zaborowski"
+date: "27 kwietnia 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library('ggplot2')
+library('tidyr')
+library('dplyr')
+library('Biostrings')
+library('cluster')
+library('MASS')
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+
+load("C:/Users/Bartek/Desktop/R/smallLogs_5m.RData")
+
+```
+
+#1. Spis treœci
+* 1. Spis treœci
+* 2. Przygotowanie danych
+* 3. Porównanie czasu spêdzonego na ró¿nych stacjach
+* 4. Odleg³oœæ pomiêdzy stacjami
+* 5. Okreœlanie liczby klastrów
+    * 5.1. Œrednia sylwetka
+    * 5.2. Gap statistic
+* 6. Odleg³oœci stacji
+* 7. Czêste po³¹czenia w œcie¿kach
+* 8. Analiza œcie¿ek - jak ludzie poruszaj¹ siê po wystawie?
+    * 8.1. Przygotowanie œcie¿ki
+    * 8.2. MDS
+    * 8.3. Klastrowanie œcie¿ek
+    * 8.4. Stacje w klastrach œcie¿ki
+* 9. Popularnoœæ krótkich œcie¿ek
+    * 9.1. Œcie¿ki d³ugoœci jeden
+    * 9.2. Œcie¿ki d³ugoœci dwa
+    * 9.3. Œcie¿ki d³ugoœci trzy
+* 10. Pocz¹tek i koniec zwiedzania
+* 11. Macierz przejœcia
+* 12. Klasteryzacja stacji ze wzglêdu prawdopodobieñstwa przejœcia
+* 13. Przejœcie - "most"
+* 14. Regu³y asocjacyjne
+
+#2. Przygotowanie danych
+
+Przygotowanie danych zaczniemy od oczyszczenia ich z informacji, które nie s¹ ciekawe do analizy. Nastêpnie poni¿szy kod liczy czas odwiedzin poszczególnych odwiedzaj¹cych na pojedynczej stacji. Zauwa¿my tak¿e, ¿e niektóre wizyty w naszych danych s¹ nienaturalnie d³ugie. W zwi¹zku z tym pozb¹dŸmy siê wizyt, które trwaj¹ d³u¿ej ni¿ 10^4.
+
+```{r, cache=TRUE, warning=FALSE}
+smallLogs <- smallLogs %>% filter(visitor != -1)
+smallLogs$visitor_change <- smallLogs$visitor != lag(smallLogs$visitor) | as.Date(smallLogs$date) != as.Date(lag(smallLogs$date)) | smallLogs$station != lag(smallLogs$station)
+
+smallLogs$visitor_change[1] <- FALSE
+smallLogs$visit_id <- cumsum(smallLogs$visitor_change)
+
+time_diffs <- smallLogs %>% group_by(visit_id, station, visitor) %>% summarise(enter_time = first(date), leave_time = last(date), time_spent = leave_time - enter_time)
+
+time_diffs$station <- factor(time_diffs$station)
+time_diffs <- time_diffs %>% as_data_frame() %>% mutate(visitor_id = paste(visitor,  as.Date(enter_time), sep='_')) 
+
+hist(log10(time_diffs$time_spent))
+#filter unusually long times
+upper_limit <- 10^4
+time_diffs <- time_diffs  %>% filter(time_spent <= upper_limit)
+
+```
+
+#3. Porównanie czasu spêdzonego na ró¿nych stacjach
+
+Zbadajmy czy profile czasu spêdzonego na ró¿nych stacjach s¹ ró¿ne? Je¿eli tak, to czy mo¿na tych ró¿nic u¿yæ do klastrowania?
+
+```{r, cache=TRUE, fig.width=9, fig.height=8}
+time_spent <- aggregate(time_diffs$time_spent,list(time_diffs$visitor),median)
+
+colnames(time_spent) <- c('visitor','mean_time_spent_visiting')
+
+ggplot(time_diffs,aes(time_spent)) + geom_histogram(aes(y=..ncount..,colour=station, guided=FALSE),bins=70) + stat_ecdf() + facet_wrap(~ station,ncol=6) + coord_cartesian(xlim=c(0,1000)) + guides(colour=FALSE)
+```
+
+#4. Odleg³oœæ pomiêdzy stacjami
+
+Mo¿na zauwa¿yæ, ¿e odpowiedŸ na pytanie o ró¿nicê czasu spêdzonego na ró¿nych stacjach jest twierdz¹ca. Spróbujmy zatem tê ró¿nicê wykorzystaæ za pomoc¹ statystyki Ko³mogorowa-Smirnowa i policzmy odleg³oœci.
+
+```{r, cache=TRUE, warning=FALSE}
+visit_time_range <- range(time_diffs$time_spent)
+min_vt <- visit_time_range[[1]]
+max_vt <- visit_time_range[[2]]
+range_vt <- seq(min_vt,max_vt,by = 1)
+
+by_station <- split(time_diffs$time_spent,time_diffs$station,drop=TRUE)
+by_station_ecdf <- lapply(by_station, function(x){return(ecdf(x)(range_vt));})
+
+dist_KS_mtx <- Vectorize(function(i,j){
+  v1 <- by_station_ecdf[[i]];
+  v2 <- by_station_ecdf[[j]];
+  kst <- ks.test(v1,v2);
+  s <- kst$statistic;
+  names(s) <- NULL;
+  return(s);
+})
+
+dist_mtx <- outer(1:length(by_station_ecdf),1:length(by_station_ecdf),dist_KS_mtx)
+
+station_names <- time_diffs %>% distinct(station) %>% dplyr::select(station)
+```
+
+#5. Okreœlanie liczby klastrów
+
+Chcielibyœmy u¿yæ tej odleg³oœci do klastrowania, sprawdŸmy zatem ile klastrów powinno byæ.
+
+###5.1. Œrednia sylwetka
+
+```{r, cache=TRUE}
+sils <- data.frame()
+for(i in 2:(nrow(dist_mtx)/2)){
+  paths_pam <- pam(dist_mtx, i);
+  sil <- silhouette(paths_pam$clustering,dist_mtx);
+  sils <- rbind(sils,data.frame(group=i,mean_silhouette=mean(sil[,"sil_width"]),std_silhouette=sd(sil[,"sil_width"])));
+}
+
+ggplot(sils,aes(group,mean_silhouette)) + geom_bar(stat="identity") + scale_x_continuous(breaks = seq(2,29,1)) + ylab("mean silhouette")
+```
+
+###5.2. Gap statistic
+
+```{r, cache=TRUE}
+library("factoextra")
+
+clusters_eclust <- eclust(dist_mtx,"agnes",graph=FALSE)
+data.frame(station=station_names$station, cluster=clusters_eclust$cluster)
+fviz_gap_stat(clusters_eclust$gap_stat)
+```
+
+Zarówno Œrednia sylwetka jak i Gap statistic sugeruj¹ liczbê klastrów równ¹ 3, natomiast po spojrzeniu na dendrogram hierarchizacji mo¿na zauwa¿yæ, ¿e ró¿nica miêdzy trzema, a czterema klastrami jest marginalna. Zdecydowaliœmy, wiêc ¿e cztery klastry bêd¹ optymalnym rozwi¹zaniem.
+
+```{r, cache=TRUE}
+clusters <- agnes(dist_mtx)
+fviz_dend(clusters, k = 4, rect = TRUE, main = "Dendrogram (k = 4)")
+```
+
+#6. Odleg³oœci stacji
+
+Mamy ju¿ odleg³oœci, spróbujmy wiêc zwizualizowaæ otrzymane za pomoc¹ powy¿szych punktów informacje u¿ywajac w tym celu PCA. Policzmy tak¿e wariancje zachowan¹ ¿eby zobaczyæ jakoœæ rysunku, klastruje u¿ywajac algorytmu pam.
+
+```{r, cache=TRUE}
+station_pca <- cmdscale(dist_mtx, eig = TRUE)
+print((station_pca$eig[1] ^ 2 + station_pca$eig[2] ^ 2) / (sum(sapply(station_pca$eig, function(x) x ^ 2))))
+
+station_pam <- pam(dist_mtx, 4)
+station_clusters <- sapply(station_pam$clustering, toString)
+ggplot(as.data.frame(station_pca$points), aes(V1, V2)) + geom_point(aes(color = station_clusters))
+
+station_names <- station_names %>% mutate(cluster = station_clusters)
+time_diffs <- time_diffs %>% mutate(station_cluster = plyr::mapvalues(station, as.vector(station_names$station), as.vector(station_names$cluster)))
+```
+
+Histogram czasu spêdzonego na stacjach z odpowiednich klastrów.
+
+```{r, cache=TRUE}
+
+ggplot(time_diffs, aes(time_spent, color = station_cluster, fill = station_cluster)) + geom_histogram(aes(y = ..density..), bins = 500) + facet_wrap(~station_cluster) + coord_cartesian(xlim = c(0, 500))
+```
+
+Aby zobaczyæ które klastry maj¹ przewagê dokonujemy sumowania i normalizujemy.
+
+```{r, cache=TRUE}
+ggplot(time_diffs, aes(time_spent, color = station_cluster, fill = station_cluster)) + geom_histogram(aes(y = ..density..), bins = 400, position = 'fill') + coord_cartesian(xlim = c(0, 500))
+
+```
+
+Rzeczywiœcie na powy¿szym rysunku mo¿na zobaczyæ, ¿e rozk³ad czasu spêdzonego ró¿ni siê.
+
+#7. Czêste po³¹czenia w œcie¿kach
+
+Zobaczmy prawdopodobieñstwo pojedynczego kroku najczêstszych po³¹czeñ miêdzy stacjami, w tym celu liczymy prawdopodobieñstwo warunkowe. Widaæ, ¿e eksponat numer 19(a - wejœcie, b - wyjœcie) s³usznie nazywa siê Sal¹ Strachów, poniewa¿ tylko czêœæ osób po wejœciu do niej wychodzi odpowiednim wyjœciem. Jednoczeœnie œcie¿ka ta: 19a -> 19b ma najwiêksze prawdopodobieñstwo warunkowe.
+
+```{r, cache=TRUE}
+time_diffs <- time_diffs %>% arrange(visitor, enter_time)
+time_diffs$day_or_visitor_changed <- as.Date(time_diffs$enter_time) != as.Date(lag(time_diffs$enter_time)) | time_diffs$visitor != lag(time_diffs$visitor)
+time_diffs$day_or_visitor_changed[1] <- FALSE
+
+time_diffs$prev_station <- lag(time_diffs$station)
+time_diffs <- time_diffs %>% mutate(prev_station = replace(prev_station, day_or_visitor_changed, NA))
+
+vis_seq <- time_diffs %>% filter(!is.na(prev_station)) %>% group_by(prev_station, station) %>% summarise(n = n()) %>% mutate(freq = n / sum(n))
+vis_seq <- vis_seq %>% ungroup() %>% dplyr::arrange(desc(freq)) %>% dplyr::slice(1:5)
+vis_seq <- vis_seq %>% transmute(step = paste(prev_station, station, sep = ' -> '), freq = freq)
+vis_seq <- vis_seq %>% mutate(step = factor(step, levels = vis_seq$step[order(freq, decreasing = T)]))
+
+ggplot(vis_seq, aes(step, freq)) + geom_bar(stat = 'identity')
+```
+
+#8. Analiza œcie¿ek - jak ludzie poruszaj¹ siê po wystawie?
+
+###8.1. Przygotowanie œcie¿ki
+
+Ka¿dej stacji przyporz¹dkowujemy unikalny znak, dziêki czemu scie¿ka to ciag znaków. Powinniœmy równie¿ wykluczyæ œcie¿ki, które maj¹ mniej ni¿ 10 znaków.
+
+```{r,  cache=TRUE, warning=FALSE}
+station_names <- time_diffs %>% distinct(station) %>% dplyr::select(station)
+station_names <- station_names %>% mutate(station_char = c(letters, LETTERS, 1:7)) #na sztywno
+
+time_diffs <- time_diffs %>% ungroup() %>% arrange(visitor, enter_time)
+time_diffs <- time_diffs %>% mutate(station_char = plyr::mapvalues(station, as.vector(station_names$station), as.vector(station_names$station_char)))
+
+paths <- time_diffs %>% group_by(visitor, date = as.Date(enter_time)) %>% summarise(path = paste(station_char, collapse = ''))
+paths <- paths %>% mutate(n = nchar(path))
+
+
+```
+
+Odleg³oœæ miêdzy œcie¿kami definiujemy jako odlegloœæ podstawieniow¹ dwóch ci¹gów znaków. Tablica podstawieñ jest generowana przez odleg³oœæ stacji z poprzedniej analizy. Aby klastrowanie nie zale¿a³o od d³ugoœci sciezek wybieramy scie¿ki d³ugosci 10. Wybierzmy tak¿e losow¹ próbkê aby macierz odleg³oœci nie by³a zbyt du¿a.
+
+```{r,  cache=TRUE, warning=FALSE}
+paths2 <- paths %>%  filter(n == 10) %>% ungroup() %>% sample_n(size=1000)
+
+row.names(dist_mtx) <- station_names$station_char
+colnames(dist_mtx) <- station_names$station_char
+
+paths_dists <- stringDist(paths2$path,method="substitutionMatrix",
+  substitutionMatrix = dist_mtx
+)
+
+hist(paths_dists)
+```
+
+###8.2. MDS
+
+```{r, eval=FALSE, include = FALSE}
+#metric MDS
+cmd <- cmdscale(paths_dists)
+plot(cmd)
+shep <- Shepard(paths_dists, cmd)
+plot(shep)
+
+df1 <- data.frame(x = cmd[,1], y = cmd[,2])
+
+```
+
+Wykonujemy niemetryczne skalowanie wielowymiarowe i wyœwietlamy za pomoc¹ funkcji Shepard.
+
+```{r, cache=TRUE}
+newcoord <- isoMDS(as.dist(paths_dists))
+#plot(newcoord$points)
+
+shep <- Shepard(paths_dists, newcoord$points)
+plot(shep)
+
+df2 <- data.frame(x = newcoord$points[,1], y = newcoord$points[,2])
+```
+
+###8.3. Klastrowanie œcie¿ek
+
+Spróbujmy u¿yæ klastrowania za pomoc¹ algorytmu pam, a tak¿e zwizualizowaæ dane. Jak widzimy jest to niskiej jakoœci, wiêc nie jest za bardzo pouczaj¹ce.
+
+```{r, cache=TRUE}
+#k-medoids
+kmedoids <- pam(paths_dists, 4)
+df2$cluster <- as.factor(kmedoids$clustering)
+
+print(paths2[kmedoids$medoids,])
+
+ggplot(df2, aes(x=x, y=y)) + geom_point(aes(color=cluster))
+
+#hierarchical clustering
+tree1 <- agnes(paths_dists, method = "ward")
+clusters <- factor(cutree(tree1, 4))
+
+summary(clusters)
+df2$cluster <- clusters
+ggplot(df2, aes(x=x, y=y)) + geom_point(aes(color=cluster))
+```
+
+###8.4. Stacje w klastrach œcie¿ki
+
+SprawdŸmy teraz czy klastry siê czymœ ró¿ni¹, w tym celu sprawdŸmy jakie stacje odwiedzali ludzie przechodz¹cy œcie¿ki w klastrach. Jak czêsto wystêpujê pojedyncza stacja w œcie¿kach z klastrami?
+
+```{r, cache=TRUE}
+
+
+get_freq_ch <- function(st_ch){
+  paths2 <- paths2 %>% mutate(got_st_ch = grepl(st_ch, path), cluster = kmedoids$clustering)
+  paths2_sum <- paths2 %>% group_by(cluster) %>% summarise(ch_freq = sum(got_st_ch) / n())
+  return(paths2_sum$ch_freq)
+}
+
+ch_freqs <- c()
+for(i in 1:dim(station_names)[1]){
+  t1 <- c(get_freq_ch(station_names[i,2]))
+  ch_freqs <- rbind(ch_freqs, t1)
+}
+
+colnames(ch_freqs) <- 1:4
+ch_freqs <- as.data.frame(ch_freqs)
+ch_freqs$station <- station_names$station
+ch_freqs <- gather(ch_freqs, cluster, freq, 1:4)
+
+ggplot(ch_freqs, aes(station, freq)) + geom_bar(position = 'fill', stat = 'identity', aes(fill = cluster)) + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+#9. Popularnoœæ krótkich œcie¿ek
+
+###9.1. Œcie¿ki d³ugoœci jeden
+
+Spróbujmy odpowiedzieæ sobie na pytanie z jakich stacji korzystaj¹ ludzie, którzy odwiedzili ma³¹ liczbê eksponatów. Zacznijmy od tych, którzy odwiedzili tylko jeden z nich(przeszli œcie¿kê d³ugoœci jeden) - pierwszy wykres s¹ to najczêœciej odwiedzane eksponaty przez tych ludzi, a drugi najrzadziej. 
+
+```{r, cache=TRUE}
+paths2 <- time_diffs %>% group_by(visitor, date = as.Date(enter_time)) %>% summarise(path2 = paste(station, collapse = '->'))
+paths$path2 <- paths2$path2
+paths1 <- paths %>% filter(n == 1)
+paths1 <- paths1 %>% group_by(path2) %>% summarise(how_many = n()) %>% arrange(how_many)
+
+ggplot(tail(paths1, 5), aes(reorder(path2, -how_many), how_many)) + geom_bar(stat = 'identity') + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(head(paths1, 5), aes(reorder(path2, -how_many), how_many)) + geom_bar(stat = 'identity') + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+###9.2. Œcie¿ki d³ugoœci dwa
+
+Skoro wiemy jakie stacje sa odwiedzane przez ludzi, którzy odwiedzaj¹ tylko jeden z dostêpnych eksponatów to sprawdŸmy jak "chodz¹" ludzie, którzy dwukrotnie korzystaj¹ z dostêpnych eksponatów.
+
+```{r, cache=TRUE}
+
+paths1 <- paths %>% filter(n == 2)
+paths1 <- paths1 %>% group_by(path2) %>% summarise(how_many = n()) %>% arrange(how_many)
+
+ggplot(tail(paths1, 5), aes(reorder(path2, -how_many), how_many)) + geom_bar(stat = 'identity') + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+###9.3. Œcie¿ki d³ugoœci trzy
+
+Analogicznie do powy¿szych wykresów sprawdŸmy teraz najpopularniejsze œcie¿ki d³ugoœci trzy.
+
+```{r, cache=TRUE}
+
+paths1 <- paths %>% filter(n == 3)
+paths1 <- paths1 %>% group_by(path2) %>% summarise(how_many = n()) %>% arrange(how_many)
+
+ggplot(tail(paths1, 5), aes(reorder(path2, -how_many), how_many)) + geom_bar(stat = 'identity') + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+Widaæ, ¿e stacja 19a, czyli wejœcie do Sali Strachów cieszy siê du¿ym zainteresowaniem wœród ludzi, którzy przeszli œcie¿kê d³ugoœci 1, 2 oraz 3. Co wiêcej wœród œcie¿ek d³ugoœci 2 drug¹ najpopularniejsz¹ œcie¿k¹ jest dwukrotne wejœcie do Sali Strachów.
+
+#10. Pocz¹tek i koniec zwiedzania
+
+SprawdŸmy jak ludzie zaczynaj¹ i koñcz¹ zwiedzanie.
+
+```{r}
+paths1 <- time_diffs %>% ungroup() %>% group_by(visitor) %>% arrange(enter_time) %>% summarise(first_st = first(station)) %>% dplyr::select(first_st)
+paths1 <- paths1 %>% group_by(first_st) %>% summarise(how_many = n()) %>% ungroup() %>% arrange(how_many)
+
+ggplot(tail(paths1, 5), aes(reorder(first_st, -how_many), how_many)) + geom_bar(stat = 'identity') + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+```{r}
+paths1 <- time_diffs %>% ungroup() %>% group_by(visitor) %>% arrange(enter_time) %>% summarise(last_st = last(station)) %>% dplyr::select(last_st)
+paths1 <- paths1 %>% group_by(last_st) %>% summarise(how_many = n()) %>% ungroup() %>% arrange(how_many)
+
+ggplot(tail(paths1, 5), aes(reorder(last_st, -how_many), how_many)) + geom_bar(stat = 'identity') + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+#11. Macierz przejœcia
+
+Policzmy najpierw macierz przejœcia.
+
+```{r, cache=TRUE}
+time_diffs <- time_diffs %>% ungroup() %>% arrange(visitor, enter_time)
+time_diffs$day_or_visitor_changed <- as.Date(time_diffs$enter_time) != as.Date(lag(time_diffs$enter_time)) | time_diffs$visitor != lag(time_diffs$visitor)
+time_diffs$day_or_visitor_changed[1] <- FALSE
+time_diffs$prev_station <- lag(time_diffs$station)
+time_diffs <- time_diffs %>% mutate(prev_station = replace(prev_station, day_or_visitor_changed, NA))
+
+vis_seq <- time_diffs %>% filter(!is.na(prev_station)) %>% group_by(prev_station, station) %>% summarise(n = n()) %>% mutate(freq = n / sum(n))
+
+trans_m <- vis_seq %>% dplyr::select(prev_station, station, freq) %>% spread(station, freq)
+row.names(trans_m) <- trans_m$prev_station
+trans_m$prev_station <- NULL
+trans_m[is.na(trans_m)] <- 0
+trans_m <- as.matrix(trans_m)
+
+ggplot(vis_seq, aes(station, prev_station)) + geom_tile(aes(fill = freq), colour = 'white') + scale_fill_gradient(low = "white", high = "red") + theme(axis.text.x = element_text(size = 8,angle=90), axis.text.y = element_text(size = 6))
+
+```
+
+#12. Klasteryzacja stacji ze wzglêdu prawdopodobieñstwa przejœcia
+
+Policzon¹ wczeœniej macierz przejœcia spróbujmy u¿yæ do sklasteryzowania stacji w tym celu odleg³os miêdzy stacjami zdefiniujmy jako ró¿nicê 2 i sumy prawdopodobieñstw przejœcia ze stacji A do B i odwrotnie. Spróbujmy zobaczyæ na grafie jak wygl¹da nasza klasteryzacja. U¿yjemy w tym celu algorytmu FR(Fruchterman-Reingold), który polega na tym, ¿e ka¿dy wierzcho³ek jest odpychaj¹c¹ siê od siebie cz¹stk¹, a ka¿da krawêdŸ przyci¹ga ³¹czone wierzcho³ki wprost proporcjonalnie do swojej wagi, w tym przypadku prawdopodobieñstwa przejœcia. 
+
+```{r, include=FALSE}
+library('igraph')
+```
+```{r, cache=TRUE}
+station_names[,3] <- time_diffs %>% group_by(station) %>% summarise(n = n()) %>% dplyr::select(n)
+
+st_dist <- trans_m + t(trans_m)
+st_dist <- 2 - st_dist
+clusters <- as.data.frame(pam(st_dist, 2)$clustering)
+
+trans_graph <- function(treshold){
+
+  nodes <- station_names %>% dplyr::select(station) %>% arrange(station)
+  nodes$cluster <- clusters[,1]
+  edges <- vis_seq %>% filter(freq >= treshold & prev_station != station)
+
+  net <- graph.data.frame(d = edges, nodes, directed = T)
+  V(net)$color <- V(net)$cluster
+  layout <- layout_with_fr(net, weights = edges$freq)
+  pal <- colorRampPalette(c("gray", "red"))(100)
+  plot(net,
+       edge.arrow.size = 0.5 * edges$freq,
+       edge.color = pal[edges$freq * 100],
+       vertex.size = station_names$n / 1500,
+       layout = layout,
+       vertex.shape = 'circle',
+       vertex.label.cex = 0.8,
+       vertex.frame.color = 'darkgray',
+       vertex.label.color = 'black',
+       edge.width = 10 * edges$freq,
+       edge.curved = 0.1,
+       edge.label.font = 2,
+       vertex.label = as.vector(substring(nodes$station, 4)),
+       mark.groups = list(which(V(net)$cluster == 2), which(V(net)$cluster == 1)),
+       mark.col = c("#C5E5E7","#ECD89A"),
+       mark.border = NA
+    )
+}
+trans_graph(0.02)
+
+trans_graph(0.05)
+
+trans_graph(0.09)
+```
+
+Na powy¿szych grafach pominiêto krawêdzie o wadze - kolejno: 0.02, 0.05 oraz 0.09. Mo¿na zauwa¿yæ tak¿e, ¿e klasteryzacja ma sens, a swoistym mostem s¹ stacje 18 i 78a. Zobaczmy jak ta klasteryzacja wygl¹da w rzeczywistoœci.
+<img src="http://oi63.tinypic.com/16i8ok0.jpg" alt="Obrazek powinien byæ pobrany z darmowego hostingu, niestety obrazek ju¿ wygas³ lub nie masz po³¹czenia z internetem." width="90%" height="90%"  />
+
+Na powy¿szym obrazku widaæ, ¿e oba klastry s¹ dosyæ naturalnie rozdzielone.
+
+#13. Przejœcie - "most"
+
+Uda³o nam sie wykryæ dwie grupy-klastry, w których poruszaj¹ siê ludzie i dwie stacje, które stanowi¹ "most" miêdzy nimi. Poni¿szy wykres pokazuje nam, ¿e stacje z nazwami 18 i 78a "bior¹ udzia³" w oko³o 40% przejœciach z klastra do klastra.
+
+```{r}
+station_names <- station_names %>% arrange(station)
+station_names$cluster <- as.vector(clusters[,1])
+
+time_diffs <- time_diffs %>% mutate(st_cl_p = plyr::mapvalues(station, as.vector(station_names$station), as.vector(station_names$cluster)))
+time_diffs <- time_diffs %>% mutate(prev_st_cl_p = plyr::mapvalues(prev_station, as.vector(station_names$station), as.vector(station_names$cluster)))
+time_diffs <- time_diffs %>% mutate(cluster_changed = st_cl_p != prev_st_cl_p)
+time_diffs$cluster_changed[is.na(time_diffs$cluster_changed)] <- FALSE
+
+cl_change <- time_diffs %>% filter(cluster_changed) %>% dplyr::select(prev_station, station)
+cl_change <- cl_change %>% group_by(prev_station, station) %>% summarise(n =n())
+cl_change <- cl_change %>% ungroup() %>% arrange(n)
+cl_change <- cl_change %>% mutate(bridge = station == 'cnk78a' | station == 'cnk18' | prev_station == 'cnk78a' | prev_station == 'cnk18')
+
+to_plot <- cl_change %>% group_by(bridge) %>% summarise(occ = sum(n))
+to_plot$freq = to_plot$occ / sum(to_plot$occ)
+ggplot(to_plot, aes(bridge, freq)) + geom_bar(stat = 'identity')
+``` 
+
+#14. Regu³y asocjacyjne
+
+Ma³o czytelne badanie wspó³wystêpowania danych stacji w œcie¿kach odwiedzaj¹cych.
+
+```{r, include=FALSE}
+library('arules')
+```
+```{r}
+transactions <- time_diffs %>% dplyr::select(visitor, station)
+transactions$visited <- TRUE
+transactions <- unique(transactions)
+
+transactions <- spread(transactions, key = station, value = visited, fill = FALSE)
+rownames(transactions) <- transactions$visitor
+transactions$visitor <- NULL
+tr_matrix <- transactions
+tr_matrix$cnk19a <- NULL
+tr_matrix <- as.matrix(tr_matrix)
+
+
+transactions <- as(tr_matrix, "transactions")
+
+rules <- apriori(transactions, parameter = list(support = 0.01))
+rules <- sort(rules, by = 'lift')
+inspect(rules)
+``` 
