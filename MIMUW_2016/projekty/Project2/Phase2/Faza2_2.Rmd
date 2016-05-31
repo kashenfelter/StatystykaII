@@ -1,0 +1,605 @@
+---
+title: "Project 2 - phase 2"
+author: "R.Cylwa, A.D¹browska, A.Paluszyñska, A. Sitko"
+date: "29 maja 2016"
+output: 
+    html_document: 
+        toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = TRUE)
+
+```
+
+
+```{r}
+library(ggplot2)
+library(rgdal)
+library(rgeos)
+library(scales)
+library(dplyr)
+library(data.table)
+library(maptools)
+library(maps)
+library(RColorBrewer)
+library(classInt) 
+library(reshape)
+library(knitr)
+library(gridExtra)
+library(caret)
+library(lme4)
+library(devtools)
+library(raster)
+
+remove(list = ls())
+path <- "C:/Users/Agnieszka/Documents/UniwersytetWarszawski/Statistics/Project2/Phase2/Ola/p02p02"
+setwd(path)
+
+```
+
+## Introduction
+
+In the second phase we will consider one type of cancer only, the lung cancer.
+We looked for some factors that could help us with understand the number of cancer cases.
+In our data the code "C34-C33" corresponds to the lung cancer and the tracheal cancer.
+
+
+```{r}
+# Wczytujemy dane do rysowania mapy powiat?w.
+tract <- readOGR("raw_data", layer = "powiaty")
+tract <- fortify(tract, region = "jpt_kod_je")
+tract <- data.table(tract)
+tract$id <- as.integer(tract$id)
+colnames(tract)[6] <- "TERYT4"
+tract$TERYT4[tract$TERYT4 == 265] <- 221
+```
+
+
+```{r}
+load("cancer_data3.rda")
+data <- cancer_data3
+rm(cancer_data3)
+data[,8:11] <- data[,8:11]/data[,12]
+
+temp <- melt(data, id.vars = c("TERYT4","woj","rok","ICD10", "PLEC", "grupa_wiek", "pow", "nowy", "wojewodztwo", "ludnosc_woj", "mez_woj", "kob_woj", "nowy_woj",  "ludnosc_pow", "mez_pow", "kob_pow", "nowy_pow", "powiat", "zanieczyszczenia", "zan_kraj","miasto", "zan_woj"))
+
+
+lungc <- data %>% group_by(TERYT4,woj,ICD10, PLEC, grupa_wiek, pow, wojewodztwo, ludnosc_woj, mez_woj, kob_woj, nowy_woj,  ludnosc_pow, mez_pow, kob_pow, nowy_pow, powiat, zanieczyszczenia, zan_kraj,miasto, zan_woj) %>%
+      summarise(Stage1 = sum(Stage1) / 3,
+                Stage2 = sum(Stage2) / 3,
+                Stage3 = sum(Stage3) / 3, 
+                Stage4 = sum(Stage4) / 3)
+
+lungc <- data.table(lungc)
+lungc[, nowy := Stage1 + Stage2 + Stage3 + Stage4]
+```
+
+First of all visualise the distributions of stages on a map. We plot the distribution of new lung cancer cases in Polish subregions. The cartogram below shows numbers of new cases for each 100 000 people in a given subregion.
+
+```{r,  fig.align = 'center', fig.width = 8, fig.height = 7}
+plotData <- left_join(tract, lungc %>% group_by(TERYT4) %>% 
+                            summarise(Stage1 = sum(Stage1),
+                                      Stage2 = sum(Stage2),
+                                      Stage3 = sum(Stage3),
+                                      Stage4 = sum(Stage4),
+                                      ludnosc_pow = mean(ludnosc_pow), 
+                                      zanieczyszczenia = mean(zanieczyszczenia), 
+                                      zan_woj = mean(zan_woj),
+                                      nowy = sum(nowy)))
+
+plotData <- data.table(plotData)
+attach(plotData)
+
+colors <- brewer.pal(3, "YlOrRd")
+
+
+theme <- theme_bw() + 
+      theme(axis.text = element_blank(), plot.title = element_text(face="bold"), axis.title = element_blank())
+
+createCartogram <- function(variable, breaks, title, legend){
+      ggplot() +
+      geom_polygon(data = plotData, aes(x = long, 
+                                        y = lat, 
+                                        group = group,
+                                        fill = factor(findInterval(variable, breaks, all.inside = TRUE))), 
+                   color = "black", size = 0.25) + 
+      scale_fill_manual(labels = c("Low", "Medium", "High"),
+                        values = colors,
+                        name = legend) +
+      ggtitle(title) +
+      theme
+}
+
+stages <- lungc %>% group_by(TERYT4) %>% 
+                            summarise(Stage1 = sum(Stage1),
+                                      Stage2 = sum(Stage2),
+                                      Stage3 = sum(Stage3),
+                                      Stage4 = sum(Stage4),
+                                      nowy = sum(nowy), 
+                                      pop=mean(ludnosc_pow))
+M <- 100000
+
+breaks <- classIntervals(M * stages$nowy / stages$pop, n = 3, style = "quantile")$brks
+attach(plotData)
+lungPlot <- createCartogram(M * nowy / ludnosc_pow, 
+                breaks, 
+                "New lung-cancer-cases\nin subregions (2010-2012)",
+                "Number of\nnew cases")
+lungPlot
+```
+
+In the graphic above regions are divided into three categories:
+<ul>
+ <li> low - between 0.7043554 and 9.7442701 new cases per 100 000 in a year, </li>
+ <li> medium - between 9.7442701 and 14.1873835 new cases per 100 000 in a year,</li>
+ <li> high - between 14.1873835 and 36.4213345 new cases per 100 000 in a year.</li>
+</ul>
+
+Next we show the differences between means of stages between voivodeships.
+We see that in all voivodeships the biggest part of all cases is Stage 4. 
+
+```{r,  fig.align = 'center'}
+df_woj <- aggregate(cbind(Stage1, Stage2, Stage3, Stage4) ~ woj, data, mean)
+wykres1 <- melt(df_woj, id.vars = "woj")
+
+wykres1$woj <- factor(wykres1$woj, levels = 2*(1:16), 
+                      labels = c("Dolnoœl¹skie", "Kujawsko-pomorskie", 
+                                 "Lubelskie", "Lubuskie", "£ódzkie", 
+                                 "Ma³opolskie", "Mazowieckie", "Opolskie", 
+                                 "Podkarpackie", "Podlaskie", "Pomorskie", 
+                                 "Œl¹skie", "Œwiêtokrzyskie", 
+                                 "Warmiñsko-mazurskie", "Wielkopolskie", 
+                                 "Zachodniopomorskie"))
+
+wykres1 <- within(wykres1, woj <- factor(woj, 
+                                         levels = wykres1[order(wykres1[wykres1$variable == "Stage1", "value"],
+                                                                decreasing = TRUE), "woj"]))
+
+ggplot(wykres1, aes(x = woj, y = value, fill = variable)) + geom_bar(stat = "identity") +
+      theme(axis.text.x=element_text(angle = 45, hjust = 1)) + 
+      guides(fill=guide_legend(title="Stage of cancer")) + 
+      ylab("Mean fraction of a case") + xlab("Voivodeship") + 
+      ggtitle("Mean profile of the disease by voivodeship")
+
+
+```
+
+
+## Additional data
+
+First of all we wondered what are the reasons of the lung cancer prevelence.
+We found that the most of cases is caused by ciggarette smoking and the air pollution. 
+
+```{r,  fig.align = 'center', fig.width = 10, fig.height = 4}
+zan <- lungc %>% group_by(TERYT4) %>% 
+                            summarise(Stage1 = sum(Stage1),
+                                      Stage2 = sum(Stage2),
+                                      Stage3 = sum(Stage3),
+                                      Stage4 = sum(Stage4),
+                                      zanieczyszczenia = mean(zanieczyszczenia)/3, 
+                                      zan_woj = mean(zan_woj)/3)
+
+
+attach(plotData)
+breaksZan <- classIntervals(zan$zanieczyszczenia, n = 3, style = "quantile")$brks
+
+zanPlot <- createCartogram(zanieczyszczenia, 
+                breaksZan, 
+                "Air pollution\nin subregions (2010-2012)",
+                "Scale of\npollution")
+
+grid.arrange(lungPlot, zanPlot, ncol = 2, nrow = 1)
+```
+
+In the graphic above regions are divided into three categories:
+<ul>
+ <li> low - between 10.32143 and 11291.0 tonnes of air pollutions in a year, </li>
+ <li> medium - between 11291 and 43365.14 tonnes of air pollutions in a year,</li>
+ <li> high - between 43365.14 and 11221070 tonnes of air pollutions in a year.</li>
+</ul>
+
+
+Next we took care of the problem of ciggarette smoking.
+In the first plot we have a mean number of cigarettes smoke by one person in each voivodeship.
+
+```{r,  fig.align = 'center'}
+load("papierosy2.rda")
+
+
+nr_woj <- seq(2,32,2)
+woj$nr_woj <- seq(2,32,2)
+
+ggplot(woj, aes(wojewodztwo, papierosy)) + 
+      geom_bar(stat="identity", aes(fill = papierosy > 15 )) + 
+      scale_fill_manual(values = c('grey', 'blue') )+ 
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+      guides(fill =guide_legend(title = "Voivodeship with more than \n 15 cigarettes per person")) + 
+      ylab("Number of ciggaretes smoke by one person") + 
+      xlab("Voivodeship") + 
+      ggtitle("Mean number of the cigarettes smoke by one smoker in voivodeship")
+
+```
+
+We also found the percentage of the population which smoke ciggaretes.
+```{r, fig.align = 'center', fig.width = 10, fig.height = 4}
+wojewodztwa <- shapefile("raw_data_woj/województwa.shp", encoding='CP1250')
+
+wojewodztwa <- fortify(wojewodztwa, region="jpt_kod_je")
+colnames(wojewodztwa)[6] <- "nr_woj"
+wojewodztwa$nr_woj <- as.numeric(wojewodztwa$nr_woj)
+plot_data <- left_join(wojewodztwa,woj,by="nr_woj")
+
+attach(plotData)
+ciggarPlot <- ggplot() + 
+      geom_polygon(data = plot_data, aes(x = long, y = lat, group = group, fill = procent), 
+                   color = "black", size = 0.25) + 
+      scale_fill_distiller(trans = "reverse") + xlab("") + ylab("") +
+      ggtitle("Percentage of smokers\nin population of voivodeship") + theme
+
+grid.arrange(lungPlot, ciggarPlot, ncol = 2, nrow = 1)
+```
+
+## Our variables
+
+The dependent variable is a share of new lung-cancer cases per each 100 000 inhabitants of a given subregion.
+
+We model dependent variable by:
+
+<ul>
+ <li> code of county, </li>
+ <li> code of voivodeship,</li>
+ <li> gender of patients,</li>
+ <li> age group of patients,</li>
+ <li> industrial air pollution produced in each county (in tonnes), </li>
+ <li> other air pollution (methan, nitrogen, carbon mixtures, etc.),</li>
+ <li> binary variable encoding urban subrefgions </li>
+ <li> mean number of the cigarettes smoke by a smoker in a voivodeship, </li>
+ <li> percent of the population of county which smoke. </li>
+</ul>
+
+
+## Models
+
+The main purpose of our analysis was to find features that explain lung cancer morbidity in Poland. 
+We put more effort on detecting variables that have an important impact on lung cancer cases than on predicting the number of new cases in next years.
+First, we analysed different linear models - with mixed effects and without. We performed stepwise feature selection
+to find a model with a high loglikelihood value and a reasonable number of parameters (to avoid overfitting). Therefore we minimized BIC criterion. 
+
+
+### Models without random effects
+
+First, we analysed different linear models and performed some stepwise selections in order to find variables that have a significant impact on cancer cases regardless of model specification:
+
+- standard OLS (as this is a panel dataset this is the so called pooled model): in order to capture the geographic differentiation of lung cancer cases we added dummy variables indicating counties and/or voivodeships: the latter were significant,
+
+- fixed-effects panel OLS: here we add dummies for each unit (so combination of county, year, age group and gender) so that the estimates of their parameters are bad so the model is useless for prediction.
+
+### Adding random effects
+
+As the above models captured the geographic effects only when loads of dummies were added (thus a lot of parameters) we added mixed effects to our model (one for voivodeships and the other for counties). This allows us to focus on the relations that interested us: gender, age group, composition of stages, air and industrial pollution, smoking cigarettes.
+
+In analysed mixed models, we include `TERYT4` and `voivodeship` as random components. We use natural nesting of subregions in regions.
+
+```{r przygotowanie danych, eval = FALSE}
+setwd("C:/Users/Agnieszka/Documents/UniwersytetWarszawski/Statistics/Project2")
+load("./cancer_data3.rda")
+
+load("./Phase2/papierosy.rda") 
+#Å‚adujÄ™ dane dotyczÄ…ce Å›redniej dziennej liczby papierosÃ³w na osobÄ™ palÄ…cÄ… (papierosy) oraz procentu palaczy.
+
+dt <- data.table(cancer_data3)
+rm(cancer_data3)
+
+new <- dt[, -c(4, 10, 25), with = FALSE]
+new$wojewodztwo <- gsub(" ", "", new$wojewodztwo)
+new$wojewodztwo <- as.factor(new$wojewodztwo)
+
+new$TERYT4 <- as.factor(new$TERYT4)
+new$woj <- as.factor(new$woj)
+new$rok <- as.factor(new$rok)
+new$pow <- as.factor(new$pow)
+new$miasto <- as.factor(new$miasto)
+new <- left_join(new, woj[,c(1,2,3), with = FALSE])
+
+
+#Dodamy zera tam, gdzie zmienna nie pojawiÅ‚y siÄ™ Å¼adne zachorowania
+new
+features <- new %>% group_by(TERYT4, powiat, wojewodztwo) %>%
+      summarise(ludnosc_woj = mean(ludnosc_woj),
+                ludnosc_pow = mean(ludnosc_pow),
+                mez_pow = mean(mez_pow),
+                kob_pow = mean(kob_pow),
+                mez_woj = mean(mez_woj),
+                kob_woj = mean(kob_woj),
+                procent = mean(procent), miasto = mean(miasto), 
+                papierosy = mean(papierosy),
+                zanieczyszczenia = mean(zanieczyszczenia),
+                zan_woj = mean(zan_woj))
+
+obsList <- unique(new[, 4:6, with = FALSE])
+TERYT4 <- unique(new$TERYT4)
+comb <- cbind(rep(TERYT4, each = 36), obsList)
+colnames(comb)[1] <- "TERYT4"
+new <- left_join(comb, new[,c(2,4:6, 8:11, 15:16), with = FALSE])
+new <- left_join(new, features, all.x = TRUE)
+
+new$Stage1[is.na(new$Stage1)] <- 0 
+new$Stage2[is.na(new$Stage2)] <- 0 
+new$Stage4[is.na(new$Stage4)] <- 0 
+
+new <- data.table(new)
+
+new[,s1 := 100 * Stage1 / nowy]
+new[,s2 := 100 * Stage2 / nowy]
+new[,s4 := 100 * Stage4 / nowy]
+
+new$nowy[is.na(new$nowy)] <- 0 
+new$nowy_pow[is.na(new$nowy_pow)] <- 0 
+new$nowy_woj[is.na(new$nowy_woj)] <- 0 
+
+new$s1[is.na(new$s1)] <- 0 
+new$s2[is.na(new$s2)] <- 0 
+new$s4[is.na(new$s4)] <- 0 
+
+#Skalujemy zmienne numeryczne
+#numeric <- new[, c(5:7, 10:16, 18:19), with = FALSE]
+#numeric <- scale(numeric, center = FALSE)
+#new <- new[, -c(5:7, 10:16, 18:19), with = FALSE]
+#new <- cbind(new, numeric)
+
+attach(new)
+new[, zan := zanieczyszczenia / (ludnosc_pow * sd(zanieczyszczenia / ludnosc_pow))]
+new[, kob := kob_pow / 10000]
+
+setwd("C:/Users/Agnieszka/Documents/UniwersytetWarszawski/Statistics/Project2")
+load("./zanieczyszczenia.rda")
+
+zaniecz <- zaniecz[-(1:2),]
+
+for(i in 3:ncol(zaniecz)){
+      zaniecz[,i] <- as.character(zaniecz[,i])
+      zaniecz[,i] <- gsub(" ", "", zaniecz[,i])
+      zaniecz[,i] <- as.numeric(zaniecz[,i])
+}
+
+zaniecz <- left_join(aggregate(data = new, ludnosc_woj ~ wojewodztwo, mean), zaniecz)
+ 
+zaniecz <- cbind(zaniecz[,1], zaniecz[,-(1:3)] / zaniecz$ludnosc_woj)
+colnames(zaniecz)[1] <- "wojewodztwo"
+zaniecz[,-1] <- scale(zaniecz[,-1])
+     
+data.table(left_join(new, data.table(zaniecz), all.y = FALSE)) -> new
+
+```
+
+We initialize backward elimination with full models.
+```{r pierwsze modele, eval = FALSE}
+rm(list = ls())
+load("./dane.rda")
+new$grupa_wiek <- C(new$grupa_wiek, base = 2)
+
+mixMod <- lmer(100000 * nowy/lud_pow ~ 
+                    (1 | wojewodztwo) + (1 |wojewodztwo:TERYT4) + 
+                    grupa_wiek + PLEC +kob + papierosy + dwutlenek.siarki + s1 + s2 + s4 +
+                    tlenki.azotu + tlenek.wêgla + dwutlenek.wêgla + miasto +
+                    zan + procent, new)
+
+linMod <- lm(100000 * nowy/lud_pow ~ 
+                    grupa_wiek + PLEC + kob + papierosy + dwutlenek.siarki + 
+                    tlenki.azotu + tlenek.wêgla + dwutlenek.wêgla + metan + podtlenek.azotu +
+                    zan + procent + wojewodztwo + miasto, new)
+
+#summary(linMod)
+```
+
+```{r testowanie istotnoœci zmiennych sta³ych, eval = FALSE}
+tVal <- summary(mixMod)$coef[, 3]
+pVal <- 2 * pnorm(abs(tVal), lower.tail = FALSE)
+pVal <- pVal[pVal < 0.025]
+```
+
+```{r testowanie istotnoœci zmiennych losowych, eval = FALSE}
+new2 <- copy(new)
+M <- 100
+logLikelihood <- logLik(mixMod)
+set.seed(301)
+
+logLikSubregions <- replicate(M, {
+      new2$TERYT4 <- sample(new2$TERYT4)
+      tmp <- lmer(100 * nowy/ludnosc_pow ~ 
+                    (1 | wojewodztwo) + (1 |wojewodztwo:TERYT4) + 
+                    grupa_wiek + PLEC + s1 + s2 + s4 + kob_pow / ludnosc_pow + 
+                    zan + procent + factor(miasto), new)
+      logLik(tmp)
+})
+
+mean(logLikSubregions > logLikelihood) #efekt powiatu jest istotny
+
+new2 <- copy(new)
+
+logLikRegions <- replicate(M, {
+      new2$wojewodztwo <- sample(new2$wojewodztwo)
+      tmp <- lmer(100 * nowy/ludnosc_pow ~ 
+                    (1 | wojewodztwo) + (1 |wojewodztwo:TERYT4) + 
+                    grupa_wiek + PLEC + s1 + s2 + s4 + kob_pow / ludnosc_pow + 
+                    zan + procent + factor(miasto), new)
+      logLik(tmp)
+})
+
+mean(logLikRegions > logLikelihood) #efekt wojewÃ³dztwa jest istotny
+```
+
+```{r step dla modelu mieszanego, eval = FALSE}
+library(lmerTest)
+s <- step(mixMod)
+param <- summary(s$model)$coef[,1]
+param <- data.frame(param)
+rownames(param) <- c("Intercept", "0-44", "55-64", 
+                     "65-74", "75-84", "85+", "male",
+                     "women.fraction", "city", "smokers.fraction")
+```
+
+Stepwise selection kept six fixed variables and two mixed variables. The list of significant effects with parameters estimation is presented below.
+<center>
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:left;">   </th>
+   <th style="text-align:right;"> param </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> Intercept </td>
+   <td style="text-align:right;"> -93.2131408 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 0-44 </td>
+   <td style="text-align:right;"> -18.7086534 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 55-64 </td>
+   <td style="text-align:right;"> 109.5654805 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 65-74 </td>
+   <td style="text-align:right;"> 218.9575333 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 75-84 </td>
+   <td style="text-align:right;"> 230.4267803 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 85+ </td>
+   <td style="text-align:right;"> 125.4843882 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> male </td>
+   <td style="text-align:right;"> 174.9377561 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> stage1.fraction </td>
+   <td style="text-align:right;"> 0.5649766 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> stage2.fraction </td>
+   <td style="text-align:right;"> 0.9331524 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> stage4.fraction </td>
+   <td style="text-align:right;"> 0.9233504 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> city </td>
+   <td style="text-align:right;"> 22.6444082 </td>
+  </tr>
+</tbody>
+</table>
+</center>
+
+<br>
+
+
+### Interpretation of coefficients
+
+We selected the final model: all of the variables are significant at 5% significance value.
+
+- Age group: the reference group is <45-54>; we can see that ceteris paribus there are less cancer cases in the age group <0-44> and more in all the other groups (older) except the last one <85+> which makes intuitive sense: the older the group the more lung cancer cases and if the group is old enough only the real survivals remain (so less cancer cases).
+
+- Gender: there are more cases of lung cancer among males (ceteris paribus).
+
+- Stage2-Stage1: if the composition of cancers changes by one percentage point from Stage2 to Stage1 (we can interpret this as improving prophylaxis) there are less cases of cancer in a given group ceteris paribus (but the effect is small: half a case).
+
+- Stage4-Stage2: if the composition of cancers changes by one percentage point from Stage4 to Stage2 (we can carefully interpret this as improving treatment) there are more cases of cancer in a given group ceteris paribus (but the effect is almost zero).
+
+- City: there are more cancer cases in city-counties.
+
+Selection algorithm ran on the fixed model resulted in similar results (coefficient may be found in Rmd).
+
+```{r step dla modelu sta³ego, eval = FALSE}
+#Tu s¹ parametry dla sta³ego modelu
+sLin <- stats::step(linMod, k = log(nrow(new)), trace = -1)
+paramLin <- data.frame(sLin$coefficients)
+```
+
+
+```{r knn, eval = FALSE}
+trainControl <- trainControl(method = "cv", number = 10)
+knnGrid <- expand.grid(.k = seq(2, 50, 3))
+
+modelKnn <- train(nowy/ludnosc_pow ~ 
+                    grupa_wiek + PLEC + rok + procent + 
+                    zanieczyszczenia + factor(miasto), new,
+                  method = "knn",
+                  tuneGrid = knnGrid,
+                  trControl = trainControl)
+
+modelKnn #ostateczny model wskazuje na k = 29.
+
+```
+
+
+
+## Appendix
+
+We also ran stepwise selections on a model without taking into account cancer stages. Results are printed below.
+
+<center>
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:left;">   </th>
+   <th style="text-align:right;"> param </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> Intercept </td>
+   <td style="text-align:right;"> -116.0021648 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 0-44 </td>
+   <td style="text-align:right;"> -50.8080583 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 55-64 </td>
+   <td style="text-align:right;"> 115.3108207 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 65-74 </td>
+   <td style="text-align:right;"> 224.1699445 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 75-84 </td>
+   <td style="text-align:right;"> 234.1212125 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 85+ </td>
+   <td style="text-align:right;"> 105.2283873 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> male </td>
+   <td style="text-align:right;"> 180.9171694 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> women.fraction </td>
+   <td style="text-align:right;"> 0.6373408 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> city </td>
+   <td style="text-align:right;"> 24.1994590 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> smokers.fraction </td>
+   <td style="text-align:right;"> 2.5625355 </td>
+  </tr>
+</tbody>
+</table>
+</center>
+
+Similarly, we also constructed this model without mixed components and treating voievodships as fixed variables. In the model we obtained 4 significant variables:  voievodship, city, gender and age group.
+
+##Bibliography:
+* Bank Danych Lokalnych,
+* "Diagnoza spo³eczna 2013 - Warunki i jakoœæ ¿ycia Polaków", J.Czapiñski, T. Panek.  
