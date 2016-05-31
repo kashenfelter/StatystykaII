@@ -8,27 +8,30 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Today we are going to play with cancer data.
+Today we are going to play with cassification of cancer data.
 
 The instruction below downloads a dataset for 408 patients with breast cancer. 
-
-In the column `outcome` we have information about 3-years survival. 
-
-The goal is to create a score/classifier that is a good prediction for the survival/outcome.
-
-We will do this in two steps.
-In the first one we will focus only on two variables: age, ALKBH1. Working on small dataset will make it easier to understand structure of different models.
-In the second we will take into account all available variables.
-
-Next week we will talk about different ways how to assess the performance of such classifier.
 
 ```{r}
 load(url("https://github.com/pbiecek/StatystykaII/raw/master/MIMUW_2016/materialy/brca.rda"))
 ```
 
+In the column `outcome` we have information about 3-years survival. It's a binary variable - dead/alive.
+
+The goal is to create a score/classifier that will predict survival/outcome for new breast cancer patients.
+
+We will do this in two steps.
+In the first one we will focus only on two variables: age, ALKBH1. 
+
+Working on small dataset will make it easier to understand structures of different models.
+
+In the second step we will take into account all available variables.
+
+Next week we will talk about different ways how to assess the performance of such classifier.
+
 ## Fit the LDA/QDA classifier
 
-1. Use the `lda{MASS}` function to fit the LDA classifier based on two variables age+ALKBH1. 
+1. Use the `lda{MASS}` function in order to fit the LDA classifier based only on two variables age+ALKBH1. 
 2. Use the `print()`  function to examine the structure of this classifier.
 3. Use the `expand.grid` function to prepare a new dataset for predictions. This function creates a new dataset with every possible combination of different levels. You may use the following code.
 ```{r}
@@ -89,9 +92,9 @@ grid <- expand.grid(age=seq(20,90, length.out=50),
 
 ## All variables
 
-Once we learned structures of various models and saw their decision regions now we are ready to work with all 96 variables.
+Once we learned structures of various models and saw their 2D decision regions now we are ready to work with all 96 variables.
 
-1. Grow and plot a decision tree based on all variables.
+1. Grow and plot a decision tree based on all variables. Which one turns to be significant?
 2. Fit a logistic regression model based on all variables. Which are important? What about regularized logistic regression?
 3. Train a Naive Bayes classifier for all variables. Is it better to work with all variables or preselect some of them?
 4. Check results for LDA/QDA methods.
@@ -99,8 +102,8 @@ Once we learned structures of various models and saw their decision regions now 
 
 ## Last hope
 
-Here you have some guides. Use them only if needed.
-
+Here you have some guides. 
+But use them only if needed (i.e. problems with time).
 
 ```
 ## Tree
