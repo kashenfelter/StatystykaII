@@ -1,0 +1,100 @@
+Ogólnie:
+Kolory wydają się ciekawym rozwiązaniem, niestety szybko okazuje się, że kolory nic nie oznaczają.
+Brakuje komentarzy i nie wiadomo co wynika z tych wykresów.
+
+Na plus:
+Wybrane wykresy mają jakiś potencjał. Wystandaryzowanie osi OY do 500 to dobry pomysł. Łatwiej porównywać wykresy.
+
+Na minus:
+Przypadkowa i drażniąca kolejność wykresów pudełkowych.
+Brak komentarzy – właściwie czy coś wynika z tych zaprezentowanych wykresów?
+
+Inne:
+
+Nie jest jasne jak określono pory dnia (kiedy kończy się rano/wieczór). 
+Również nie jest jasne skąd ta kolejność południe, popołudnie, przedpołudnie …)
+Podobnie dla dni tygodnia. Poniedziałek pomiędzy piątkiem a sobotą?
+Przez obserwacje odstające te boxploty trudno porównać. Między sobą.
+
+Obcięcie wszystkiego do 500 sekund to dobry pomysł, ale być może należałoby by tez przedstawić to na innych osiach (np. pierwiastkowych)?
+
+Brakuje też komentarzy. Przez to nie wiadomo jaki jest główny wniosek płynący z tych wykresów?
+
+
+
+
+## -------------------------
+## Phase 2
+
+
+Czasem nie widzę związku pomiędzy opisem a kodem.
+Np. 'Znajdujemy aktywnych zwiedzających, tzn. takich, którzy odwiedzili min. 6 eksponatów, ale nie więcej niż 40:'
+a pod spodem kod pokazujący jak wyglądają kwartyle.
+Dopiero 4 linie niżej jest odpowiedni filtr.
+
+W komentarzach piszą państwo co państwo robią, np. 'Patrzymy przy pomocy funkcji Shepard, czy zredukowane dane dobrze zachowują odległości pomiędzy obiektami.'.
+Jest to zupełnie zbędne, bo kod tłumaczy co państwo robią.
+Ale brakuje informacji co udało się państwu odczytać z tych wykresów.
+Jest 'Patrzymy...' a powinno być 'Widzimy że...'
+
+
+Piszą państwo 'Z wykresu dla danych ze zredukowanej przestrzeni możemy określić liczbę możliwych klastrów.'
+ale nie ma informacji ile jest tych klastrów.
+Co więcej, z wykresu w żaden sposób to nie wynika.
+
+Dlaczego 5 klastrów? Dlaczego metodą k-średnich?
+
+Później jest PAM ale bez żadnych komentarzy.
+
+Podsumowując
+Ten skrypt wygląda jak zbiór notatek bez komentarzy.
+nie sposób nazwać do raportem.
+Nie ma w nim żadnych wniosków,
+z przeprowadzonych analiz nic nie wynika.
+
+W pierwszej fazie pisałem 'Brakuje też komentarzy.'
+Do tej fazy mam tą samą uwagę. 
+Jeżeli w raporcie państwo nie interpretują wyników, nie stawiają i weryfikują hipotez to sam raport nie ma wartości, jest tylko zbiorem przypadkowych obrazków i tabel. 
+Proszę poświęcić znaczeni więcej uwagi temu co i po co państwo analizują.
+
+
+## -------------------------
+## Phase 3
+
+1. Proficiency in tools	
+
+Jest wykonany histogram, jest shepard, isoMDS i pam.
+Wybranie numerów medoidów dla PAM nic nie mówi. Lepiej już byłoby pokazać jak wyglądają ścieżki wskazanych użytkowników.
+Wygląd tego kwiatka po mapowaniu isoMDS powinno włączyć alarm, dosyć zaskakujący jest taki wyraźny podział na cztery grupy.
+
+
+2. Structure and conclusions	
+
+Nie ma postawionych pytań badawczych. 
+W rozdziale 'Jakie zmienne są skorelowane z takim ładnym klastrowaniem?' nie ma nawet zdania komentarza, trudno to nazwać raportem.
+
+Diagnostyka nie jest wykonana poprawnie. 
+Skoro piszą państwo, że grupy mają coś wspólnego z czasem przebywania na klastrach to powinna zostać wykonana analiza jak wyglądają rozkłady czasu przebywania na eksponatach w grupach opisanych przez klastry.
+
+Struktura i opis są bardzo nieczytelne. 
+Z obrazków wynika że są cztery grupy, ale zupełnie nie wiadomo z czym są one związane i jak można by je wykorzystać.
+
+
+3. Adequacy
+
+Zaproponowano własną metrykę, ale brakuje dyskusji dlaczego jest dobra, jak ma się do pozostałych metryk.
+Może ona i jest lepsza, ale gdzie porównanie?
+
+Jak ocenić sensowność tej metryki na bazie 'distances_station_manual_clustering_good_reduced[1:10, 1:10]' - te liczby przecież nic nie mówią o tej metryce.
+
+Trudno uznać zdanie 'Rzutowanie prezentuje się bardzo ładnie:' za dyskusje czy ten sposób rzutowania był właściwy, czy metryka była właściwa.
+
+Porównanie zależności innych zmiennych z czterema uzyskanymi klastrami lepiej robić nie na wykresie po isoMDS ale używając do tego testów/innych technik. Przykładowo aby porównać średni czas przebywania a klaster.
+Do tego lepiej wykorzystać boxploty lub test dla średnich. Podobnie z liczbą odwiedzonych eksponatów.
+
+Aby porównać dwie zmienne jakościowe lepiej wykorzystać test chi2 lub analizę korespondencji
+
+Oceny obszarów:
+
+80% / 30% / 40%
+

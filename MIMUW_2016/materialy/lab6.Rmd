@@ -1,0 +1,37 @@
+---
+title: "Lab6"
+author: "put your name here"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Association rules
+
+We will be playing with data related to student grades. 
+Let's use association rules to find some structure in data related to grades.
+
+
+1. Load the dataset `archivist::aread("pbiecek/Przewodnik/arepo/12b75717051be0ae516b900e1e70c049")`. 
+2. What is inside? Check first few rows. Plot the distribution of grades and codes and number of codes per student.
+3. Use the `tidyr` package to convert this dataset into the wide format. The function `spread` will do the job. 
+4. Create a binary matrix with two possible values TRUE (student gets grade higher or equal than 3) and FALSE (have not taken this course or got 2).
+5. Convert this matrix into an objects of class `transactions`. Use the `as()` function for this. Note, that you need to load the `arules` package first.
+6. Use the `apriori()` function to find rules with support >0.1
+7. Use the `inspect` and `sort` functions to print rules sorted along the `lift`.
+8. Install the `arulesViz` package. Use the `plot()` / `itemFrequencyPlot()` function to investigate the set of rules. 
+
+
+Looking for more? Try this dataset: `379dde77e1b8446ecdb0e87fc6552909`.
+
+## Principal Components Analysis
+
+Let's play with data related to movies, from Hollywood Insider.
+
+1. Download data from `archivist::aread("pbiecek/Przewodnik/arepo/10aab376f2bc0001cbd1db1802e9fb53")`.
+2. Limit this data only to movies from 2015 and choose columns 4:8.
+3. Use the `prcomp()` function to find a PCA representation of this dataset.
+4. Create a biplot. What can you say about this landscape of movies? Use either the `biplot()` function or the `autoplot()` function from the `ggfortify` package.
+

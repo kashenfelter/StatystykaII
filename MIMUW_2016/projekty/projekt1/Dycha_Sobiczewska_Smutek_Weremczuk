@@ -1,0 +1,100 @@
+Ogólnie:
+Wydruk (wielkie piksele) i wykresy sprawia wrażenie bardzo niestarannych. Nie widać ani wysiłku włożonego w dopracownie wykresów ani wysiłku włożonego w policzeniu sensowych rzeczy. Ok kilka przypadkowych wykresów. 
+
+Na plus:
+Pierwszy wykres jako jedyny wygląda jak coś bogatego w treść.
+
+Na minus:
+Wykres z prawej górnej strony – nic z niego nie wynika. Pokazuje, że nie zastanawiali się Państwo nad tym co mają te wykresy pokazywać.
+
+Inne:
+
+Wydruk jest bardzo słabej jakości, nie wygląda to najlepiej.
+Z wykresu w prawym górnym rogu nie sposób nic odczytać. Nie wiadomo który słupek to która stacja. Można by usunąć ten wykres i nic by się nie zmieniło.
+
+Z wykresu po prawej stronie na dole (literówka w tytule) trudno odczytać ile było odwiedzających w niedzielę. I dlaczego odwiedzających jest najwięcej w środy i czwartki. Te wyniki są inne niż innych grup i są inne niż można by się spodziewać.
+
+Czy to jest liczba na dzień, czy suma przez wszystkie wtorki/środy itp.
+Oznaczenia na osi OX naw wykresie z godzinami nie są zbyt czytelne, 12.5? 17.5?
+
+Lewy górny wykres, czy to jest wykres jednej maszyny czy wszystkich? Nie sposób odczytać.
+Nie dość że wykresy niewiele mówią to brakuje jeszcze na plakacie komentarzy.
+
+Bardzo dużo trzeba poprawić na kolejną fazę.
+
+
+
+## -------------------------
+## Phase 2
+
+Brak przesłanego raportu
+
+
+## -------------------------
+## Phase 3
+
+1. Proficiency in tools	
+
+Wykorzystano i narzędzia do analizy grup, arules, isoMDS, ale ograniczanie się tylko do analizy dwóch zmiennych. 
+A jest to znaczne zubożenie informacji, która jest w tak dużych danych.
+
+Wykres o nazwie 'boxploty uzyskanych grup' jest bardzo nieczytelny. Co jest na osi OX? Dlaczego różne boxploty są w różnych miejscach.
+
+Wykresy przedstawiają coś innego niż sugeruje opis.
+Jest opis 'liczba interakcji w zależności od czasu' a to na liczba interakcji jest na osi X.
+
+Metody analizy isoMDS i grupowania mają sens, gdy są stosowane do wielowymiarowych danych. 
+Dla dwóch zmiennych, w tym przypadku, ich użyteczność jest dyskusyjna.
+
+
+2. Structure and conclusions	
+
+Opisy są lakoniczne, jest ich nie wiele i toną w kodzie R, tabelach i wykresach.
+
+Zalew wyników, które nie zostały w żaden sposób wyselekcjonowane, bardzo utrudnia czytanie.
+
+Przedstawione są kolejne fazy, ale brakuje wniosków dotyczących danych.
+Celem projektu nie jest zrobienie kilku faz, ale rozwiązania zagadki związanej z danymi.
+
+Użyty język jest okropny. Można wybaczyć słowo 'wizytor' gdy ktoś pośpiesznie omawia prezentacje, ale nie w pisemnym raporcie.
+
+Wiele zdań jest napisanych tak jakby ich nikt nie oglądał po raz drugi.
+
+,,Celem tej części jest wyodrębnienie - grup stacji - grup odwiedzających W oparciu o macierz odwiedzin, która na pozycji i,j ma jedynkę jeżeli i-ty gość zwiedził j-ty eksponat (zero w przeciwnym przypadku).''
+
+
+Każda z metod ma osobno przedstawione wnioski na końcu raportu. Ale wnioski powinny być spójne i dotyczyć danych
+
+Niektóre komentarze są oderwane od wyników, np.:
+,,CNK16 - “Powąchaj mnie” jest stacją zachęcającą do odwiedzenia innych eksponatów''
+
+
+Inne wnioski są bardzo trudne do zrozumienia. Np o co chodzi w zdaniu:
+
+,,Większość stacji zachowuje się bardzo podobnie. Można jednak zauważyć dwie charaktarystyczne skupiska:
+- grupy w których liczba krótkich interakcji przekracza ponad 50% wszystkich
+- grupy w których liczba krótkich interakcji jest znikoma w stosunku do całości''
+
+
+3. Adequacy
+
+Użycie wykresu pudełkowego/boxplotu do tych danych to bardzo zły pomysł
+
+Oparcie się o dwie zmienne do analizy skupisk nie jest dobrym pomysłem, dla 2d możemy lepiej określić grupy odręcznie, nie potrzebny jest żaden algorytm
+
+Pisza państwo o użytej 'odległości jaccarda'. Ale nie jest jasne na jakich danych została ona zastosowana. Jak traktowano osoby które dwa razy odwiedzały jedna stacje, czy czas odwiedzin się liczyć?
+
+Poprawnie stwierdzono ze nie należy używać PCA.
+
+Wyniki dla grupowania są przedstawiane na bardzo małym zbiorze odwiedzających. Pytanie czy jest to jakkolwiek reprezentatywna próba.
+
+Numery grup znalezionych z algorytmem manhattan i z algorytmem jaccard nie musza mieć nic ze sobą wspólnego, nie należy ich porównać. 
+Przez to nie wiem jak czytać wyniki z 'Porównanie klastrów i stref'. Co wynika z tego porównania?
+
+
+Punkty:
+
+80% / 30% / 50%
+
+
+

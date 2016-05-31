@@ -1,0 +1,144 @@
+---
+title: "Lab 5"
+author: "Przemyslaw Biecek"
+date: "12 April 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Warm-up
+
+`mlbench` is an R package for benchmarking some Machine Learning algorithms.
+
+It contains a collection of functions for generation of artificial datasets (their names start with `mlbench.`).
+
+Task: 
+
+Draw 600 observations from `mlbench.cassini()`, `mlbench.cuboids()`, `mlbench.spirals()` and `mlbench.smiley()`. 
+
+Plot all these datasets. Note that the value returned by any of these functions is a list with two slots `x` - coordinates and `classes` - components of observations - use them as colours.
+
+
+```{r}
+# put your answer here
+
+```
+
+## Agglomerative clustering - simulations
+
+Try hierarchical clustering. You may use functions `hclust{stats}` or `agnes{cluster}` they are pretty similar.
+
+Compare different methods for linkage. Start with `single`, `complete`, `average` and `ward`. 
+
+Apply all these methods to the dataset generated with `mlbench.cassini()`. Cut the dendrogram in order to get 4 clusters (use the `cutree()` function). 
+
+Compare these four clusters with original components.
+
+Which method gives the 'best' results?
+
+```{r}
+# put your answer here
+
+```
+
+And now try the dataset generated with `mlbench.spirals()` function.
+
+Which method is the best one, now?
+
+```{r}
+# put your answer here
+
+```
+
+## Real data
+
+Do you remember data about votings?
+
+Download it again, fill the missing data, calculate distances between deputies and create dendrogram for deputies.
+
+Try different linkage methods. Which dendrogram looks best?
+
+```{r}
+library(archivist)
+
+votings <- archivist::aread("pbiecek/Przewodnik/arepo/9175ec8b23098c4364495afde9a2cc17")
+votings[is.na(votings)] <- "Not present"
+
+# put your answer here
+
+```
+
+You can try the `fviz_dend{factoextra}` function for visualisation. 
+
+Here are instructions how to install this package
+
+```{r}
+# library(devtools)
+# install_github("kassambara/factoextra")
+```
+
+## Multi-dimensional scaling
+
+Let's start with artificial dataset. The `mlbench.cuboids()` generates data from 3-dimensional space. Let's project it on the 2-d space.
+
+Try the `cmdscale{MASS}` (new coordinates are linear transformations of original ones), `isoMDS{MASS}` (distances between objects shall be preserved as precisely as possible) functions in order to find suitable transformation. Both functions take the distance matrix as an argument and return coordinates in the new space.
+
+```{r, echo=FALSE}
+# put your answer here
+
+```
+
+## Diagnostics
+
+Use the `Shepard{MASS}` function to calculate information related to distortions in distances. Plot these values.
+
+## Real data
+
+Once again, let's use data about votings.
+
+Transform distances between deputies on 2-d space. Plot new coordinates for deputies. Use their clubs as colors.
+
+Do you see any advantage of such plots over clustering?
+
+```{r, echo=FALSE}
+# put your answer here
+
+```
+
+## Backup
+
+Use only if you have no other choice.
+
+```{r}
+library(mlbench)
+
+plot(mlbench.cassini(150))
+plot(mlbench.cuboids(150))
+plot(mlbench.spirals(150))
+plot(mlbench.smiley(150))
+
+dat <- mlbench.cassini(600)
+
+library(cluster)
+
+tree1 <- agnes(dat$x, method = "ward")
+plot(tree1)
+ndf <- data.frame(dat$x, clust=factor(cutree(tree1, 4)))
+table(ndf$clust, dat$classes)
+
+library(ggplot2)
+ggplot(ndf, aes(X1, X2, color=clust)) + geom_point()
+
+dat <- mlbench.cuboids(600)
+
+library(MASS)
+newcoord <- isoMDS(dist(dat$x))
+
+ndf <- data.frame(newcoord$points, class = dat$classes)
+ggplot(ndf, aes(X1, X2, color=class)) + geom_point()
+
+```
+
