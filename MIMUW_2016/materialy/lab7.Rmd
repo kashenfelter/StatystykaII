@@ -1,0 +1,135 @@
+---
+title: "Lab7"
+author: "put your name here"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Simulations
+
+In order to validate properties of different regression models we will start with an artificial dataset.
+
+0. Set N = 1000, d = 10, p = 2 and delta = 0.5.
+1. Generate a matrix `X`. It should be a matrix of the size N x d. It can be filled with values from uniform distribution `U[0,1]`. Try `runif()` and `matrix` functions.
+2. Generate the vector `y`. Values in `y` should be sum of random noise and linear predictor. Use a linear combination of first `p` columns with weights `delta` as linear predictor and add Gaussian random noise `N(0,1)`. Try functions `rnorm()`, `rowSums`.
+So 
+$$
+y = X_1 + ... + X_p + e,
+$$
+where $$e \sim N(0,1)$$.
+3. Create a data frame with column `y` and columns in `X`.
+
+## Model fitting
+
+There is a lot of ways to fit a model in R. We are going to work with the `caret` package - an uniform approach to predictive modelling. The learning slope is steep but the payoff is high.
+
+1. Use the `caret::train` function to fit `lm` model. The argument `method = "lm"` should do the job.
+2. Use `method = "knn"` to fit k nearest neighbours.
+3. Use `method = "ctree"` to fit decision trees.
+
+By default the `knn` and `ctree` are doing some optimisation to find best model parameters (like k). But let's talk about this option in future. 
+Today we are going to work with a single model.
+
+See the section 'Fitting Models Without Parameter Tuning' of http://topepo.github.io/caret/training.html to learn how to fit a model with selected k.
+
+To find list of available models and their parameters check the list https://topepo.github.io/caret/modelList.html
+
+## Model scoring
+
+For each fitted model calculate the RSS statistic based on a new dataset.
+So:
+
+1. Generate a new data set `data.frame(y, X)` with same size and structure as before.
+2. Apply the `caret::predict` function to find $$\hat y$$ on new independent data set.
+3. Calculate the sum of squares of $$\hat_y - y$$ on this new dataset.
+4. Repeat these calculations 100 times.
+5. Plot distribution of SS with the use of boxplots.
+
+Which method has the lowest SS?
+
+## Model comparisons
+
+Check which model has the lowest SS for:
+
+1.  N = 1000, d = 10, p = 2 and delta = 0.5.
+2.  N = 50, d = 20, p = 20 and delta = 0.5.
+3.  N = 1000, d = 10, p = 10 and delta = 0.5.
+4.  N = 1000, d = 2, p = 2 and delta = 0.5.
+
+Surprised?
+
+Let's see profiles of the SS as a function of: (use matplot or ggplot2) 
+
+1. N = 10, 100, 1000,
+2. d = 2, 5, 10, 20,
+3. p = 10%, 20%, 50%, 100%,
+4. delta = 0.2, 0.5, 0.9.
+
+
+.
+
+.
+
+.
+
+.
+
+.
+
+.
+
+.
+
+##  In case you really need it
+
+```{r}
+set.seed(1313)
+N = 50
+d = 20
+p = 20
+delta = 0.5
+
+rr <- replicate(20, {
+  
+X <- matrix(runif(N*d), N, d)
+y <- rowSums(X[, 1:p, drop=FALSE])*delta + rnorm(N)
+df <- data.frame(y, X)
+
+X2 <- matrix(runif(N*d), N, d)
+y2 <- rowSums(X2[, 1:p, drop=FALSE])*delta + rnorm(N)
+df2 <- data.frame(y2, X2)
+
+library(caret)
+library(party)
+
+fit1 <- train(y~., data = df, method = "lm")
+
+fitControl <- trainControl(method = "none")
+fit2 <- train(y~., data = df, method = "knn", 
+              trControl = fitControl, 
+              tuneGrid = data.frame(k = 10))
+
+fit3 <- train(y~., data = df, method = "ctree", 
+              trControl = fitControl, 
+              tuneGrid = data.frame(mincriterion = 0.9))
+
+pf1 <- predict(fit1, df2)
+pf2 <- predict(fit2, df2)
+pf3 <- predict(fit3, df2)
+c(lm = sum((pf1 - df2$y2)^2),
+  knn = sum((pf2 - df2$y2)^2),
+  ctree = sum((pf3 - df2$y2)^2))
+})
+
+boxplot(t(rr))
+
+```
+
+Inne materiały o caret
+
+https://www.r-project.org/nosvn/conferences/useR-2013/Tutorials/kuhn/user_caret_2up.pdf
+
+

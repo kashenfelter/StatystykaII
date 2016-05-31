@@ -1,0 +1,216 @@
+CNK 07 - deeper analysis
+========================================================
+author: D. Bottoli, M. Mlynarczyk, J. Trojgo, A. Sitko
+
+
+Station description
+========================================================
+<img src = "CNK07.png", height = 600, width = 1000>
+
+Station description
+========================================================
+Station **CNK07** consist of an experiment based on **Stroop effect**.
+
+This effect is shown through a psychological experiment on **two different levels**. 
+
+In the first one, the user is asked to press a button of the *same colour* as the word that he is reading.
+
+But what if the word and its colour are *dissociated*?
+
+This happens on the second level: the user has to follow the same procedure but this time it’s much harder.
+
+
+Stroop effect
+========================================================
+
+<img src = "Obraz1.png", height = 250, width = 1000>
+<img src = "Obraz2.png", height = 250, width = 1000>
+
+Deeper analysis - agenda
+========================================================
+
+<br><br><br><br>
+<ol>
+      <li>CNK07 descriptors - mixtures of distributions parameters.</li>
+      <li>Stroop effect - is it proven by the data?</li>
+</ol>
+
+Clusters - previous approach
+========================================================
+Below there are presented clusters obtained *in the second 
+phase*. They are constructed basing on scenes counts vectors.
+
+<img src = "Obraz3.png", height = 500, width = 1000>
+
+Clusters - EM algorithm
+========================================================
+
+<br><br>
+
+How many clusters should we look for? <br><br>
+
+Let's start with the previous approach - **two clusters**.
+
+Clusters - EM algorithm - two clusters
+========================================================
+
+<img src = "twoClustersEM.png", height = 600, width = 1000>
+
+Clusters - EM algorithm
+========================================================
+<br>
+
+**Note:** It doesn't look good... 
+Maybe there are more than two clusters?
+
+Let's train EM algorithm using different numbers of components 
+and see which one *minimizes BIC*.
+
+We will train two different models: 
+- "E" with equal variances,
+- "V" with different variances.
+
+Clusters - EM algorithm - BIC analysis
+========================================================
+<img src = "BIC.clusters.png", height = 600, width = 1000>
+
+
+Clusters - EM algorithm - BIC analysis
+========================================================
+<br><br>
+**Note:** Models with different variances outperform models
+with equal variance. <br><br>
+It looks like adding just the first few clusters
+improves BIC significantly.
+
+
+Clusters - EM algorithm - BIC analysis
+========================================================
+
+<br><br><br>
+We performed *Bootstrap Likelihood Ratio Test for the Number of Mixture Components*
+to identify the most satisfying number of clusters.<br><br>
+It turned out that this is **five**.
+
+Clusters - EM algorithm - final results
+========================================================
+<img src = "fiveClustersSqrt.png", height = 600, width = 1000>
+
+Clusters - EM algorithm - final results
+========================================================
+
+<br><br>
+
+|                |red cluster |blue cluster |green cluster |violet cluster |orange cluster |
+|:---------------|:-----------|:------------|:-------------|:--------------|:--------------|
+|Splash          |100%        |100%         |100%          |100%           |100%           |
+|LevelOne        |100%        |100%         |100%          |100%           |100%           |
+|ResultOne       |82%         |40%          |98%           |100%           |99%            |
+|LevelTwo        |8%          |7%           |92%           |96%            |91,7%          |
+|ResultTwo       |0,3%        |0,8%         |84%           |94%            |86%            |
+|StroopHighScore |0,1%        |0,2%         |38%           |59%            |51%            |
+
+Clusters - EM algorithm - final results
+========================================================
+<img src = "resultsByCluster.png", height = 600, width = 1000>
+
+
+Clusters - EM algorithm - final results
+========================================================
+
+<br><br>
+
+|                                         |red |blue |green |violet |orange |
+|:----------------------------------------|:---|:----|:-----|:------|:------|
+|Average time spent at one stations (sec) |65  |60   |89    |110    |110    |
+|Average time spent at CNK07 (sec)        |44  |33   |96    |178    |178    |
+|Average time spent at Whole Sector (min) |42  |40   |51    |51     |53     |
+|Avarege number of visited stations       |11  |10   |13    |13     |13     |
+
+Clusters - EM algorithm - final results
+========================================================
+
+Below we present the amounts of visitors in each cluster.
+<img src = "clustersNumerousness.png", height = 400, width = 1000>
+
+|    1|    2|     3|    4|   5|
+|----:|----:|-----:|----:|---:|
+| 4002| 3550| 12909| 3171| 423|
+
+Stroop effect - is it proven by the data?
+========================================================
+<br>
+FIRST OBSERVATION:
+  - level one is played around 26000 times while level two only around 18500,
+  - 24450 different users in level one, but only 16135 played the second level -> **exactly 66% of people who played level one go to the second level**,
+  - **89%** of people who started first level and **87%** of those who started second level did see the result of the level they played.
+  
+Stroop effect - is it proven by the data?
+========================================================  
+left: 53%
+<br><br><br>
+SECOND OBSERVATION:
+  - Frequencies of games per person divided into two levels are presented on the rigth,
+  - We don't observe it from the table but some users played level one 27, 30 and 34 times.
+
+***
+
+**Level One**  
+
+|   |Freq. |Relative Freq. |
+|:--|:-----|:--------------|
+|1  |20130 |82.7%          |
+|2  |3364  |13.8%          |
+|3  |598   |2.5%           |
+|4+ |245   |1.0%           |
+
+**Level Two**
+
+|   |Freq. |Relative Freq. |
+|:--|:-----|:--------------|
+|1  |13799 |86.0%          |
+|2  |1913  |11.9%          |
+|3  |241   |1.5%           |
+|4+ |91    |0.6%           |  
+  
+Stroop effect - is it proven by the data?
+========================================================  
+<img src = "timeTwoLevelsIntersection.png", height = 500, width = 1000>
+**Note:** Only people who completed both levels once and saw the results for both levels (some 14500 people) will be considered in further analysis.
+
+
+Stroop effect - is it proven by the data?
+========================================================  
+<br> 
+THIRD OBSERVATON:
+
+  - From the plot we can observe that distributions are bell-shaped, we could consider them **normal curves with different means**,
+  - **72.7%** of analysed people completed the first level faster.
+  
+    |          |1st Q. |Median |Mean  |3rd Q. |
+    |:---------|:------|:------|:-----|:------|
+    |Level One |31     |35     |36.18 |39     |
+    |Level Two |34     |38     |39.41 |44     |
+    
+Stroop effect - is it proven by the data?
+========================================================  
+<br>
+
+RESULTS:
+ 
+ - Kolmogorov-Smirnov test **rejects the hypothesis about distributions equality**!
+ 
+ - ANOVA **rejects the hypothesis about means equality**!
+ 
+CONCLUSION:
+  - From our analysis we can confirm, with a high level of confidence, that the Stoop Effect is present in people.
+
+========================================================
+left: 15%
+
+
+***
+<br><br><br><br><br><br>
+Finito! Thank you!
+
+

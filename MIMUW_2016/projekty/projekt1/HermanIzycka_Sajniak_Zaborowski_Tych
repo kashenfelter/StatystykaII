@@ -24,3 +24,50 @@ Wykres po prawej stronie na dole jest czytelny. Przy czym te małe wartości po 
 Ogólnie te histogramy w skali log nie są najlepszym pomysłem, Nie sposób porównać stacji. 
 
 Do prawych wykresów nie ma komentarzy, są tylko dla lewych wykresów.
+
+
+## -------------------------
+## Phase 2
+
+Brak przesłanego raportu
+
+## -------------------------
+## Phase 3
+
+1. Proficiency in tools	
+
+W raporcie jest bardzo wiele technik
+gap statistic, agnes, ggplot, warunkowe, mds, shepard, FR, reguły asocjacyjne tez są, choć bez wniosków.
+Narzędziowo dosyć uporządkowany raport, generalnie dawno popranie.
+
+
+2. Structure and conclusions	
+
+Pierwszym elementem powinno być jasne określenie na jakie pytania odpowiada ten raport. 
+To nawet wprost było napisane w regułach punktacji aby uzyskać 50%.
+Bardzo tego brakuje, jest bowiem zapis różnych eksperymentów ale nie ma informacji co z nich wynika i czy cokolwiek miało wynikać.
+
+Nie ma praktycznie wniosków, są luźno zdania typu 'Sprawdźmy teraz czy klastry się czymś różnią, w tym celu sprawdźmy jakie stacje odwiedzali ludzie przechodzący ścieżki w klastrach. Jak często występuję pojedyncza stacja w ścieżkach z klastrami?'.
+Obok nich są wykresy i może coś z nich wynika, ale nie jest to napisane.
+
+A jedyny komentarz do reguł to 'Mało czytelne badanie współwystępowania danych stacji w ścieżkach odwiedzających.'
+
+Stwierdzenia typu 'Rzeczywiście na powyższym rysunku można zobaczyć, że rozkład czasu spędzonego różni się.' są niekompletne. Różni się od czego?
+
+
+3. Adequacy
+
+Użycie dystrybuanty do grupowania to ciekawy pomysł. Ale dlaczego do skalowania wykorzystywać PCA (a tak naprawdę to nie jest PCA tylko skalowanie klasyczne.
+
+Grupy znalezione mogłyby być jakoś scharakteryzowane, a tutaj tego brakuje. Są cztery grupy ale czym się różnią?
+Zamiast pokazywać czas w każdej z grup można by pokazać jak podobne są dystrybuanty stacji z poszczególnych grup
+
+Grupowanie ścieżek za pomocą algorytmu PAM przeprowadzono bez badania jak dobierać odległość i czy to grupowanie ma jakikolwiek sens, więc dalsze wnioskowanie (rozdział 8) jest palcem po wodzie
+
+Wykonali państwo sporo pracy, ale bez sprawdzenia na ile uzyskane wyniki są powtarzalne i bez dodania komentarzy ta praca pozostaje niezakończoną eksploracją.
+
+
+
+Punktacja:
+100% / 35% / 50%
+
