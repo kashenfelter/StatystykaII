@@ -119,8 +119,11 @@ $(document).ready(function () {
 <li><a href="#introduction">Introduction</a></li>
 <li><a href="#additional-data">Additional data</a></li>
 <li><a href="#our-variables">Our variables</a></li>
-<li><a href="#models">Models</a></li>
-<li><a href="#model-coefficients-interpretation.">Model coefficients interpretation.</a></li>
+<li><a href="#models">Models</a><ul>
+<li><a href="#models-without-random-effects">Models without random effects</a></li>
+<li><a href="#adding-random-effects">Adding random effects</a></li>
+<li><a href="#interpretation-of-coefficients">Interpretation of coefficients</a></li>
+</ul></li>
 <li><a href="#appendix">Appendix</a></li>
 <li><a href="#bibliography">Bibliography:</a></li>
 </ul>
@@ -207,6 +210,17 @@ percent of the population of county which smoke.
 <div id="models" class="section level2">
 <h2>Models</h2>
 <p>The main purpose of our analysis was to find features that explain lung cancer morbidity in Poland. We put more effort on detecting variables that have an important impact on lung cancer cases than on predicting the number of new cases in next years. First, we analysed different linear models - with mixed effects and without. We performed stepwise feature selection to find a model with a high loglikelihood value and a reasonable number of parameters (to avoid overfitting). Therefore we minimized BIC criterion.</p>
+<div id="models-without-random-effects" class="section level3">
+<h3>Models without random effects</h3>
+<p>First, we analysed different linear models and performed some stepwise selections in order to find variables that have a significant impact on cancer cases regardless of model specification:</p>
+<ul>
+<li><p>standard OLS (as this is a panel dataset this is the so called pooled model): in order to capture the geographic differentiation of lung cancer cases we added dummy variables indicating counties and/or voivodeships: the latter were significant,</p></li>
+<li><p>fixed-effects panel OLS: here we add dummies for each unit (so combination of county, year, age group and gender) so that the estimates of their parameters are bad so the model is useless for prediction.</p></li>
+</ul>
+</div>
+<div id="adding-random-effects" class="section level3">
+<h3>Adding random effects</h3>
+<p>As the above models captured the geographic effects only when loads of dummies were added (thus a lot of parameters) we added mixed effects to our model (one for voivodeships and the other for counties). This allows us to focus on the relations that interested us: gender, age group, composition of stages, air and industrial pollution, smoking cigarettes.</p>
 <p>In analysed mixed models, we include <code>TERYT4</code> and <code>voivodeship</code> as random components. We use natural nesting of subregions in regions.</p>
 <p>We initialize backward elimination with full models.</p>
 Stepwise selection kept six fixed variables and two mixed variables. The list of significant effects with parameters estimation is presented below.
@@ -314,16 +328,19 @@ city
 </table>
 </center>
 <p><br></p>
+</div>
+<div id="interpretation-of-coefficients" class="section level3">
+<h3>Interpretation of coefficients</h3>
+<p>We selected the final model: all of the variables are significant at 5% significance value.</p>
+<ul>
+<li><p>Age group: the reference group is &lt;45-54&gt;; we can see that ceteris paribus there are less cancer cases in the age group &lt;0-44&gt; and more in all the other groups (older) except the last one &lt;85+&gt; which makes intuitive sense: the older the group the more lung cancer cases and if the group is old enough only the real survivals remain (so less cancer cases).</p></li>
+<li><p>Gender: there are more cases of lung cancer among males (ceteris paribus).</p></li>
+<li><p>Stage2-Stage1: if the composition of cancers changes by one percentage point from Stage2 to Stage1 (we can interpret this as improving prophylaxis) there are less cases of cancer in a given group ceteris paribus (but the effect is small: half a case).</p></li>
+<li><p>Stage4-Stage2: if the composition of cancers changes by one percentage point from Stage4 to Stage2 (we can carefully interpret this as improving treatment) there are more cases of cancer in a given group ceteris paribus (but the effect is almost zero).</p></li>
+<li><p>City: there are more cancer cases in city-counties.</p></li>
+</ul>
 <p>Selection algorithm ran on the fixed model resulted in similar results (coefficient may be found in Rmd).</p>
 </div>
-<div id="model-coefficients-interpretation." class="section level2">
-<h2>Model coefficients interpretation.</h2>
-<ol style="list-style-type: decimal">
-<li><p>Age group: fitted values suggest that age groups 65-74 and 75-84 are the most susceptible to lung cancer while age group 0-44 is much less susceptible.</p></li>
-<li><p>Gender: Men are more likely to have lung cancer than women.</p></li>
-<li><p>City: People from cities are more likely to have lung cancer than from non-city regions.</p></li>
-<li><p>Stages: nie rozumiem tej interpretacji</p></li>
-</ol>
 </div>
 <div id="appendix" class="section level2">
 <h2>Appendix</h2>
