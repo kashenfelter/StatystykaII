@@ -2,7 +2,10 @@
 title: "Faza 2"
 author: "Patrycja Matys, Jan Rosa, Krzysztof Rutkowski, Magda Sobiczewska"
 date: "31 maja 2016"
-output: html_document
+output: 
+  html_document:
+    fig_caption: yes
+    toc: true
 ---
 
 ##Wprowadzenie
@@ -10,7 +13,7 @@ W prezentacji pokażemy w jaki sposób staraliśmy się wybrać model predykcji 
 piersi w danym powiecie. Korzystając z analiz dokonanych w pierwszej fazie projektu zdecydowaliśmy się
 robić model wyłączenie dla kobiet. Za czynniki mogące wpływać na odsetek zachorowań wybraliśmy:
 * gęstość zaludnienia
-* urbanizację
+* urbanizację 
 * stężenie szkodliwych substancji w powietrzu
 * uciążliwe warunki pracy
 * tereny zielone
@@ -71,7 +74,7 @@ Najpierw porównano bardziej klasyczne metody metody:
 
 Wykres przedstawia porównanie błędów przy próbkowaniach dla trzech metod, średni MSE dla wszytskich metod przedstawia tablela. 
 
-#Wyb?r metody
+#Wybór metody
 ```{r setup, include=FALSE, echo=FALSE, results='hide'}
 wynik_pre_normal1<-rep(0,92)
 wynik_aic1<-rep(0,92)
