@@ -1,0 +1,149 @@
+---
+title: "Lab9"
+author: "put your name here"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Today we are going to play with cancer data.
+
+The instruction below downloads a dataset for 408 patients with breast cancer. 
+
+In the column `outcome` we have information about 3-years survival. 
+
+The goal is to create a score/classifier that is a good prediction for the survival/outcome.
+
+We will do this in two steps.
+In the first one we will focus only on two variables: age, ALKBH1. Working on small dataset will make it easier to understand structure of different models.
+In the second we will take into account all available variables.
+
+Next week we will talk about different ways how to assess the performance of such classifier.
+
+```{r}
+load(url("https://github.com/pbiecek/StatystykaII/raw/master/MIMUW_2016/materialy/brca.rda"))
+```
+
+## Fit the LDA/QDA classifier
+
+1. Use the `lda{MASS}` function to fit the LDA classifier based on two variables age+ALKBH1. 
+2. Use the `print()`  function to examine the structure of this classifier.
+3. Use the `expand.grid` function to prepare a new dataset for predictions. This function creates a new dataset with every possible combination of different levels. You may use the following code.
+```{r}
+grid <- expand.grid(age=seq(20,90, length.out=50),
+            ALKBH1=seq(100,900, length.out=50))
+```
+4. Use the `predict()` function to predict classes for the `grid` dataset. Extract the `posterior` slot from this result.
+5. Plot the predictions for the grid dataset (scatterplot / geom_point).
+6. Check how the decision regions behave for different cutoffs for posteriors.
+
+
+## Grow a tree
+
+There are many functions for growing the classification tree in R. 
+For visualization a good choice is the `ctree` function from the `party` package.
+
+1. Use the `ctree{party}` to grow a classification tree for two variables age/ALKBH1. 
+2. Use the `print()` and `plot()` function to visualize the tree.
+3. Use the `expand.grid` function to prepare a new dataset for predictions. This function creates a new dataset with every possible combination of different levels. You may use the following code.
+```{r}
+grid <- expand.grid(age=seq(20,90, length.out=50),
+            ALKBH1=seq(100,900, length.out=50))
+```
+4. Use the `predict()` function to predict classes for the `grid` dataset. Check out results. Are they surprising? Is there anything that we can do?
+5. Try different splitting criteria. Check the `ctree_control()` function and parameters like `mincriterion`, `minsplit`, `minbucket`
+
+
+## Train a Naive Bayes classifier
+
+1. Use the `naiveBayes{e1071}` or `NaiveBayes{klaR}` to train the Naive Bayes classifier for two variables age/ALKBH1. 
+2. Use the `plot()` function to visualize the conditional densities.
+3. Use the `expand.grid` function to prepare a new dataset for predictions. This function creates a new dataset with every possible combination of different levels. You may use the following code.
+```{r}
+grid <- expand.grid(age=seq(20,90, length.out=50),
+            ALKBH1=seq(100,900, length.out=50))
+```
+4. Use the `predict()` function to predict classes for the `grid` dataset. 
+5. Plot the predictions for the grid dataset (scatterplot / geom_point).
+6. Check how the decision regions behave for different cutoffs for posteriors.
+
+
+## Build a logistic regression model
+
+You may use the `glm()` function for standard logistic regression of `glmnet()` for the regularized logistic regression. In both cases set `family="binomial"`.
+
+1. Use the `glm()` or `glmnet{glmnet}` function to build the logistic regression model two variables age/ALKBH1. 
+2. Use the `coef()` or `summary()` functions to examine coefficients in both models.
+3. Use the `expand.grid()` function to prepare a new dataset for predictions. This function creates a new dataset with every possible combination of different levels. You may use the following code.
+```{r}
+grid <- expand.grid(age=seq(20,90, length.out=50),
+            ALKBH1=seq(100,900, length.out=50))
+```
+4. Use the `predict()` function to predict classes for the `grid` dataset. 
+5. Plot the predictions for the grid dataset (scatterplot / geom_point).
+6. Check how the decision regions behave for different cutoffs for posteriors.
+
+
+
+## All variables
+
+Once we learned structures of various models and saw their decision regions now we are ready to work with all 96 variables.
+
+1. Grow and plot a decision tree based on all variables.
+2. Fit a logistic regression model based on all variables. Which are important? What about regularized logistic regression?
+3. Train a Naive Bayes classifier for all variables. Is it better to work with all variables or preselect some of them?
+4. Check results for LDA/QDA methods.
+
+
+## Last hope
+
+Here you have some guides. Use them only if needed.
+
+
+```
+## Tree
+library(party)
+
+tree <- ctree(outcome ~ age+ ALKBH1, data=brca)
+tree <- ctree(outcome ~ ., data=brca)
+tree <- ctree(outcome ~ ., data=brca, controls = ctree_control(mincriterion=0.6, minsplit = 10, minbucket = 5))
+plot(tree)
+plot(tree, type="simple")
+
+
+## LDA
+
+lda(outcome~., data=brca[,c(1,5:97)])
+
+ml <- lda(outcome~ALKBH1+age, data=brca)
+
+grid <- expand.grid(age=seq(20,90, length.out=50),
+            ALKBH1=seq(100,900, length.out=50))
+
+grid$posterior <- predict(ml, grid)$class
+
+ggplot(grid, aes(age, ALKBH1, color=posterior)) + 
+  geom_point(size=1) + 
+  geom_point(data=brca, aes(color=outcome)) 
+
+## Naive Bayes
+
+library(e1071)
+nb <- naiveBayes(outcome~., data=brca)
+predict(nb, brca, type = "raw")
+
+library(klaR)
+nb <- NaiveBayes(outcome~., data=brca)
+plot(nb)
+
+## GLM
+
+ml <- glm(outcome~., data=brca, family = "binomial")
+library(glmnet)
+ml2 <- cv.glmnet(model.matrix(ml)[,-1], brca$outcome, family = "binomial", lambda = 10^seq(-4,2,0.1))
+plot(ml2)
+coef(ml2)
+
+```
