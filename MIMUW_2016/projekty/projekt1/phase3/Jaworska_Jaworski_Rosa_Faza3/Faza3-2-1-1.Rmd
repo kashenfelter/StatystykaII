@@ -1,0 +1,1247 @@
+---
+title: "Projekt_faza_3"
+author: 'Gabriela Jaworska: mapy (dla sekwencji), klastry +20, korekta skryptu, Micha³ Jaworski: analiza przejœæ bezpoœrednich, Jan Rosa: pomys³ badania, analiza klastrów (poza +20), analiza regu³ asocjacyjnych oraz sekwencji, regresja'
+output:
+  html_document:
+    depth: 3
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+#Wstêp
+
+Stacje cnk19, cnk02, cnk18, cnk12 i cnk16 s¹ odwiedzane przez znaczn¹ czêœæ goœci Centrum Nauki Kopernik. Ze wzglêdu na ich popularnoœæ, to co prezentuj¹ mo¿e, w znacznym stopniu, rzutowaæ na recepcjê ca³ej wystawy. W naszej pracy postaramy siê przeanalizowaæ jak wymienione wy¿ej stacje wp³ywaj¹ na decyzje goœci: czy zachêcaj¹ do obejrzenia mniej popularnych eksponatów, czy tylko tych najpopularniejszych? Zbadamy bezpoœredni jak i poœredni ich wp³yw, zarówno dla wszystkich odwiedzaj¹cych jak i dla szczególnych grup goœci. 
+
+W analizie wyró¿niliœmy dwa typy popularnych stacji, do których bêdziemy starali siê dopasowaæ analizowane eksponaty:
+
+1) stacje "tranzytowe" - stacje popularne nie zachêcaj¹ce jednak goœci do zobaczenia innych, mniej popularnych stacji, kieruj¹ce odwiedzaj¹cych do innych najbardziej popularnych stacji,
+
+2) stacje "inspiruj¹ce" - stacje popularne jednoczeœnie zachêcaj¹ce do zobaczenia mniej popularnych, byæ mo¿e podobnych tematycznie, stacji.
+
+Jednoczeœnie nale¿y zdawaæ sobie sprawê, ¿e ustawienie eksponatów mo¿e mieæ du¿y wp³yw na typ stacji.
+
+<img src="regeneracja - mapa-page-001.jpg" />
+
+Na mapce widaæ, ¿e stacji cnk02 najtrudniej byæ "inspiruj¹c¹", gdy¿ jest ona zwykle odwiedzana w pierwszej kolejnoœci i najbli¿ej z niej do pozosta³ych popularnych stacji. 
+
+```{r, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE}
+#Pakiety
+library(knitr)
+library(lubridate)
+library(binhf)
+library(plyr)
+library(tidyr)
+library(data.table)
+library(dplyr)
+library(arules)
+library(arulesSequences)
+library(arulesViz)
+library(MASS)
+library(cluster)
+library(vegan)
+library(ggfortify)
+library(factoextra)
+library(reshape2)
+library(ggplot2)
+
+
+load("C:/Users/Sony/Downloads/Downloads/smallLogs.rda")
+#przygotowanie danych
+data2<-subset(smallLogs, month(smallLogs$date)==3)
+k1<-c(paste(data2$visitor,mday(data2$date),data2$station))
+k11<-as.data.frame(k1)
+data2$dane<-k11
+data2<-subset(data2, data2$visitor!=-1)
+data21<-data2[!duplicated(data2$dane),]
+k2<-as.data.frame(c(paste(data21$visitor,mday(data21$date),as.numeric(data21$date))))
+data21$visitor2<-k2
+data21$visitor<-c(paste(data21$visitor,mday(data21$date)))
+data7<-data21[1:3]
+data7<-data7[order(data7$date),]
+df<-data7
+
+#####################
+#DANE
+####################
+shift <- function(x, n){
+  c(x[-(seq(n))], rep(NA, n))
+}
+
+data21$visitor2<-k2
+data211<-data21[order(data21$visitor2),]
+
+data211$visitor3<-shift(data211$visitor,1)
+data211$pstacja<-shift(as.character(data211$station),1)
+
+data212<-subset(data211, data211$visitor==data211$visitor3)
+
+data214<-subset(data212, data212$pstacja!="cnk19b")
+data214$station[data214$station=="cnk19b"]<-"cnk19a"
+
+data213<-subset(data214, data214$station=="cnk19a")
+cnk19ax<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk18")
+cnk18x<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk16")
+cnk16x<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk12")
+cnk12x<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk02a")
+cnk02ax<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk02b")
+cnk02bx<-as.data.frame(table(data213$pstacja))
+
+stacje1<-as.data.frame(table(data21$station))
+
+stacje1<-subset(stacje1,stacje1$Freq!=0)
+save(stacje1,file="stacje.RData")
+
+cnk02axx<-subset(cnk02ax, cnk02ax$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+
+cnk02axx<-subset(cnk02ax, cnk02ax$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+
+cnk02bxx<-subset(cnk02bx, cnk02bx$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a"))
+
+cnk12xx<-subset(cnk12x, cnk12x$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a"))
+
+cnk16xx<-subset(cnk16x, cnk16x$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a"))
+
+cnk18xx<-subset(cnk18x, cnk18x$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a"))
+
+cnk19axx<-subset(cnk19ax, cnk19ax$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18"))
+
+#####################
+#kolejnoœæ
+#####################
+df1<-df %>% group_by(visitor) %>% mutate(counter = row_number(date))
+#rozszerzenie tabeli
+
+B<-df
+B$date<-as.numeric(B$date)
+B<-spread(B, key=station, value=date,0)
+
+
+#stacje, barplot
+stacje1<-as.data.frame(table(df$station))
+stacje1<-subset(stacje1,stacje1$Freq!=0)
+y<- stacje1$Freq
+colors <- c("grey", "red")[(y > 6105) + 1]
+barplot(stacje1$Freq, main="Liczba odwiedzaj¹cych", ylab="Stacje", xlab="Liczba odwiedzaj¹cych", names.arg = stacje1$Var1, horiz = TRUE, col=colors, cex.names=0.4, las=1)
+  
+####################################
+```
+
+#Macierze przejœcia pomiêdzy wybranymi stacjami
+
+```{r, echo=FALSE, include=TRUE, message=FALSE, results="hide", warning="hide" }
+#WYZNACZANIE HEATMAP
+###################################
+
+cnk02wek<-cnk02axx
+newrow<- c("cnk02a",0)
+cnk02wek <- rbind(newrow,cnk02wek)
+
+cnk02bwek<-cnk02bxx
+cnk02bwek <- rbind(cnk02bwek[1,],newrow,cnk02bwek[2:5,])
+
+cnk12wek<-cnk12xx
+cnk12wek <- rbind(cnk12wek[1:2,],newrow,cnk12wek[3:5,])
+
+cnk16wek<-cnk16xx
+cnk16wek <- rbind(cnk16wek[1:3,],newrow,cnk16wek[4:5,])
+
+cnk18wek<-cnk18xx
+cnk18wek <- rbind(cnk18wek[1:4,],newrow,cnk18wek[5,])
+
+cnk19wek<-cnk19axx
+cnk19wek <- rbind(cnk19wek[1:5,],newrow)
+
+macprz<-cnk02wek
+colnames(macprz)[2]<-"cnk02a"
+macprz$cnk02b<-cnk02bwek$Freq
+macprz$cnk12<-cnk12wek$Freq
+macprz$cnk16<-cnk16wek$Freq
+macprz$cnk18<-cnk18wek$Freq
+macprz$cnk19a<-cnk19wek$Freq
+macprz2<-macprz
+macprz2$Var1<-NULL
+
+macprz2<-as.data.frame(macprz2)
+stac<-colnames(macprz2)
+freq = matrix(as.character(unlist(macprz2)),6,6, dimnames = list(stac,stac))
+diag(freq)<-NA
+class(freq)<-"numeric"
+freq
+freq1 = melt(freq)
+names(freq1)<-c('wejœcie','wyjœcie','liczebnosc')
+ggplot(freq1, aes(wejœcie, wyjœcie, group=wyjœcie)) +
+    geom_tile(aes(fill = liczebnosc)) + 
+    geom_text(aes(fill = freq1$liczebnosc, label = round(freq1$liczebnosc, 1))) +
+    scale_fill_gradient(low = "white", high = "red") 
+#########################
+
+```
+
+Powy¿sza macierz sk³ada siê z liczby bezpoœrednich przejœæ pomiêdzy najbardziej popularnymi stacjami (cnk02, cnk12, cnk16, cnk18, cnk19). Na podstawie tej macierzy ciep³a zauwa¿amy, ¿e najczêstsze bezpoœrednie przejœcia to:
+
+1) z cnk02a, cnk02b do cnk19 - jest to najprawdopodobniej spowodowane tym, ¿e cnk02a, cnk02b s¹ bardzo czêsto stacjami "startowymi" natomiast stacja cnk19a jest jedn¹ z najbli¿szych popularnych stacji.
+
+2) z cnk19 do cnk16 - stacje te le¿¹ najbli¿ej siebie spoœród pozosta³ych popularnych.
+
+3) z cnk16 do cnk12 - ponownie s¹ to dwa popularne eksponaty znajduj¹ce siê obok siebie. Zauwa¿amy jednak, ¿e znacznie czêœciej wystêpuje przejœcie z cnk16 do cnk12 ni¿ odwrotne. Powodem tego jest to, ¿e wiêkszoœæ zwiedzaj¹cych przechodzi z najpopularniejszej stacji (cnk19) w³asnie do cnk16 i dopiero póŸniej decyduje siê odwiedziæ cnk12 (wynika to z lokalizacji ka¿dej ze stacji).
+
+4) z cnk12 do cnk18. 
+
+Podsumowuj¹c, na podstawie macierzy mo¿emy stwierdziæ, ¿e stosunkowo du¿a czêœæ odwiedzaj¹cych zaczyna od stacji cnk02 nastêpnie odwiedza kolejno: cnk19, cnk16, cnk12, cnk18. Eksponat cnk18 jest najczêœciej ostatnim odwiedzanym popularnym eksponatem. Wynika to z tego, ¿e jest on po³o¿ony najdalej od wejœcia spoœród innych popularnych stacji.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, error=FALSE, results="hide" }
+#####################
+#DANE POP, ŒREDNIO_POP, MA£O_POP
+#####################
+data213<-subset(data214, data214$station=="cnk19a")
+cnk19ax<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk18")
+cnk18x<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk16")
+cnk16x<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk12")
+cnk12x<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk02a")
+cnk02ax<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data214, data214$station=="cnk02b")
+cnk02bx<-as.data.frame(table(data213$pstacja))
+
+stacje1<-as.data.frame(table(data21$station))
+
+stacje1<-subset(stacje1,stacje1$Freq!=0)
+save(stacje1,file="stacje.RData")
+
+cnk02axx<-subset(cnk02ax, cnk02ax$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+cnk02axa<-subset(cnk02ax, (cnk02ax$Var1 %in% c("cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+cnk02axb<-subset(cnk02ax, !(cnk02ax$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a","cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+suma02axx<-sum(cnk02axx$Freq)
+suma02axa<-sum(cnk02axa$Freq)
+suma02axb<-sum(cnk02axb$Freq)
+suma02ax<-sum(cnk02ax$Freq)
+
+cnk02bxx<-subset(cnk02bx, cnk02bx$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a"))
+cnk02bxa<-subset(cnk02bx, (cnk02bx$Var1 %in% c("cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+cnk02bxb<-subset(cnk02bx, !(cnk02bx$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a","cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+suma02bxx<-sum(cnk02bxx$Freq)
+suma02bxa<-sum(cnk02bxa$Freq)
+suma02bxb<-sum(cnk02bxb$Freq)
+suma02bx<-sum(cnk02bx$Freq)
+
+cnk12xx<-subset(cnk12x, cnk12x$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a"))
+cnk12xa<-subset(cnk12x, (cnk12x$Var1 %in% c("cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+cnk12xb<-subset(cnk12x, !(cnk12x$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a","cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+suma12xx<-sum(cnk12xx$Freq)
+suma12xa<-sum(cnk12xa$Freq)
+suma12xb<-sum(cnk12xb$Freq)
+suma12x<-sum(cnk12x$Freq)
+
+cnk16xx<-subset(cnk16x, cnk16x$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a"))
+cnk16xa<-subset(cnk16x, (cnk16x$Var1 %in% c("cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+cnk16xb<-subset(cnk16x, !(cnk16x$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a","cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+suma16xx<-sum(cnk16xx$Freq)
+suma16xa<-sum(cnk16xa$Freq)
+suma16xb<-sum(cnk16xb$Freq)
+suma16x<-sum(cnk16x$Freq)
+
+cnk18xx<-subset(cnk18x, cnk18x$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a"))
+cnk18xa<-subset(cnk18x, (cnk18x$Var1 %in% c("cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+cnk18xb<-subset(cnk18x, !(cnk18x$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a","cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+suma18xx<-sum(cnk18xx$Freq)
+suma18xa<-sum(cnk18xa$Freq)
+suma18xb<-sum(cnk18xb$Freq)
+suma18x<-sum(cnk18x$Freq)
+
+cnk19axx<-subset(cnk19ax, cnk19ax$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18"))
+cnk19axa<-subset(cnk19ax, (cnk19ax$Var1 %in% c("cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+cnk19axb<-subset(cnk19ax, !(cnk19ax$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a","cnk10","cnk09","cnk78a","cnk17","cnk11","cnk20","cnk05","cnk07")))
+suma19axx<-sum(cnk19axx$Freq)
+suma19axa<-sum(cnk19axa$Freq)
+suma19axb<-sum(cnk19axb$Freq)
+suma19ax<-sum(cnk19ax$Freq)
+
+pop<-c(suma02axx/suma02ax,suma02bxx/suma02bx,suma12xx/suma12x,suma16xx/suma16x,suma18xx/suma18x,suma19axx/suma19ax)
+spop<-c(suma02axa/suma02ax,suma02bxa/suma02bx,suma12xa/suma12x,suma16xa/suma16x,suma18xa/suma18x,suma19axa/suma19ax)
+mpop<-c(suma02axb/suma02ax,suma02bxb/suma02bx,suma12xb/suma12x,suma16xb/suma16x,suma18xb/suma18x,suma19axb/suma19ax)
+
+macdf<-data.frame(pop,spop,mpop)
+
+freq = matrix(as.character(unlist(macdf)),6,3, dimnames = list(stac, c("pop","spop","mpop")))
+class(freq)<-"numeric"
+freq
+freq1 = melt(freq)
+names(freq1)<-c('wyjscie','wejscie','frakcja')
+ggplot(freq1, aes(wejscie, wyjscie, group=wejscie)) +
+    geom_tile(aes(fill = frakcja)) + 
+    geom_text(aes(fill = freq1$frakcja, label = round(freq1$frakcja, 1))) +
+    scale_fill_gradient(low = "white", high = "red") 
+#######################
+```
+
+Powy¿sza macierz przedstawia stosunek przejœæ z wyszczególnionych stacji popularnych do stacji popularnych (cnk02, cnk12, cnk16, cnk18, cnk19), œrednio-popularnych (cnk10, cnk09, cnk78a, cnk17, cnk11, cnk20, cnk05, cnk07), ma³o-popularnych (pozosta³e, 43 stacje). Na podstawie macierzy mo¿na zauwa¿yæ, ¿e dwie stacje odstaj¹ od pewnej prawid³owoœci. Mianowicie, ze stacji cnk02b wychodzi stosunkowo wiêcej osób do zbioru stacji popularnych ni¿ do œrednio-popularnych (mimo, i¿ liczba eksponatów w zbiorze stacji popularnych jest o dwa mniejsza). Jest to spowodowane tym, ¿e bardzo du¿a czêœæ zwiedzaj¹cych przechodzi z tej stacji bezpoœrednio do najpopularniejszego eksponatu cnk19a. Kolejn¹, wyró¿niaj¹c¹ siê stacj¹ jest cnk18. Zauwa¿amy, ¿e stosunkowo bardzo ma³o osób (tylko ok. 5%) wychodz¹c z tej stacji odwiedza stacje popularne. Oczywiœcie, tak jak zosta³o to ju¿ opisane przy okazji analizy poprzedniej macierzy, jest to spowodowane tym, ¿e stacja cnk18 jest najczêœciej odwiedzanym ostatnim eksponatem spoœród tych najpopularniejszych. 
+
+#Analiza typów zwiedzaj¹cych
+
+Nim przyst¹pimy do analizy wp³ywu najczêœciej odwiedzanych stacji na decyzje odwiedzaj¹cych warto siê im bli¿ej przyjrzeæ - sprawdziæ, czy mo¿na ich podzieliæ na grupy o bardziej jednolitych charakterystykach, by póŸniej móc przeprowadziæ analizê wp³ywu wybranych przez nas stacji na cz³onków tych grup. Jest to rozwiniêcie naszych analiz z fazy drugiej. 
+
+Analizê ograniczymy tylko do osób odwiedzaj¹cych co najmniej 10 stacji, przy czym badaæ bêdziemy osobno goœci, którzy odwiedzili [10,14] stacji, [15,19] oraz powy¿ej 20 stacji. Wybór takiego podzia³u jest doœæ arbitralny, jednak kierowaliœmy siê podzia³em na goœci, którzy odwiedzili co najmniej 1/6 stacji, co najmniej 1/4, b¹dŸ te¿ powy¿ej 1/3 stacji.   
+
+Goœci zró¿nicowaliœmy wzglêdem odwiedzonych stacji. Poniewa¿ przeprowadzenie analiz na pe³nym miesi¹cu jest zbyt z³o¿one obliczeniowo, analizy, za pomoc¹ których wybraliœmy metodê skalowania, oraz sposób klastrowania przeprowadzono na jednym pe³nym tygodniu. Dzia³anie takie jest uprawnione, poniewa¿ w ka¿dym tygodniu Centrum odwiedza³y podobne grupy zwiedzaj¹cych (nie by³o œwi¹t, niezwyk³ych imprez).
+
+```{r, echo=FALSE, message=FALSE}
+C<-subset(df,week(df$date)==10)
+C$date<-as.numeric(C$date)
+C<-spread(C,key=station, value=date,0)
+C[2:60]<-sign(C[2:60])
+K<-C[2:60]
+C$suma<-rowSums(K)
+remove(K)
+C1<-subset(C, C$suma>=10 & C$suma<=14)
+K1<-C1[2:60]
+C11<-dist(K1)
+C12<-dist(K1,method="manhattan")
+C13<-vegdist(K1,method="jaccard")
+
+C2<-subset(C, C$suma>=15 & C$suma<=19)
+K2<-C2[2:60]
+C22<-dist(K2,method="manhattan")
+
+
+C3<-subset(C, C$suma>=20)
+K3<-C3[2:60]
+C32<-dist(K3,method="manhattan")
+
+```
+
+##Wybór metody skalowania i podzia³ zwiedzaj¹cych na klastry
+
+By zilustrowaæ podzia³ punktów u¿yto metody wektorów PCA, poniewa¿ w ka¿dym z przypadków ilustrowa³y one ponad 80% wariancji miêdzy punktami.
+
+```{r, echo=FALSE, message=FALSE, warning="hide"}
+p11<-prcomp(C11)
+autoplot(p11,main="Euklidesowa")
+plot(p11)
+
+p12<-prcomp(C12)
+autoplot(p12, main="Manhattan")
+plot(p12)
+
+p13<-prcomp(C13)
+autoplot(p13, main="Jaccard")
+plot(p13)
+
+```
+
+Poniewa¿ wygl¹d rzutowania punktów na dwa wymiary metod¹ PCA wskaza³o, i¿ skalowanie odleg³oœci¹ euklidesow¹ i metod¹ Manhattan daj¹ podobne wyniki, porównamy jedynie skalowanie metod¹ Jaccarda i Manhattan.
+
+Najpierw nale¿y ustaliæ liczbê klastrów. Poniewa¿ w algorytmie eclust nie ma metryki Jaccarda, u¿yliœmy najbardziej zbli¿onej metryki Canberra.
+Najpierw pokazano gap statistic dla metryki Manhattan, a nastêpnie dla metryki Canberra.
+
+```{r, echo=FALSE, message=FALSE}
+d1<-eclust(K1, FUNcluster ="hclust",k = NULL, k.max = 5,graph = FALSE,nboot =40)
+d2<-eclust(K1, FUNcluster ="hclust",k = NULL, k.max = 5,graph = FALSE,nboot =30,hc_metric="canberra")
+fviz_gap_stat(d1$gap_stat)
+fviz_gap_stat(d2$gap_stat)
+
+```
+
+W obu przypadkach widzimy, ¿e najwiêkszy wzrost statystyki gap_stat notujemy przy liczbie klastrów 3, wobec tego t¹ wartoœæ uznano za najbardziej rozs¹dn¹.
+
+Klastrowano metod¹ Ward oraz metod¹ k-œrednich, otrzymuj¹c nastêpuj¹ce wyniki (rzut na dwa wymiary metod¹ PCA).
+
+```{r, echo=FALSE, message=FALSE}
+cl1<-hclust(C12, method = "ward")
+cl2<-hclust(C13, method="ward")
+
+tr1<-cutree(cl1,3)
+tr2<-cutree(cl2,3)
+tr3<-pam(C13, 3)
+tr4<-pam(C12,3)
+
+comp1<-data.frame(p11$x[,1:2])
+comp2<-data.frame(p13$x[,1:2])
+comp1$tr<-tr1
+comp2$tr<-tr2
+comp1$tr2<-tr4$clustering
+comp2$tr2<-tr3$clustering
+ggplot(comp1, aes(PC1, PC2, color=factor(tr))) +geom_point()+ ggtitle("Manhattan + ward")
+
+ggplot(comp1, aes(PC1, PC2, color=factor(tr2))) +geom_point()+ ggtitle("Manhattan + k-srednie")
+
+ggplot(comp2, aes(PC1, PC2, color=factor(tr))) +geom_point()+ ggtitle("Jaccard + ward")
+ggplot(comp2,aes(PC1, PC2, color=factor(tr2))) +geom_point()+ ggtitle("Jaccard + k-srednie")
+
+```
+
+Wybrano metodê skalowania Manhattan oraz metodê klastrowania Ward, poniewa¿ podzia³ na klastry wydawa³ siê w tej parze najbardziej zgodny z rzutem. 
+
+Te same metody zastosowano przy klastrowaniu goœci odwiedzaj¹cych 15-19 stacji, aby zachowaæ spójnoœæ analiz. W tym przypadku równie¿ wybrano podzia³ na 3 klastry.   
+
+```{r, echo=FALSE, message=FALSE}
+d3<-eclust(K2, FUNcluster ="hclust",k = NULL, k.max = 5,graph = FALSE,nboot =30, hc_metric = "manhattan")
+fviz_gap_stat(d3$gap_stat)
+p21<-prcomp(C22)
+plot(p21)
+
+cl3<-hclust(C22, method = "ward")
+tr5<-cutree(cl3,3)
+comp3<-data.frame(p21$x[,1:2])
+comp3$tr<-tr5
+ggplot(comp3, aes(PC1, PC2, color=factor(tr))) +geom_point()
+
+```
+
+Dla osób zwiedzaj¹cych powy¿ej 19 stacji u¿yto tych samych metod.
+
+```{r, echo=FALSE, message=FALSE}
+d4<-eclust(K3, FUNcluster ="hclust",k = NULL, k.max = 5,graph = FALSE,nboot =30, hc_metric = "manhattan")
+fviz_gap_stat(d4$gap_stat)
+p31<-prcomp(C32)
+plot(p31)
+
+cl4<-hclust(C32, method = "ward")
+tr6<-cutree(cl4,3)
+comp4<-data.frame(p31$x[,1:2])
+comp4$tr<-tr6
+ggplot(comp4, aes(PC1, PC2, color=factor(tr))) +geom_point()
+
+```
+
+Nie zdecydowano siê jednak na podzia³ ze wzglêdu na ma³¹ zgodnoœæ rzutowania z podzia³em oraz ma³¹ liczbê goœci w tej grupie.
+
+```{r, echo=FALSE, message=FALSE}
+C1$clus<-tr1
+C2$clus<-tr5
+remove(C11, C12, C12, C22)
+```
+
+##Macierze ciep³a ilustruj¹ce przejœcia miêdzy najbardziej popularnymi stacjami
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide" }
+######################################
+#HEATMAP DLA KLASTRA1 [10,14]
+###################################
+C1$clus<-tr1
+D11<-subset(C1, C1$clus==1)
+D12<-subset(C1, C1$clus==2)
+D13<-subset(C1, C1$clus==3)
+
+viss<-c(paste(data214$visitor))
+data214$visitor4<-viss
+viss1<-D11$visitor
+data215<-subset(data214, data214$visitor4 %in% viss1)
+
+data213<-subset(data215, data215$station=="cnk19a")
+cnk19axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk18")
+cnk18xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk16")
+cnk16xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk12")
+cnk12xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02a")
+cnk02axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02b")
+cnk02bxkl1<-as.data.frame(table(data213$pstacja))
+
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+cnk02axakl1<-subset(cnk02axkl1, !(cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk02axakl1$Freq)
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+cnk02axakl1<-subset(cnk02axkl1, !(cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk02axakl1$Freq)
+
+cnk02bxxkl1<-subset(cnk02bxkl1, cnk02bxkl1$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a"))
+cnk02bxakl1<-subset(cnk02bxkl1, !(cnk02bxkl1$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk02bxakl1$Freq)
+
+cnk12xxkl1<-subset(cnk12xkl1, cnk12xkl1$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a"))
+cnk12xakl1<-subset(cnk12xkl1, !(cnk12xkl1$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk12xakl1$Freq)
+
+cnk16xxkl1<-subset(cnk16xkl1, cnk16xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a"))
+cnk16xakl1<-subset(cnk16xkl1, !(cnk16xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a")))
+sumaxa<-sum(cnk16xakl1$Freq)
+
+cnk18xxkl1<-subset(cnk18xkl1, cnk18xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a"))
+cnk18xakl1<-subset(cnk18xkl1, !(cnk18xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a")))
+sumaxa<-sum(cnk18xakl1$Freq)
+
+cnk19axxkl1<-subset(cnk19axkl1, cnk19axkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18"))
+cnk19axakl1<-subset(cnk19axkl1, !(cnk19axkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18")))
+sumaxa<-sum(cnk19axakl1$Freq)
+
+cnk02wekkl1<-cnk02axxkl1
+newrow<- c("cnk02a",0)
+cnk02wekkl1 <- rbind(newrow,cnk02wekkl1)
+cnk02wekkl1 <- rbind(cnk02wekkl1[1,],newrow,cnk02wekkl1[2:3,])
+cnk02wekkl1 <- rbind(cnk02wekkl1[1:2,],newrow,cnk02wekkl1[3:4,])
+cnk02wekkl1 <- rbind(cnk02wekkl1[1:4,],newrow,cnk02wekkl1[5,])
+
+cnk02bwekkl1<-cnk02bxxkl1
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1,],newrow,cnk02bwekkl1[2:3,])
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1:2,],newrow,cnk02bwekkl1[3:4,])
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1:4,],newrow,cnk02bwekkl1[5,])
+
+cnk12wekkl1<-cnk12xxkl1
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1[1:2,])
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1[1:3,])
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1[1:4,])
+cnk12wekkl1 <- rbind(cnk12wekkl1[1:5,],newrow)
+
+cnk16wekkl1<-cnk16xxkl1
+cnk16wekkl1 <- rbind(newrow,cnk16wekkl1)
+cnk16wekkl1 <- rbind(newrow,cnk16wekkl1)
+cnk16wekkl1 <- rbind(newrow,cnk16wekkl1)
+cnk16wekkl1 <- rbind(newrow,cnk16wekkl1)
+cnk16wekkl1 <- rbind(cnk16wekkl1[1:5,],newrow)
+
+cnk19wekkl1<-cnk19axxkl1
+cnk19wekkl1 <- rbind(cnk19wekkl1[1,],newrow,cnk19wekkl1[2:4,])
+cnk19wekkl1 <- rbind(cnk19wekkl1,newrow)
+
+macprzkl1<-cnk02wekkl1
+colnames(macprzkl1)[2]<-"cnk02a"
+macprzkl1$cnk02b<-cnk02bwekkl1$Freq
+macprzkl1$cnk12<-cnk12wekkl1$Freq
+macprzkl1$cnk16<-cnk16wekkl1$Freq
+macprzkl1$cnk18<-0
+macprzkl1$cnk19a<-cnk19wekkl1$Freq
+macprz2kl1<-macprzkl1
+macprz2kl1$Var1<-NULL
+
+macprz2kl1<-as.data.frame(macprz2kl1)
+stac<-colnames(macprz2kl1)
+freq = matrix(as.character(unlist(macprz2kl1)),6,6, dimnames = list(stac,stac))
+diag(freq)<-NA
+class(freq)<-"numeric"
+freq
+freq1 = melt(freq)
+names(freq1)<-c('wejœcie','wyjœcie','liczebnosc')
+ggplot(freq1, aes(wejœcie, wyjœcie, group=wyjœcie)) +
+    geom_tile(aes(fill = liczebnosc)) + 
+    geom_text(aes(fill = freq1$liczebnosc, label = round(freq1$liczebnosc, 1))) +
+    scale_fill_gradient(low = "white", high = "red") 
+######################
+```
+
+Powy¿sza macierz sk³adaj¹ca siê z liczby przejœæ pomiêdzy najbardziej popularnymi stacjami (cnk02, cnk12, cnk16, cnk18, cnk19) dla I klastra wœród osób, które odwiedzi³y [10,14] eskponatów. Klaster ten charakteryzuje siê tym, ¿e stosunkowo wiele osób odwiedza stacje cnk12, cnk16 (przychodzi do nich ze stacji mniej popularnych), nastêpnie przechodz¹ oni bezpoœrednio do stacji cnk18.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"  }
+######################################
+#HEATMAP DLA KLASTRA2 [10,14]
+###################################
+viss<-c(paste(data214$visitor))
+data214$visitor4<-viss
+viss1<-D12$visitor
+data215<-subset(data214, data214$visitor4 %in% viss1)
+
+data213<-subset(data215, data215$station=="cnk19a")
+cnk19axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk18")
+cnk18xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk16")
+cnk16xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk12")
+cnk12xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02a")
+cnk02axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02b")
+cnk02bxkl1<-as.data.frame(table(data213$pstacja))
+
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+cnk02axakl1<-subset(cnk02axkl1, !(cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk02axakl1$Freq)
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+cnk02axakl1<-subset(cnk02axkl1, !(cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk02axakl1$Freq)
+
+cnk02bxxkl1<-subset(cnk02bxkl1, cnk02bxkl1$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a"))
+cnk02bxakl1<-subset(cnk02bxkl1, !(cnk02bxkl1$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk02bxakl1$Freq)
+
+cnk12xxkl1<-subset(cnk12xkl1, cnk12xkl1$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a"))
+cnk12xakl1<-subset(cnk12xkl1, !(cnk12xkl1$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk12xakl1$Freq)
+
+cnk16xxkl1<-subset(cnk16xkl1, cnk16xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a"))
+cnk16xakl1<-subset(cnk16xkl1, !(cnk16xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a")))
+sumaxa<-sum(cnk16xakl1$Freq)
+
+cnk18xxkl1<-subset(cnk18xkl1, cnk18xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a"))
+cnk18xakl1<-subset(cnk18xkl1, !(cnk18xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a")))
+sumaxa<-sum(cnk18xakl1$Freq)
+
+cnk19axxkl1<-subset(cnk19axkl1, cnk19axkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18"))
+cnk19axakl1<-subset(cnk19axkl1, !(cnk19axkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18")))
+sumaxa<-sum(cnk19axakl1$Freq)
+
+cnk02wekkl1<-cnk02axxkl1
+cnk02wekkl1 <- rbind(newrow,cnk02wekkl1)
+cnk02wekkl1 <- rbind(cnk02wekkl1[1:4,],newrow,cnk02wekkl1[5,])
+
+cnk02bwekkl1<-cnk02bxxkl1
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1,],newrow,cnk02bwekkl1[2:4,])
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1:4,],newrow,cnk02bwekkl1[5,])
+
+cnk12wekkl1<-cnk12xxkl1
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1[1:3,])
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1[1:4,])
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1[1:5,])
+
+cnk16wekkl1<-cnk16xxkl1
+cnk16wekkl1 <- rbind(cnk16wekkl1[1,],newrow,cnk16wekkl1[2:4,])
+cnk16wekkl1 <- rbind(cnk16wekkl1[1:3,],newrow,cnk16wekkl1[4:5,])
+
+cnk18wekkl1<-cnk18xxkl1
+cnk18wekkl1 <- rbind(cnk18wekkl1[1:4,],newrow,cnk18wekkl1[5,])
+
+cnk19wekkl1<-cnk19axxkl1
+cnk19wekkl1 <- rbind(cnk19wekkl1[1,],newrow,cnk19wekkl1[2:4,])
+cnk19wekkl1 <- rbind(cnk19wekkl1,newrow)
+
+macprzkl1<-cnk02wekkl1
+colnames(macprzkl1)[2]<-"cnk02a"
+macprzkl1$cnk02b<-cnk02bwekkl1$Freq
+macprzkl1$cnk12<-cnk12wekkl1$Freq
+macprzkl1$cnk16<-cnk16wekkl1$Freq
+macprzkl1$cnk18<-cnk18wekkl1$Freq
+macprzkl1$cnk19a<-cnk19wekkl1$Freq
+macprz2kl1<-macprzkl1
+macprz2kl1$Var1<-NULL
+
+macprz2kl1<-as.data.frame(macprz2kl1)
+stac<-colnames(macprz2kl1)
+freq = matrix(as.character(unlist(macprz2kl1)),6,6, dimnames = list(stac,stac))
+diag(freq)<-NA
+class(freq)<-"numeric"
+freq
+freq1 = melt(freq)
+names(freq1)<-c('wejœcie','wyjœcie','liczebnosc')
+ggplot(freq1, aes(wejœcie, wyjœcie, group=wyjœcie)) +
+    geom_tile(aes(fill = liczebnosc)) + 
+    geom_text(aes(fill = freq1$liczebnosc, label = round(freq1$liczebnosc, 1))) +
+    scale_fill_gradient(low = "white", high = "red") 
+####################
+```
+
+Powy¿sza macierz sk³adaj¹ca siê z liczby przejœæ pomiêdzy najbardziej popularnymi stacjami (cnk02, cnk12, cnk16, cnk18, cnk19) dla II klastra wœród osób, które odwiedzi³y [10,14] eskponatów. Klaster II sk³ada siê z odwiedzaj¹cych, którzy najczêœciej przechodz¹ typow¹ œcie¿kê opisan¹ na samym pocz¹tku raportu. Odwiedzaj¹ oni cnk02, nastêpnie cnk19, póŸniej cnk16, cnk12, cnk18.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"  }
+######################################
+#HEATMAP DLA KLASTRA3 [10,14]
+###################################
+viss<-c(paste(data214$visitor))
+data214$visitor4<-viss
+viss1<-D13$visitor
+data215<-subset(data214, data214$visitor4 %in% viss1)
+
+data213<-subset(data215, data215$station=="cnk19a")
+cnk19axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk18")
+cnk18xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk16")
+cnk16xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk12")
+cnk12xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02a")
+cnk02axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02b")
+cnk02bxkl1<-as.data.frame(table(data213$pstacja))
+
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+cnk02axakl1<-subset(cnk02axkl1, !(cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk02axakl1$Freq)
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+cnk02axakl1<-subset(cnk02axkl1, !(cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk02axakl1$Freq)
+
+cnk02bxxkl1<-subset(cnk02bxkl1, cnk02bxkl1$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a"))
+cnk02bxakl1<-subset(cnk02bxkl1, !(cnk02bxkl1$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk02bxakl1$Freq)
+
+cnk12xxkl1<-subset(cnk12xkl1, cnk12xkl1$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a"))
+cnk12xakl1<-subset(cnk12xkl1, !(cnk12xkl1$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a")))
+sumaxa<-sum(cnk12xakl1$Freq)
+
+cnk16xxkl1<-subset(cnk16xkl1, cnk16xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a"))
+cnk16xakl1<-subset(cnk16xkl1, !(cnk16xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a")))
+sumaxa<-sum(cnk16xakl1$Freq)
+
+cnk18xxkl1<-subset(cnk18xkl1, cnk18xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a"))
+cnk18xakl1<-subset(cnk18xkl1, !(cnk18xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a")))
+sumaxa<-sum(cnk18xakl1$Freq)
+
+cnk19axxkl1<-subset(cnk19axkl1, cnk19axkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18"))
+cnk19axakl1<-subset(cnk19axkl1, !(cnk19axkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18")))
+sumaxa<-sum(cnk19axakl1$Freq)
+
+cnk02wekkl1<-cnk02axxkl1
+cnk02wekkl1 <- rbind(newrow,cnk02wekkl1)
+cnk02wekkl1 <- rbind(cnk02wekkl1[1:4,],newrow,cnk02wekkl1[5,])
+
+cnk02bwekkl1<-cnk02bxxkl1
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1,],newrow,cnk02bwekkl1[2:4,])
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1:4,],newrow,cnk02bwekkl1[5,])
+
+cnk12wekkl1<-cnk12xxkl1
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1[1:2,])
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1[1:3,])
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1[1:4,])
+cnk12wekkl1 <- rbind(cnk12wekkl1,newrow)
+
+cnk16wekkl1<-cnk16xxkl1
+cnk16wekkl1 <- rbind(newrow,cnk16wekkl1)
+cnk16wekkl1 <- rbind(cnk16wekkl1[1:3,],newrow,cnk16wekkl1[4:5,])
+
+cnk18wekkl1<-cnk18xxkl1
+cnk18wekkl1 <- rbind(newrow,cnk18wekkl1[1:3,])
+cnk18wekkl1 <- rbind(newrow,cnk18wekkl1[1:4,])
+cnk18wekkl1 <- rbind(cnk18wekkl1[1:4,],newrow,cnk18wekkl1[5,])
+
+cnk19wekkl1<-cnk19axxkl1
+cnk19wekkl1 <- rbind(cnk19wekkl1,newrow)
+
+macprzkl1<-cnk02wekkl1
+colnames(macprzkl1)[2]<-"cnk02a"
+macprzkl1$cnk02b<-cnk02bwekkl1$Freq
+macprzkl1$cnk12<-cnk12wekkl1$Freq
+macprzkl1$cnk16<-cnk16wekkl1$Freq
+macprzkl1$cnk18<-cnk18wekkl1$Freq
+macprzkl1$cnk19a<-cnk19wekkl1$Freq
+macprz2kl1<-macprzkl1
+macprz2kl1$Var1<-NULL
+
+macprz2kl1<-as.data.frame(macprz2kl1)
+stac<-colnames(macprz2kl1)
+freq = matrix(as.character(unlist(macprz2kl1)),6,6, dimnames = list(stac,stac))
+diag(freq)<-NA
+class(freq)<-"numeric"
+freq
+freq1 = melt(freq)
+names(freq1)<-c('wejœcie','wyjœcie','liczebnosc')
+ggplot(freq1, aes(wejœcie, wyjœcie, group=wyjœcie)) +
+    geom_tile(aes(fill = liczebnosc)) + 
+    geom_text(aes(fill = freq1$liczebnosc, label = round(freq1$liczebnosc, 1))) +
+    scale_fill_gradient(low = "white", high = "red") 
+#####################
+```   
+
+Powy¿sza macierz sk³adaj¹ca siê z liczby przejœæ pomiêdzy najbardziej popularnymi stacjami (cnk02, cnk12, cnk16, cnk18, cnk19) dla III klastra wœród osób, które odwiedzi³y [10,14] eskponatów. Ten klaster, pod pewnymi wzglêdami, przypomina klaster II. Ponownie odwiedzaj¹cy przechodz¹ kolejno przez cnk02, cnk19, jednak ju¿ z cnk19 równo rozchodz¹ siê po stacjach cnk12, cnk16, cnk18. Niewielkie wartoœæ w wierszach cnk12, cnk16, cnk18 mog¹ wskazywaæ, ¿e nastepnie odwiedzaj¹cy przechodz¹ do mniej popularnych eksponatów.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE, results="hide" }
+########################
+#HEATMAP DLA [15,19]
+########################
+viss<-c(paste(data214$visitor))
+data214$visitor4<-viss
+viss1<-C2$visitor
+data215<-subset(data214, data214$visitor4 %in% viss1)
+
+data213<-subset(data215, data215$station=="cnk19a")
+cnk19axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk18")
+cnk18xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk16")
+cnk16xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk12")
+cnk12xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02a")
+cnk02axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02b")
+cnk02bxkl1<-as.data.frame(table(data213$pstacja))
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+cnk02axakl1<-subset(cnk02axkl1, !(cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a")))
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+cnk02axakl1<-subset(cnk02axkl1, !(cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a")))
+
+cnk02bxxkl1<-subset(cnk02bxkl1, cnk02bxkl1$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a"))
+cnk02bxakl1<-subset(cnk02bxkl1, !(cnk02bxkl1$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a")))
+
+cnk12xxkl1<-subset(cnk12xkl1, cnk12xkl1$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a"))
+cnk12xakl1<-subset(cnk12xkl1, !(cnk12xkl1$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a")))
+
+cnk16xxkl1<-subset(cnk16xkl1, cnk16xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a"))
+cnk16xakl1<-subset(cnk16xkl1, !(cnk16xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a")))
+
+cnk18xxkl1<-subset(cnk18xkl1, cnk18xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a"))
+cnk18xakl1<-subset(cnk18xkl1, !(cnk18xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a")))
+
+cnk19axxkl1<-subset(cnk19axkl1, cnk19axkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18"))
+cnk19axakl1<-subset(cnk19axkl1, !(cnk19axkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18")))
+
+cnk02wekkl1<-cnk02axxkl1
+cnk02wekkl1 <- rbind(newrow,cnk02wekkl1)
+
+cnk02bwekkl1<-cnk02bxxkl1
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1,],newrow,cnk02bwekkl1[2:5,])
+
+cnk12wekkl1<-cnk12xxkl1
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1)
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1)
+cnk12wekkl1 <- rbind(newrow,cnk12wekkl1)
+
+cnk16wekkl1 <- cnk16xxkl1
+cnk16wekkl1 <- rbind(cnk16wekkl1[1:3,],newrow,cnk16wekkl1[4:5,])
+
+cnk18wekkl1<-cnk18xxkl1
+cnk18wekkl1 <- rbind(cnk18wekkl1[1:4,],newrow,cnk18wekkl1[5,])
+
+cnk19wekkl1<-cnk19axxkl1
+cnk19wekkl1 <- rbind(cnk19wekkl1,newrow)
+
+macprzkl1<-cnk02wekkl1
+colnames(macprzkl1)[2]<-"cnk02a"
+macprzkl1$cnk02b<-cnk02bwekkl1$Freq
+macprzkl1$cnk12<-cnk12wekkl1$Freq
+macprzkl1$cnk16<-cnk16wekkl1$Freq
+macprzkl1$cnk18<-cnk18wekkl1$Freq
+macprzkl1$cnk19a<-cnk19wekkl1$Freq
+macprz2kl1<-macprzkl1
+macprz2kl1$Var1<-NULL
+
+macprz2kl1<-as.data.frame(macprz2kl1)
+stac<-colnames(macprz2kl1)
+freq = matrix(as.character(unlist(macprz2kl1)),6,6, dimnames = list(stac,stac))
+diag(freq)<-NA
+class(freq)<-"numeric"
+freq
+freq1 = melt(freq)
+names(freq1)<-c('wejœcie','wyjœcie','liczebnosc')
+ggplot(freq1, aes(wejœcie, wyjœcie, group=wyjœcie)) +
+    geom_tile(aes(fill = liczebnosc)) + 
+    geom_text(aes(fill = freq1$liczebnosc, label = round(freq1$liczebnosc, 1))) +
+    scale_fill_gradient(low = "white", high = "red") 
+#####################
+```
+
+Powy¿sza macierz sk³adaj¹ca siê z liczby przejœæ pomiêdzy najbardziej popularnymi stacjami (cnk02, cnk12, cnk16, cnk18, cnk19) wœród osób, które odwiedzi³y [15,19] eskponatów. W tym przypadku mo¿emy po raz kolejny mówiæ o typowej kolejnoœci zwiedzania najbardziej popularnych stacji. Podobnie sytuacja wygl¹da w przypadku osób, które odwiedzi³y ponad 20 eksponatów.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide" }
+######################################
+#HEATMAP DLA KLASTRA 20+
+###################################
+viss<-c(paste(data214$visitor))
+data214$visitor4<-viss
+viss1<-C3$visitor
+data215<-subset(data214, data214$visitor4 %in% viss1)
+
+data213<-subset(data215, data215$station=="cnk19a")
+cnk19axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk18")
+cnk18xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk16")
+cnk16xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk12")
+cnk12xkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02a")
+cnk02axkl1<-as.data.frame(table(data213$pstacja))
+
+data213<-subset(data215, data215$station=="cnk02b")
+cnk02bxkl1<-as.data.frame(table(data213$pstacja))
+
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+
+cnk02axxkl1<-subset(cnk02axkl1, cnk02axkl1$Var1 %in% c("cnk02b","cnk12","cnk16","cnk18","cnk19a"))
+
+cnk02bxxkl1<-subset(cnk02bxkl1, cnk02bxkl1$Var1 %in% c("cnk02a","cnk12","cnk16","cnk18","cnk19a"))
+
+cnk12xxkl1<-subset(cnk12xkl1, cnk12xkl1$Var1 %in% c("cnk02a","cnk02b","cnk16","cnk18","cnk19a"))
+
+cnk16xxkl1<-subset(cnk16xkl1, cnk16xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk18","cnk19a"))
+
+cnk18xxkl1<-subset(cnk18xkl1, cnk18xkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk19a"))
+
+cnk19axxkl1<-subset(cnk19axkl1, cnk19axkl1$Var1 %in% c("cnk02a","cnk02b","cnk12","cnk16","cnk18"))
+
+cnk02wekkl1<-cnk02axxkl1
+cnk02wekkl1 <- rbind(newrow,cnk02wekkl1)
+
+cnk02bwekkl1<-cnk02bxxkl1
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1,],newrow,cnk02bwekkl1[2:4,])
+cnk02bwekkl1 <- rbind(cnk02bwekkl1[1:4,],newrow,cnk02bwekkl1[5,])
+
+cnk12wekkl1<-cnk12xxkl1
+cnk12wekkl1 <- rbind(cnk12wekkl1[1,],newrow,cnk12wekkl1[2:4,])
+cnk12wekkl1 <- rbind(cnk12wekkl1[1,],newrow,cnk12wekkl1[2:5,])
+
+cnk16wekkl1 <- cnk16xxkl1
+cnk16wekkl1 <- rbind(cnk16wekkl1[1,],newrow,cnk16wekkl1[2:4,])
+cnk16wekkl1 <- rbind(cnk16wekkl1[1:3,],newrow,cnk16wekkl1[4:5,])
+
+cnk18wekkl1<-cnk18xxkl1
+cnk18wekkl1 <- rbind(newrow,cnk18wekkl1)
+cnk18wekkl1 <- rbind(newrow,cnk18wekkl1)
+cnk18wekkl1 <- rbind(cnk18wekkl1[1:4,],newrow,cnk18wekkl1[5,])
+
+cnk19wekkl1<-cnk19axxkl1
+cnk19wekkl1 <- rbind(cnk19wekkl1[1,],newrow,cnk19wekkl1[2:4,])
+cnk19wekkl1 <- rbind(cnk19wekkl1,newrow)
+
+macprzkl1<-cnk02wekkl1
+colnames(macprzkl1)[2]<-"cnk02a"
+macprzkl1$cnk02b<-cnk02bwekkl1$Freq
+macprzkl1$cnk12<-cnk12wekkl1$Freq
+macprzkl1$cnk16<-cnk16wekkl1$Freq
+macprzkl1$cnk18<-cnk18wekkl1$Freq
+macprzkl1$cnk19a<-cnk19wekkl1$Freq
+macprz2kl1<-macprzkl1
+macprz2kl1$Var1<-NULL
+
+macprz2kl1<-as.data.frame(macprz2kl1)
+stac<-colnames(macprz2kl1)
+freq = matrix(as.character(unlist(macprz2kl1)),6,6, dimnames = list(stac,stac))
+diag(freq)<-NA
+class(freq)<-"numeric"
+freq
+freq1 = melt(freq)
+names(freq1)<-c('wejœcie','wyjœcie','liczebnosc')
+ggplot(freq1, aes(wejœcie, wyjœcie, group=wyjœcie)) +
+    geom_tile(aes(fill = liczebnosc)) + 
+    geom_text(aes(fill = freq1$liczebnosc, label = round(freq1$liczebnosc, 1))) +
+    scale_fill_gradient(low = "white", high = "red") 
+
+############################
+```
+
+Macierz sk³adaj¹ca siê z liczby przejœæ pomiêdzy najbardziej popularnymi stacjami (cnk02, cnk12, cnk16, cnk18, cnk19) wœród osób, które odwiedzi³y ponad 20 eskponatów.
+
+#Regu³y asocjacyjne
+
+Oprócz wp³ywu bezpoœredniego, ciekawe ekspozycje popularnych stacji mog¹ tak¿e rozbudzaæ zainteresowanie ca³¹ wystaw¹, a przez to wp³ywaæ na odwiedzenie jakichœ konkretnych stacji. Analizê poœredniego wp³ywu przedstawimy zarówno bior¹c jak i nie bior¹c pod uwagê kolejnoœæ zwiedzania (w pierwszym przypadku mo¿liwe jest to, ¿e sam zamiar odwiedzenia konkretnej stacji odbija³ siê póŸniej na decyzjach zwiedzaj¹cych).
+
+##Analiza ca³ej populacji zwiedzaj¹cych
+
+###Bez uwzglêdnienia kolejnoœci zwiedzania
+
+Analiza decyzji odwiedzaj¹cych po pierwsze uwidacznia, ¿e wiêkszoœæ zauwa¿onych regularnoœci dotyczy regu³, w których po prawej stronie wynikania wystêpuj¹ najpopularniejsze stacje. Mo¿emy wskazaæ jednak, ¿e do odwiedzenia mniej popularnych stacji najbardziej inspiruj¹ca by³a stacja cnk12.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide" }
+
+B$visitor<-NULL
+B$cnk19<-B$cnk19a+B$cnk19b
+B$cnk19a<-NULL
+B$cnk19b<-NULL
+B$cnk02<-B$cnk02a+B$cnk02b
+B$cnk02a<-NULL
+B$cnk02b<-NULL
+B<-B>1
+trans<-as(B,"transactions")
+c<-apriori(trans,parameter = list(supp=0.02, conf=0.6))
+
+subrules2 <- head(sort(c, by="lift"), 430)
+plot(subrules2, method="grouped",control=list(cex=.1))
+itemFrequencyPlot(trans, control=list(cex=.1))
+
+```
+
+Trzeba jednak zaznaczyæ, i¿ znalezione regu³y nie mia³y zbyt wysokiego poziomu support - co namniej 0,02.  
+
+```{r, echo=FALSE, include=TRUE, warning=FALSE, message=FALSE}
+plot(c)
+```
+
+###Z uwglêdnieniem kolejnoœci zwiedzania
+
+Sytuacja przedstawia siê inaczej gdy weŸmiemy pod uwagê kolejnoœæ odwiedzanych stacji. Za pomoc¹ pakietu arulesSequences zbadano najczêstsze sekwencje zwiedzania - na poziomie support 0.02 oraz dla maksymalnej d³ugoœci 3.   
+
+```{r, echo=FALSE, include=TRUE, warning=FALSE, message=FALSE}
+#czytam dane
+x <- read_baskets(con = "data123.txt", info = c("sequenceID","eventID","SIZE"))
+
+#algorytm dla sekwencji cspade
+s1<- cspade(x, parameter = list(support = 0.02, maxwin=5, maxlen=4), control = list(verbose = FALSE, summary=TRUE))
+
+#wybieram najciekawsze sekwencje d³ 2 
+s2<-as(s1,"data.frame")
+s3<-subset(s2, s2$support>0.04)
+
+s3$dl<-nchar(as.character(s3$sequence))
+s3<-s3[order(s3$dl,decreasing=TRUE),]
+s3<-subset(s3, s3$dl>=16)
+s3[1:2]
+
+#d³. 3
+s2$dl<-nchar(as.character(s2$sequence))
+s4<-subset(s2,s2$dl>20)
+s4[1:2]
+
+```
+
+Spoœród najpopularniejszych stacji (cnk19, cnk02, cnk18, cnk12 i cnk16) widaæ, ¿e jako pocz¹tek sekwencji wyró¿niaj¹ siê stacje cnk02a. Ciekawe jest to, ¿e regu³y sekwencji ³¹cz¹ stacjê cnk02 z stacjami z innych stref tematycznych. Zastanawiaj¹cy jest brak stacji cnk18, cnk16 i cnk12.
+
+W przypadku sekwencji o maksymalnej d³ugoœci 3 widaæ, ¿e jako pocz¹tek sekwencji wyró¿niaj¹ siê stacje cnk02a, cnk02b, cnk19 oraz cnk18. Tak jak na poprzedniej mapie, z nich odwiedzaj¹cy przechodz¹ do eksponatów w drugiej czêœci galerii. Przejœcia miêdzy mniej popularnymi maszynami (zazwyczaj drugie przejœcie w sekwencji) wymuszane s¹ raczej przez uk³ad maszyn. 
+
+Analiza sekwencji wyró¿nia wiêc stacjê pocz¹tkow¹ cnk02 oraz, w mniejszym stopniu, stacje cnk18 i cnk19, co jest doœæ niezgodne z wnioskami wyci¹gniêtymi z analizy regu³ asocjacyjnych (bez kolejnoœci).
+
+<img src="stat1.jpg" />
+<img src="stat2.jpg" />
+
+##Analiza zwiedzaj¹cych z poszczególnych klastrów (bez kolejnoœci zwiedzania)
+
+Przeprowadzimy teraz analizy dla klastrów 1-3 dla grupy goœci odwiedzaj¹cych 10-14 stacji. 
+
+```{r, echo=FALSE, include=TRUE, warning=FALSE, message=FALSE, results="hide"}
+B<-subset(C1, C1$clus==1)
+B$visitor<-NULL
+B$cnk19<-B$cnk19a+B$cnk19b
+B$cnk19a<-NULL
+B$cnk19b<-NULL
+B$cnk02<-B$cnk02a+B$cnk02b
+B$cnk02a<-NULL
+B$cnk02b<-NULL
+B$suma<-NULL
+B$clus<-NULL
+B<-B==1
+trans<-as(B,"transactions")
+c<-apriori(trans,parameter = list(supp=0.02, conf=0.6))
+
+subrules2 <- head(sort(c, by="lift"), 800)
+plot(subrules2, method="grouped",control=list(cex=.1))
+
+B<-subset(C1, C1$clus==2)
+B$visitor<-NULL
+B$cnk19<-B$cnk19a+B$cnk19b
+B$cnk19a<-NULL
+B$cnk19b<-NULL
+B$cnk02<-B$cnk02a+B$cnk02b
+B$cnk02a<-NULL
+B$cnk02b<-NULL
+B$suma<-NULL
+B$clus<-NULL
+B<-B==1
+trans<-as(B,"transactions")
+c<-apriori(trans,parameter = list(supp=0.02, conf=0.6))
+
+subrules2 <- head(sort(c, by="lift"), 800)
+plot(subrules2, method="grouped",control=list(cex=.1))
+
+B<-subset(C1, C1$clus==3)
+B$visitor<-NULL
+B$cnk19<-B$cnk19a+B$cnk19b
+B$cnk19a<-NULL
+B$cnk19b<-NULL
+B$cnk02<-B$cnk02a+B$cnk02b
+B$cnk02a<-NULL
+B$cnk02b<-NULL
+B$suma<-NULL
+B$clus<-NULL
+B<-B==1
+trans<-as(B,"transactions")
+c<-apriori(trans,parameter = list(supp=0.02, conf=0.6))
+
+subrules2 <- head(sort(c, by="lift"), 800)
+plot(subrules2, method="grouped",control=list(cex=.1))
+
+
+
+```
+
+We wszystkich klastrach, w przypadku analizy regu³ asocjacji bez kolejnoœci, zdecydowanie najsilniejszy jest wp³yw stacji cnk12, która inspiruje do obejrzenia tak¿e mniej popularnych stacji. W klastrach 1 i 2 widoczny jest tak¿e wp³yw stacji cnk18 i cnk16. Wp³yw stacji cnk02 widoczny jest jedynie w pierwszym klastrze. 
+
+Przeprowadzimy teraz analizê dla klastrów 1-3 dla grupy goœci odwiedzaj¹cych 15-19 stacji.
+
+```{r, echo=FALSE, include=TRUE, warning=FALSE, message=FALSE, results="hide"}
+B<-subset(C2, C2$clus==1)
+B$visitor<-NULL
+B$cnk19<-B$cnk19a+B$cnk19b
+B$cnk19a<-NULL
+B$cnk19b<-NULL
+B$cnk02<-B$cnk02a+B$cnk02b
+B$cnk02a<-NULL
+B$cnk02b<-NULL
+B$suma<-NULL
+B$clus<-NULL
+B<-B==1
+trans<-as(B,"transactions")
+c<-apriori(trans,parameter = list(supp=0.02, conf=0.6))
+
+subrules2 <- head(sort(c, by="lift"), 800)
+plot(subrules2, method="grouped",control=list(cex=.1))
+
+B<-subset(C2, C2$clus==2)
+B$visitor<-NULL
+B$cnk19<-B$cnk19a+B$cnk19b
+B$cnk19a<-NULL
+B$cnk19b<-NULL
+B$cnk02<-B$cnk02a+B$cnk02b
+B$cnk02a<-NULL
+B$cnk02b<-NULL
+B$suma<-NULL
+B$clus<-NULL
+B<-B==1
+trans<-as(B,"transactions")
+c<-apriori(trans,parameter = list(supp=0.02, conf=0.6))
+
+subrules2 <- head(sort(c, by="lift"), 3000)
+plot(subrules2, method="grouped",control=list(cex=.1))
+
+B<-subset(C2, C2$clus==3)
+B$visitor<-NULL
+B$cnk19<-B$cnk19a+B$cnk19b
+B$cnk19a<-NULL
+B$cnk19b<-NULL
+B$cnk02<-B$cnk02a+B$cnk02b
+B$cnk02a<-NULL
+B$cnk02b<-NULL
+B$suma<-NULL
+B$clus<-NULL
+B<-B==1
+trans<-as(B,"transactions")
+c<-apriori(trans,parameter = list(supp=0.02, conf=0.6))
+
+subrules2 <- head(sort(c, by="lift"), 3000)
+plot(subrules2, method="grouped",control=list(cex=.1))
+```
+
+Dla goœci w klastrze 1 ¿adna z najpopularniejszych stacji nie stoi po lewej stronie regu³y, w klastrze 2 widoczny jest wp³yw stacji cnk12. Najciekawszy jest jednak klaster 3, gdzie wystêpuj¹ wszystkie z popularnych stacji (poza cnk19), najsilniejszy jest wp³yw stacji cnk02.
+
+Pozostaje jeszcze sprawdziæ goœci odwiedzaj¹cych +20 stacji.
+
+```{r, echo=FALSE, include=TRUE, warning=FALSE, message=FALSE, results="hide"}
+B<-C3
+B$visitor<-NULL
+B$cnk19<-B$cnk19a+B$cnk19b
+B$cnk19a<-NULL
+B$cnk19b<-NULL
+B$cnk02<-B$cnk02a+B$cnk02b
+B$cnk02a<-NULL
+B$cnk02b<-NULL
+B$suma<-NULL
+B$clus<-NULL
+B<-B==1
+trans<-as(B,"transactions")
+c<-apriori(trans,parameter = list(supp=0.1, conf=0.6))
+
+subrules2 <- head(sort(c, by="lift"), 3000)
+plot(subrules2, method="grouped",control=list(cex=.1))
+
+```
+
+Znów za najsilniejszy mo¿emy uznaæ wp³yw stacji cnk18 oraz w mniejszym stopniu cnk12.
+
+#Prosta regresja
+
+Po analizie regu³ warto siê jeszcze zastanowiæ w jaki sposób odwiedzenie najpopularniejszych stacji wp³ywa na ogóln¹ liczbê odwiedzonych stacji. W tym celu opracowano prosty model regresji linowej postaci:
+
+liczba odwiedzonych stacji = {zbiór zmiennych kontrolnych} + (odwiedzenie stacji): cnk02 + cnk19 + cnk16 + cnk18 + cnk12
+
+Za zmienne kontrolne przyjêto: 
+ a) dzieñ tygodnia (zbiór zmiennych binarnych, pominiêto czwartek ze wzglêdu na wspó³liniowoœæ),
+ b) godzina wejœcia (znów zbiór zmiennych binarnych, pominiêto 17 ze wzglêdu na wspó³liniowoœæ).
+ 
+Analizie poddano jedynie tych goœci, którzy odwiedzili co najmniej 10 stacji. W tym zbiorze zastosowanie regresji jest bardziej uprawnione ni¿ w przypadku wszystkich goœci, gdy¿ osoby te prawdopodobnie bardziej uwa¿nie zwiedza³y ekspozycjê i wybór odwiedzonych stacji by³ mniej przypadkowy. Z drugiej strony, by zachowaæ ró¿norodnoœæ liczby odwiedzonych stacji, nie dzielono wybranego zbioru odwiedzaj¹cych na kolejne podzbiory.   
+
+Oszacowano dwa modele: w pierwszym - przez liczbê odwiedzonych stacji rozumiemy wszystkie stacje,w drugim - stacje nienale¿¹ce do najpopularniejszych. Modele zosta³y oszacowane jedynie w celu wykazania istnienia oraz znalezienia kierunku zwi¹zku miêdzy zmiennymi objaœniaj¹cymi a zmienn¹ objaœnian¹. Nie maj¹ jednak wartoœci prognostycznej. 
+
+```{r, echo = F, message=FALSE, warning=F}
+df1$dzien<-wday(df1$date)
+df1$godzina<-hour(df$date)
+df2<-subset(df1,df1$counter==1)
+df2$counter<-NULL
+df2$date<-NULL
+df2$station<-NULL
+df3<-spread(df2, key=godzina, value=dzien,0)
+df3[2:21]<-sign(df3[2:21])
+colnames(df3)[2:21]<-c("g0","g2", "g4", "g5", "g6", "g7", "g8", "g9", "g10", "g11", "g12", "g13", "g14", "g15", "g16", "g17", "g18", "g19", "g20", "g21")
+df4<-spread(df2, key=dzien, value=godzina,0)
+df4[2:8]<-sign(df4[2:8])
+colnames(df4)[2:8]<-c("n","p","w","s","c","pi1","so1")
+df5<-join(df3, df4, by="visitor")
+C<-df1
+C$counter<-NULL
+C$dzien<-NULL
+C$dzien<-NULL
+C$godzina<-NULL
+C$date<-as.numeric(C$date)
+C<-spread(C,key=station, value=date,0)
+C[2:60]<-sign(C[2:60])
+K<-C[2:60]
+C$suma<-rowSums(K)
+remove(K)
+C<-subset(C, C$suma>=10)
+
+df6<-join(C,df5, by="visitor")
+B<-df6
+B$visitor<-NULL
+B$cnk19<-B$cnk19a+B$cnk19b
+B$cnk19a<-NULL
+B$cnk19b<-NULL
+B$cnk02<-B$cnk02a+B$cnk02b
+B$cnk02a<-NULL
+B$cnk02b<-NULL
+B$cnk02<-sign(B$cnk02)
+B$cnk19<-sign(B$cnk19)
+B$suma1<-rowSums(B[1:8])+rowSums(B[14:55])+B$cnk13+B$cnk17
+
+fit<-lm(suma ~ cnk16+cnk19+cnk02+cnk12+cnk18+n+p+w+s+pi1+so1+ g8+g9+g10+g11+g12+g13+g14+g15+g16+g18+g19+g20+g21, data=B) 
+summary(fit)
+fit1<- lm(suma1 ~ cnk16+cnk19+cnk02+cnk12+cnk18+n+w+s+pi1+so1+ g8+g9+g10+g11+g12+g13+g14+g15+g16+g18+g19+g20+g21, data=B)
+summary(fit1)
+
+```
+
+W pierwszym modelu wszystkie zmienne dotycz¹ce stacji s¹ uznane za istotne statystycznie (przy poziomie istotnoœci 5%). WyraŸna jest jednak ró¿nica miêdzy cnk12, o wspó³czynniku przekraczaj¹cym 2, a pozosta³ymi stacjami. Tak¿e stacje cnk18 i cnk16 maj¹ wspó³czynniki wy¿sze ni¿ stacje cnk02 i cnk19. Widoczny jest negatywny wp³yw cnk19, przy silnie pozytywnym wp³ywie cnk12, ale tak¿e stacji cnk18 i cnk16. Model ma jednak charakter jedynie informacyjny i wyci¹ganie wniosków nie musi byæ uprawnione ze wzglêdu na bardzo niski poziom R-kwadrat. 
+
+#Podsumowanie
+
+Przeprowadzona analiza pokaza³a, ¿e niemo¿liwa jest jednoznaczna odpowiedŸ na pytanie czy dana stacja jest "tranzytowa" czy "inspiruj¹ca". Mo¿liwe jest natomiast okreœlenie, która ze stacji jest bardziej zbli¿ona do okreœlonych przez nas typów (stacje u³o¿one przez nas w kolejnoœci od najbardziej tranzytowych do najbardziej inspiruj¹cych):
+
+cnk19 - tê stacjê mo¿na okreœliæ jako najbardziej "tranzytow¹". Mimo tego, ¿e wiêkszoœæ goœci zaraz po jej opuszczeniu kierowa³a siê do ma³o- i œrednio-popularnych stacji oraz tego, ¿e analiza sekwencji odnalaz³a kilka regu³ ³¹cz¹cych cnk19 z mniej popularnymi stacjami, to pozosta³e analizy wskaza³y tê ekspozycjê jako wyj¹tkowo ma³o inspiruj¹c¹. Regu³y asocjacyjne ³¹czy³y cnk19 jedynie z popularn¹ stacj¹ cnk02. Równie¿ regresje wskaza³y, ¿e stacja ta mia³a negatywny (lub najmniej pozytywny) wp³yw na liczbê odwiedzonych przez goœci stacji. Wydaje siê wiêc, ¿e odwiedzaj¹cy wychodz¹ z tej stacji w przypadkowych kierunkach i trudno uznaæ, by czuli siê w szczególny sposób zainspirowani do zobaczenia jakichœ konkretnych ekspozycji. 
+
+cnk16 - regu³y asocjacyjne ³¹czy³y tê stacjê jedynie z innymi popularnymi stacjami, wzglêdnie najmniej osób przesz³o z niej do ekspozycji œrednio lub ma³o popularnych. Z tych wzglêdów uznaliœmy cnk16 za bardziej "tranzytow¹" ni¿ "inspiruj¹c¹".
+
+cnk02- najbardziej zagadkowa stacja. Analiza regu³ asocjacyjnych bez kolejnoœci wskaza³a, ¿e wp³yw tej stacji jest silny jedynie w okreœlonych klastrach (okreœlonych dla osób odwiedzaj¹cych przynajmniej 10 stacji). Analiza sekwencji wykaza³a natomiast, ¿e stacja ta silnie oddzia³uje na zwiedzaj¹cych - wynik ten mo¿e byæ jednak spowodowany tym, ¿e wiêkszoœæ z nich zaczyna zwiedzanie w³aœnie od cnk02. W pozosta³ych analizach stacja ta ujawni³a ma³o charakterystyczne w³aœciwoœci. Dlatego te¿ znajduje siê w œrodku naszego zestawienia.
+
+cnk12 - stacja ta wystêpowa³a po lewej stronie bardzo wielu regu³, zarówno dla ca³ej populacji, jak i dla wielu klastrów. Tak¿e wspó³czynniki w obu regresjach wskazywa³y na pozytywny wp³yw stacji cnk12. Analiza sekwencji nie ujawni³a natomiast ¿adnych sposobów zwiedzania, zaczynaj¹cych siê od tej stacji. Dlatego umieœciliœmy j¹ na drugim miejscu.
+
+cnk18 - zarówno analizy regu³ asocjacyjnych bez kolejnoœci jak i regu³ dla sekwencji (w du¿o mniejszym stopniu) ujawni³y, ¿e stacja ta ma silny wp³yw, inspiruj¹cy do odwiedzenia mniej popularnych stacji, najbardziej widoczny wœród zwiedzaj¹cych powy¿ej 10 eksponatów. Równie¿ z tej stacji najwiêcej goœci skierowa³o siê do stacji mniej popularnych (choæ, w pewnym stopniu, mo¿e to byæ wynikiem uk³adu eksponatów). Równie¿ wspó³czynniki w obu regresjach wskazywa³y na pozytywny wp³yw tej stacji. Wobec tego uznaliœmy j¹ za najbardziej inspiruj¹c¹.     
+

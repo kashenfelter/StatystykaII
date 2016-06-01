@@ -61,3 +61,55 @@ Slajd 10 wprowadza całkowity zamęt ponieważ nie wiadomo czy kastrowane sa eks
 Z pliku 'Rmd' przed wyłąniem należałoby uzunąć zbędne opisy - pozostałość po szablonie.
 Nie mówiąc już o tym, że należałoby dodać wnioski lub koemntarze tak by dało się zrozumieć co i po co w tym pliku się dzieje.
 
+
+## -------------------------
+## Phase 3
+
+Podział na stacje tranzytowe i inspirujące jest ciekawy. 
+Ale przyjęty sposób analizy nie pzowala na rzstrzygnięcie jaka stacja byłaby inspirującą.
+
+1. Proficiency in tools	
+
+Wykorzystano metody PCA, k średnich, arules.
+To podstawowe wersje, któ5e powinny być porównane przynajmniej z innymi technikami, takimi jak isoMDS i pam.
+
+
+2. Structure and conclusions	
+
+Nie ma postawionych pytań badawczych. Zdecydowana większość wykresów powinna być przeniesiona do załącznika, teraz tylko utrudnia czytanie bo nie wiadomo co ma z nich wynikać.
+Wygląda jakby projekt się skończył na eksploracji, ale zabrakło syntezy wyników
+
+W tym raporcie jest wiele zdań, które nie sposób zrozumieć.
+
+Przykładowo:
+..Nie zdecydowano się jednak na podział ze względu na małą zgodność rzutowania z podziałem oraz małą liczbę gości w tej grupie.'' - zdanie pod tajemniczo brzmiącym wykresem p31
+
+Nazwy wykresów, takie jak p21, p31 nic nie wnoszą. Jest wiele miejsca na tytuł i jeżeli to konieczne to też podtytuł.
+
+
+
+3. Adequacy
+
+Cytat: 'Na mapce widać, że'. Na tej mapie z tak małymi etykietami nic nie widać. 
+Poniżej tego zdania jest wykres bez komentarza, z którego niewiele wynika.
+
+Wybór liczby grup jest niepoprawny. 
+Dla statystyki k można odnieść wrażenie że znacznie większe wartości klastrów niż 5 bedą dobre. a tutaj wykres odcięty do 5.
+
+Określenie 'ponieważ podział na klastry wydawał się w tej parze najbardziej zgodny z rzutem.' powinno być jakkolwiek uzasadnione liczbowo.
+
+W tekst wplecione są notatki typu 'Zastanawiający jest brak stacji cnk18, cnk16 i cnk12.' ale bez żadnego wyjaśnienia. Czy to wniosek, że coś zostało źle zrobione, czy też jest to punkt do sprawdzenia, czy też jest to sposób podkreślenia ważności wyniku.
+
+Czemu służyć ma dodanie modelu liniowego, skoro kończy się on określeniem: 'Model ma jednak charakter jedynie informacyjny i wyciąganie wniosków nie musi być uprawnione ze względu na bardzo niski poziom R-kwadrat.'
+Skoro tak to po co umieszczać tą metodę skoro wyniki nie są informatywne?
+
+Z komentarzem 'Przeprowadzona analiza pokazała, że niemożliwa jest jednoznaczna odpowiedź na pytanie czy dana stacja jest “tranzytowa” czy “inspirująca”. ' nie mogę się zgodzić. Zgodzę się jedynie z tym, że przyjęte metody nie pozwalały na odpowiedzenie na to pytanie.
+
+Brakuje uzasadnienia dlaczego użyto PCA, czy na tych danych to ma sens?
+
+Wykresy ze strzałkami są bardzo nieczytelne.
+
+Oceny obszarów:
+
+70 / 50 / 40
+

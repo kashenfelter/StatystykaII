@@ -36,3 +36,48 @@ Comments on slides 8-9 are too short. Much more interesting things are happening
 
 In the third phase I will look forward analyses of mixtures and possible: analyses of other stations.
 
+
+## -------------------------
+## Phase 3
+
+I really like your idea. The second phase was very interesting. But I have expected a little more (more models, more descriptions) on third phase.
+
+1. Proficiency in tools	
+
+You have used right tools (mclust/BIC). 
+The significance testing with anova/ks-test would be a good idea for sample size like 200-1000 observations.
+What you could consider is to use a multidimensional scaling or clustering.
+This will enrich the battery of tools that you have used.
+
+Here you score due to higher consistency but loose because of limited number of tools that have been tried.
+
+
+2. Structure and conclusions	
+
+Agenda could be more detailed. 
+The algorithm name is 'mixture of Gaussian components' not EM (EM is a technique how to fit the model parameters).
+
+Lack of comments may be good for presentation, but is really bad for reporting. 
+So it is hard to guess your intentions based on uncommented plots/tables
+
+Without comments it is a have hard to read report.
+It is hard to find, understand and validate conclusions.
+
+3. Adequacy
+
+Tools is selected properly. BIC is applied correctly.
+
+What you should do is to try some data transformations or some methods to validate model assumptions.
+
+You have not included any validation of the fit (maybe except case for two components - which clearly do not match data).
+In the presentation you have not presented fitted parameters of the selected model, so we do not know neither mixing proportions, nor means not standard deviations.
+
+Many plots do not have legend nor descriptions. So it is hard to understand what is being presented (e.g. page 18, which colour is which)
+
+What I really like is the novelty of the approach.
+
+Scores:
+
+80% / 75% / 80%
+
+

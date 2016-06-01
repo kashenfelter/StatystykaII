@@ -56,3 +56,45 @@ W pierwszej fazie pisałem 'Brakuje też komentarzy.'
 Do tej fazy mam tą samą uwagę. 
 Jeżeli w raporcie państwo nie interpretują wyników, nie stawiają i weryfikują hipotez to sam raport nie ma wartości, jest tylko zbiorem przypadkowych obrazków i tabel. 
 Proszę poświęcić znaczeni więcej uwagi temu co i po co państwo analizują.
+
+
+## -------------------------
+## Phase 3
+
+1. Proficiency in tools	
+
+Jest wykonany histogram, jest shepard, isoMDS i pam.
+Wybranie numerów medoidów dla PAM nic nie mówi. Lepiej już byłoby pokazać jak wyglądają ścieżki wskazanych użytkowników.
+Wygląd tego kwiatka po mapowaniu isoMDS powinno włączyć alarm, dosyć zaskakujący jest taki wyraźny podział na cztery grupy.
+
+
+2. Structure and conclusions	
+
+Nie ma postawionych pytań badawczych. 
+W rozdziale 'Jakie zmienne są skorelowane z takim ładnym klastrowaniem?' nie ma nawet zdania komentarza, trudno to nazwać raportem.
+
+Diagnostyka nie jest wykonana poprawnie. 
+Skoro piszą państwo, że grupy mają coś wspólnego z czasem przebywania na klastrach to powinna zostać wykonana analiza jak wyglądają rozkłady czasu przebywania na eksponatach w grupach opisanych przez klastry.
+
+Struktura i opis są bardzo nieczytelne. 
+Z obrazków wynika że są cztery grupy, ale zupełnie nie wiadomo z czym są one związane i jak można by je wykorzystać.
+
+
+3. Adequacy
+
+Zaproponowano własną metrykę, ale brakuje dyskusji dlaczego jest dobra, jak ma się do pozostałych metryk.
+Może ona i jest lepsza, ale gdzie porównanie?
+
+Jak ocenić sensowność tej metryki na bazie 'distances_station_manual_clustering_good_reduced[1:10, 1:10]' - te liczby przecież nic nie mówią o tej metryce.
+
+Trudno uznać zdanie 'Rzutowanie prezentuje się bardzo ładnie:' za dyskusje czy ten sposób rzutowania był właściwy, czy metryka była właściwa.
+
+Porównanie zależności innych zmiennych z czterema uzyskanymi klastrami lepiej robić nie na wykresie po isoMDS ale używając do tego testów/innych technik. Przykładowo aby porównać średni czas przebywania a klaster.
+Do tego lepiej wykorzystać boxploty lub test dla średnich. Podobnie z liczbą odwiedzonych eksponatów.
+
+Aby porównać dwie zmienne jakościowe lepiej wykorzystać test chi2 lub analizę korespondencji
+
+Oceny obszarów:
+
+80% / 30% / 40%
+
