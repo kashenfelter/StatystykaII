@@ -1,0 +1,557 @@
+---
+title: "PROJECT 2, PHASE 2"
+author: "Davide Bottoli, Karolina Gajewska"
+date: "30 May 2016"
+output: 
+  html_document:  
+    toc: TRUE
+
+---
+
+
+#Introduction
+
+The main goal of this phase is finding and presenting the predictions for number of cancer cases in different regions of Poland. Identification of outliers. Comparision of results for different models.
+
+#Choosing type of cancer
+
+In order to predicting numbers of choosed cancer case we adding into our dataframe new factors, which can contribute to cancer disease.
+
+We used data from GUS. We have choosed data about:
+
+- normalized value of dust pollution for each subregions
+
+- general population for each subregions and gender.
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(sp)
+library(rgdal)
+library(rgeos)
+library(raster)
+library(maptools)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(scales)
+library(plotrix)
+library(glmnet)
+library(pls)
+library(tree)
+library(gbm)
+library(randomForest)
+library(gridExtra)
+```
+
+## 1) THE COMPLETE DATASET  
+Our complete dataset contains information about generic and demographic data of people and the amount of new cancers (in different phases) in Poland in the years bewtween 2010 and 2012.  After deeper reaserches we included in the original dataset also the **Rate of Pollution**, the **Population** and the **Population by gender** in the different regions per year. 
+
+
+```{r, echo=FALSE, include=F}
+# Let's present here how's the *distribution of different cancers per Gender*.  
+data_1 <- read.csv(file = "Data_complete.csv", header = T, sep = ";", dec = ",", na.strings = "#N/D!")
+data_1 <- data_1[complete.cases(data_1),]
+#head(data_1)
+#str(data_1)
+data_1$TERYT4 <- as.factor(data_1$TERYT4)
+data_1$region <- as.factor(data_1$region)
+data_1$subregion <- as.factor(data_1$subregion)
+data_1 <- data_1 %>% 
+  group_by(ICD10, GENDER, AGE_GROUP, TERYT4, region, subregion, year, Population, Gender.Population, RateOfPollution, CancerGroup, CancerSex) %>%
+  summarise(Stage1 = sum(as.numeric(Stage1)), 
+            Stage2 = sum(as.numeric(Stage2)), 
+            Stage3 = sum(as.numeric(Stage3)), 
+            Stage4 = sum(as.numeric(Stage4)),
+            new = sum(new))
+levels(data_1$region) <- c("Lower Silesia", "Kuyavia-Pomerania", "Lublin", "Lubusz", "Lodz", "Lesser Poland", "Mazovia", "Opole", "Subcarpathia", "Podlaskie", "Pomerania", "Silesia", "Holy Cross", "Warmia-Masuria", "Greater Poland", "West Pomerania")
+
+data_1 <- subset(data_1, select=-c(Stage1,Stage2,Stage3,Stage4))
+table(data_1$ICD10, data_1$GENDER)
+#table(data_1$CancerGroup,data_1$GENDER)
+data_2 <- data_1[data_1$ICD10=="C50_D05"&data_1$GENDER=="K",]
+data_2 <- subset(data_2, select=-c(CancerGroup, CancerSex))
+
+```
+## 2) PURPOSE OF THE ANALYSIS  
+We decided to perform an analysis on cancers **C50** and **D05**, that are *breast cancers*. Since this type of cancers strike women on a bigger percentage, we limited our research to the female gender.  Our *final purpose* is trying to forecast the new amount of breast cancer in a given region for a given age range.  
+
+## 3) PREPARING THE DATASET
+
+From the complete data we removed:   
+* code of TERYT and subregion, because we want to use only the region as a factor for the prediction;  
+* stages, because our analysis has the only scope to predict the number of new cancers;  
+* Gender, because our analysis is focused only on female breast cancer.  
+So, the variables that we kept are: *age-range*, *region*, *general population*, *female population* and *rate of pollution*.  
+Here is it the composition of the dataset we used for modelling:
+
+```{r, echo=FALSE}
+data_model1 <- subset(data_2, select = -c(ICD10,TERYT4,subregion,GENDER))
+head(data_model1)
+```
+
+
+## 4) LINEAR ANALYSIS
+
+Let's start with a simple linear model including all the parameters :
+```{r, echo=FALSE}
+lm1 <- lm(new ~ ., data = data_model1)
+summary(lm1)
+
+```
+
+Adding stepwise selection:
+```{r, echo=FALSE}
+bt_m1 <- step(lm1, direction = "both")
+summary(bt_m1)
+```
+
+As we see only few parameters were removed from the complete model. Let's have a look on the AIC:
+```{r}
+AIC(lm1)
+AIC(bt_m1)
+```
+
+They're not so different. 
+As we will see in a following plot, the MSEs are very similar too.
+
+```{r, echo=FALSE}
+
+x_1 <- model.matrix(new ~ ., data = data_model1)[, -1]
+y <- data_model1$new
+
+#Creating a function to perform n simulation of train/test error
+
+simulate_MSE <- function(n, x){
+  MSE <- c()
+  for (i in 1:n){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- y[test]
+    pred1 <- predict(x, data = x_1, subset = test)
+    pred1 <- pred1[test]
+    MSE[i]<- mean((pred1-y.test)^2)
+  }
+  return(MSE)
+}
+
+#Calculate MSE
+
+MSE_clm <- simulate_MSE(1000, lm1)
+MSE_btlm <- simulate_MSE(1000, bt_m1)
+
+```
+Afterwards we implemented a ridge regression, a lasso regression and a principal component regression. 
+
+```{r, echo=FALSE}
+
+#RIDGE1
+bestlam1 <- c()
+for (i in 1:100){
+  train = sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+  test <- -train
+  y.test <- y[test]
+  cv.out1 <- cv.glmnet(x_1[train,], y[train], alpha = 0)
+  bestlam1[i] <- cv.out1$lambda.min
+}
+bestlam1 <- mean(bestlam1)
+
+out1 <- glmnet(x_1, y, alpha = 0)
+
+#LASSO1
+bestlam2 <- c()
+for (i in 1:100){
+  train = sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+  test <- -train
+  y.test <- y[test]
+  cv.out2 <- cv.glmnet(x_1[train,], y[train], alpha = 1)
+  bestlam2[i] <- cv.out2$lambda.min
+}
+bestlam2 <- mean(bestlam2)
+
+out2 <- glmnet(x_1, y, alpha = 1)
+
+#predict(out2, type = "coefficients", s = bestlam2)
+
+
+```
+
+```{r, echo=FALSE}
+MSE_ridge <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- y[test]
+    ridge.pred1 <-predict(out1, s = bestlam1, newx = x_1[test,])
+    MSE_ridge[i] <- mean((ridge.pred1 - y.test)^2)
+}
+MSE_lasso <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- y[test]
+    lasso.pred1 <-predict(out2, s = bestlam2, newx = x_1[test,])
+    MSE_lasso[i] <- mean((lasso.pred1 - y.test)^2)
+}
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+
+#PCR
+#PRINCIPAL COMPONENT REGRESSION 1
+set.seed(2)
+pcr.fit1 <- pcr(new ~ ., data = data_model1, scale = TRUE, validation = "CV")
+#summary(pcr.fit1)
+validationplot(pcr.fit1, val.type = "MSEP")
+
+set.seed(1)
+train = sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+test <- -train
+y.test <- y[test]
+pcr.fit1 <- pcr(new ~ ., data = data_model1, scale = TRUE, ncomp = 24)
+summary(pcr.fit1)
+
+```
+Using the cross validation to find the best values for the parameters we obtained the following five linear models:  
+  
+Type of model | Number of parameters
+--------------|---------------------
+Complete LM   |     25
+Stepwise LM   |     23
+Ridge         |     25
+Lasso         |     22
+PCR           |     24
+
+After choosing the models, we performed an analysis based on 1000 random selection of test set and calculate MSEs. Here we have the distributions:      
+
+```{r, echo=FALSE}
+MSE_pcr <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- y[test]
+    pcr.pred1 = predict(pcr.fit1, x_1[test,], ncomp = 24)
+    MSE_pcr[i] <- mean((pcr.pred1-y.test)^2)
+}
+
+
+#boxplot(cbind(MSE_clm, MSE_btlm, MSE_ridge, MSE_lasso,MSE_pcr), ylab="MSE", main ="Distribution of MSEs for the different linear models")
+
+MSE_clm_df<-as.data.frame(MSE_clm)
+MSE_clm_df$type<-"MSE_clm"
+
+MSE_btlm_df<-as.data.frame(MSE_btlm)
+MSE_btlm_df$type<-"MSE_btlm"
+
+MSE_ridge_df<-as.data.frame(MSE_ridge)
+MSE_ridge_df$type<-"MSE_ridge"
+
+MSE_lasso_df<-as.data.frame(MSE_lasso)
+MSE_lasso_df$type<-"MSE_lasso"
+
+MSE_pcr_df<-as.data.frame(MSE_pcr)
+MSE_pcr_df$type<-"MSE_pcr"
+
+cols <- c("Value","type")
+colnames(MSE_pcr_df) <- cols
+colnames(MSE_lasso_df) <- cols
+colnames(MSE_ridge_df) <- cols
+colnames(MSE_btlm_df) <- cols
+colnames(MSE_clm_df) <- cols
+
+total <- rbind(MSE_pcr_df, MSE_lasso_df, MSE_ridge_df, MSE_btlm_df,
+               MSE_clm_df)
+
+ggplot(total, aes( x=type, y=Value,fill=type))+
+  geom_boxplot() + xlab("MSE") +ylab("Value of MSE") +
+  ggtitle("Distribution of MSEs for different linear models" )
+
+```
+  
+## 5) MOVING BEYOND LINEARITY
+
+### 5.1) Regression trees   
+    
+With cross validation, we see that the deviance is minimized with a number of leaves equal to 12, so we don't have the necessity to prune the original tree.  
+As we see from the summary and the plot, the variables used by this model are only *Population*, *Gender Population*, *Age Range* and *Region*.  
+
+```{r, echo=FALSE}
+
+#TREE (from library tree)
+set.seed(1)
+train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+tree.2 <- tree(new ~ ., data = data_model1)
+summary(tree.2)
+
+cv.tree.2 <- cv.tree(tree.2)
+#typeof(cv.tree.2)
+
+cv.tree.2.df<-data.frame(cv.tree.2$size, cv.tree.2$dev)
+
+ggplot(cv.tree.2.df, aes(x=cv.tree.2.size, y=cv.tree.2.dev, group=1)) +
+  geom_line() + geom_point() + ggtitle("Deviance vs Tree Size") +
+  xlab("Size of the tree") + ylab("Deviance")
+
+
+#plot(cv.tree.2$size, cv.tree.2$dev, type = "b",xlab = "Size of the #tree", main ="Deviance vs Tree Size")
+
+
+
+plot(tree.2, type="uniform")
+text(tree.2, pretty = 30, cex=0.55, srt = 0, col = rainbow(1))
+
+yhat <- as.data.frame(predict(tree.2, newdata = data_model1[-train,]))
+
+MSE_tree <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- data_model1[-train, "new"]
+    yhat <- predict(tree.2, newdata = data_model1[-train,])
+    MSE_tree[i] <- mean((yhat-y.test)^2)
+}
+
+```
+
+### 5.2) Bagging    
+    
+Trees suffer from a problem of high variance in relation to the division in training and test set, one method for reducing it is the bagging or random forests (the difference is that bagging analyze each variable at each tree split, while random forests only a subset).  We decided to apply bagging because of its more precise results. The problem of this approach is the limiteted representation of the model, in fact it's impossible to plot the results: we loose interpretability in exchange of more precision.  
+Anyway we reported here the summary of the model, and a graphic that shows the importance of the variables used. The one on the left is based upon the mean decrease of accuracy in prediction when a given variable is excluded from the model; the one on the right is a measure of the total decrease in node impurity that results from splits over that variable, averaged over all trees.
+
+```{r, echo=FALSE}
+
+bag.2 <- randomForest(new ~ ., data = data_model1, mtry = 6, importance = TRUE)
+bag.2
+#importance(bag.2)
+#str(bag.2)
+#str(bag.2$importance)
+data <- as.data.frame(cbind(rownames(bag.2$importance),
+                      round(bag.2$importance[,"IncNodePurity"],1)))
+colnames(data) <- c("Parameters","IncNodePurity")
+data$IncNodePurity <- as.numeric(as.character(data$IncNodePurity))
+
+
+
+p1<-ggplot(data) + geom_point(aes(IncNodePurity,Parameters)) +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1))+
+  #scale_x_continuous(limits=c(3,7),breaks=3:7) + 
+  theme(axis.title.y = element_blank())+
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = 
+          element_line(colour = 'gray', linetype = 'dashed'),
+        panel.background = element_rect(fill='white', colour='black'))
+
+
+
+data2 <- as.data.frame(cbind(rownames(bag.2$importance),
+                      round(bag.2$importance[,"%IncMSE"],1)))
+colnames(data) <- c("Parameters","%IncMSE")
+data2$V2 <- as.numeric(as.character(data2$V2))
+
+
+
+p2<-ggplot(data2) + geom_point(aes(V2,V1)) +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1))+
+  #scale_x_continuous(limits=c(3,7),breaks=3:7) + 
+  theme(axis.title.y = element_blank())+
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = 
+          element_line(colour = 'gray', linetype = 'dashed'),
+        panel.background = element_rect(fill='white', colour='black')) +
+  xlab("%IncMSE")
+
+#p2
+
+grid.arrange(p1, p2, nrow=1, top="Importance of parametrs") 
+library(gridExtra)
+
+
+#varImpPlot(bag.2)
+
+
+MSE_bagg <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- data_model1[-train, "new"]
+    yhat.bag <- predict(bag.2, newdata = data_model1[-train,])
+    MSE_bagg[i] <- mean((yhat.bag-y.test)^2)
+}
+#boxplot(cbind(MSE_tree, MSE_bagg))
+```
+
+### 5.3) Boosting   
+    
+While bagging and random forests use bootstrap to build tree independently one from the other, boosting uses the same procedure but the trees are grown sequentially, so each tree is grown using information from previously grown trees.   
+We selected a value for the number of trees equal to 5000 (aware that value too big could lead to overfitting), a shrinkage parameter equal to 0.1, and interaction depth equal to 6 that is the number of variables.   
+We reported here the influence of each variable in the model; as we previously saw, the most important are *Population*, *Gender Population* and *Age Range*.
+
+
+```{r, echo=FALSE}
+
+set.seed(1)
+boost.2 <- gbm(new ~ ., data = data_model1, distribution = "gaussian", n.trees = 5000, interaction.depth = 6, shrinkage = 0.1)
+summary(boost.2)
+
+
+MSE_boost <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- data_model1[-train, "new"]
+    yhat.boost <- predict(boost.2, newdata = data_model1[-train,], n.trees = 5000)
+    MSE_boost[i] <- mean((yhat.boost-y.test)^2)
+}
+```
+
+    
+Here we present the distribution of MSEs for these three methods:    
+
+```{r, echo=FALSE}
+MSE_tree_df<-as.data.frame(MSE_tree)
+MSE_tree_df$type<-"MSE_tree"
+
+MSE_bagg_df<-as.data.frame(MSE_bagg)
+MSE_bagg_df$type<-"MSE_bagg"
+
+MSE_boost_df<-as.data.frame(MSE_boost)
+MSE_boost_df$type<-"MSE_boost"
+
+cols <- c("Value","type")
+colnames(MSE_tree_df) <- cols
+colnames(MSE_bagg_df) <- cols
+colnames(MSE_boost_df) <- cols
+
+
+total2 <- rbind(MSE_tree_df, MSE_bagg_df, MSE_boost_df)
+total3<-rbind(MSE_bagg_df, MSE_boost_df)
+
+p4<-ggplot(total2, aes( x=type, y=Value,fill=type))+
+  geom_boxplot() + xlab("MSE") +ylab("Value of MSE") +
+  theme(axis.text = element_text(size = 6))
+  #ggtitle("Distribution of MSEs for different non linear models" )
+
+p5<-ggplot(total3, aes( x=type, y=Value,fill=type), size=1111)+
+  geom_boxplot() + xlab("MSE") +ylab("Value of MSE") +
+  theme(axis.text = element_text(size = 6))
+  #ggtitle("Distribution of MSEs for different non linear models" )
+
+grid.arrange(p4, p5, nrow=1, top = "Distribution of MSEs for fifferent non linear models") 
+
+
+#boxplot(cbind(MSE_tree, MSE_bagg, MSE_boost), main ="Distribution of MSEs for the different non linear models")
+```
+
+## 6) CONCLUSIONS   
+    
+In this final table, we summarized what we've found for the different models. Its clear that linear models perform in a worse way than non linear ones. In particular we notice that the **BAGGING** and **BOOSTING** method appears to work significantly well, so our final decision is to use them for the predction of new breast cancers.
+
+```{r, echo = FALSE}
+c1 <- c("complete linear model", "linear model with stepwise selection", "ridge", "lasso", "principal component regression", "tree", "bagging", "boosting") 
+c2 <- c(mean(MSE_clm), mean(MSE_btlm), mean(MSE_ridge), mean(MSE_lasso), mean(MSE_pcr),  mean(MSE_tree), mean(MSE_bagg), mean(MSE_boost))
+c3 <- c(sd(MSE_clm), sd(MSE_btlm), sd(MSE_ridge), sd(MSE_lasso), sd(MSE_pcr), sd(MSE_tree), sd(MSE_bagg), sd(MSE_boost))
+df <- as.data.frame(cbind(c1,c2,c3))
+colnames(df) <- c("Model", "MSE_mean", "MSE_sd")
+df
+```
+
+## Apendix
+### Data preparation
+
+```{r, warning=F, message=F}
+dt<- read.csv2("dane_podstawowe_ICD.csv")
+
+
+row_delete_M <- which((dt$ICD10== "C53"|dt$ICD10== "C54"| dt$ICD10=="C56") & (dt$PLEC=="M"))
+dt1<-dt[-row_delete_M,]
+row_delete_K <- which((dt1$ICD10== "C61"|dt1$ICD10== "C62") & (dt1$PLEC=="K"))
+dt2<-dt1[-row_delete_K,]
+
+library("PogromcyDanych")
+dt3<- dt2 %>% 
+  group_by(ICD10, PLEC, grupa_wiek, TERYT4, woj, pow, rok) %>%
+    summarise(Stage1 = sum(Stage1), 
+            Stage2 = sum(Stage2), 
+            Stage3 = sum(Stage3), 
+            Stage4 = sum(Stage4))
+
+dt3$new<-dt3$Stage1 +dt3$Stage2 +dt3$Stage3 +dt3$Stage4
+
+dt3$CancerGroup<-1
+
+HandN <- which(dt3$ICD10== "C00"|dt3$ICD10== "C01_C02_C03_C04_C05_C06_C09_C10_C14"| 
+                  dt3$ICD10=="C07_C08" |dt3$ICD10=="C11_C12_C13_C30_C31")
+dt3[HandN,]$CancerGroup<-"Malignant neoplasms of head and neck cancer"
+
+deOrg <- which(dt3$ICD10== "C15"|dt3$ICD10== "C16_C26"| dt3$ICD10== "C25"| 
+                 dt3$ICD10=="C20_C21" |dt3$ICD10=="C22" |dt3$ICD10=="C23_C24" |dt3$ICD10== "C18_C19")
+dt3[deOrg,]$CancerGroup<-"Malignant neoplasms of digestive organs"
+
+RandI <- which(dt3$ICD10== "C32"|dt3$ICD10== "C33_C34"| dt3$ICD10== "C43")
+dt3[RandI,]$CancerGroup<-"Malignant neoplasms of respiratory and intrathoracic organs"
+
+NofB <- which(dt3$ICD10== "C50_D05")
+dt3[NofB,]$CancerGroup<-"Malignant neoplasm of breast"
+
+FGO <- which(dt3$ICD10== "C53"|dt3$ICD10== "C54"| dt3$ICD10== "C56")
+dt3[FGO,]$CancerGroup<-"Malignant neoplasms of female genital organs"
+
+MGO <- which(dt3$ICD10== "C61"|dt3$ICD10== "C62")
+dt3[MGO,]$CancerGroup<-"Malignant neoplasms of male genital organs"
+
+NofUT <- which(dt3$ICD10== "C64_C65_C66"|dt3$ICD10== "C67")
+dt3[NofUT,]$CancerGroup<-"Malignant neoplasms of urinary tract"
+
+CNS <- which(dt3$ICD10== "C70_C71_C72")
+dt3[CNS,]$CancerGroup<-"Malignant neoplasms of eye, brain and other parts of central nervous system"
+
+TG <- which(dt3$ICD10== "C73")
+dt3[TG,]$CancerGroup<-"Malignant neoplasm of thyroid gland"
+
+dt3$CancerSex<-"Both"
+
+M <- which(dt3$CancerGroup== "Malignant neoplasms of male genital organs")
+dt3[M,]$CancerSex<-"Men"
+
+K <- which(dt3$CancerGroup== "Malignant neoplasms of female genital organs")
+dt3[K,]$CancerSex<-"Female"
+
+dt_ACT<-as.data.frame(dt3)
+
+save(dt_ACT,file="dataCancer.Rda")
+
+DT_ACT<-load("dataCancer.Rda")
+
+```
+
+```{r, echo=F, warning=F, message=F}
+library(ggplot2)
+library(scales)
+library(dplyr)
+
+
+# Summarize to get counts and percentages
+
+DC_ACT1 <- read.csv(file = "DC_ACT1.csv", header = T, sep = ";", dec = ",", na.strings = "#N/D!")
+
+
+test.pct = DC_ACT1 %>% group_by(rok, grupa_wiek, CancerGroup,PLEC) %>%
+  summarise(liczba=sum(new)) %>%
+  mutate(pct=liczba/sum(liczba))
+
+
+ggplot(test.pct, aes(grupa_wiek, liczba, fill = PLEC)) + 
+  geom_bar(stat="identity",position="dodge") +
+  facet_grid(rok~CancerGroup) +
+  theme(strip.text.x = element_text(angle = 0, size = 5,
+                                    hjust = 0.5, vjust = 0.5), legend.position = "bottom",text = element_text(size=9),
+                                     axis.text.x = element_text(angle=90, vjust=1)) 
+```
