@@ -1,0 +1,9 @@
+Prezentacja na zajęciach była dobra i czytelna, ale sam HTML bez komentarzy w treści jest trudny do odcyfrowania.
+
+Warto poświęcić więcej uwagi by szerzej opisać wybrane modele.
+Modele są tylko trzy, więc niewiele. 
+Ale nie znaczy to że trzeba dodać wiele więcej modeli co raczej, że warto szerzej opisać te konkretnie wybrane.
+
+Warto też szerzej pokazać jak wygląda przestrzenna składowa.
+
+Ostatni slajd – ‘porównanie model’ jest bardzo potrzebny i nikt czegoś takiego nie zrobił więc warto go uwypuklić. Zrobić czytelniej użyć ggplot2).
