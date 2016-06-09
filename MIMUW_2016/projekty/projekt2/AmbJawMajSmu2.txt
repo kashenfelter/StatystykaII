@@ -1,0 +1,14 @@
+Podejście poprawne, ale też bardzo podobne do tego co robiliśmy na zajęciach.
+Warto spróbować innych modeli do predykcji, nie tylko liniowych. Rozważyć więcej zmiennych, może powiaty, może województwa.
+
+Do wyznaczania MSE warto podział na zbiór uczący i testowy powtórzyć wiele razy i na wykresach pokazywać rozkład MSE a nie tylko średnią.
+
+Modele na pierwszym wykresie można posortować pod kątem MSE, gdyby było tych modeli więcej łatwiej będzie znaleźć ten najlepszy.
+
+Prezentowanie liczb z dokładnością do 5 cyfr znaczących jest złym pomyłem, utrudnia porównanie wartości.
+
+W raporcie nie ma potrzeby pisać ‘Przyjrzyjmy się dokładniej parametrom modelu o najmniejszym błędzie średniokwadratowym.’ Ale jest potrzeba skomentować uzyskane wyniki. A państwo piszą ,,przyjrzyjmy się’’ ale nie piszą co wynika z tego przyglądania. 
+
+Prezentując  średnią zachorowalność warto też pokazać dokładność tych oszacować. Bez niej nie wiadomo czy różnice pomiędzy latami są duże czy czysto przypadkowe.
+
+Ciekaw jestem jaki model okaże się za najlepszy w trzeciej fazie
