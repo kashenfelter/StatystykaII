@@ -17,7 +17,7 @@ Schedule MIM UW:
 * 24-25 V   [Prediction], [Classification LDA, QDA, logistic regression, chapter 4](http://statweb.stanford.edu/~tibs/ElemStatLearn/)
 * 31-1 V    [Presentations], [Project 2 phase 2], [Lab 9](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/lab9.Rmd)
 * 7-8 VI    [Prediction], Bagging, boosting, random forest, model evaluation, [Lab 10](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/lab10.Rmd)
-* 14-15 VI  [Presentations], [Project 2 phase 3]
+* 14-15 VI  [Presentations], [Project 2 phase 3] [Lab 11](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/lab11.Rmd)
 
 Projects:
 ---------
