@@ -1,0 +1,9 @@
+Na pierwszym wykresie nie jest wyjaśnione co to jest próbkowanie. Posortowanie tych wartości ułatwiłoby odczytanie jak mają się do siebie regresja grzbietowa I zwykła.
+Nie ma informacji jak wybierana była lambda dla regresji grzbietowej.
+
+Porównanie knn i innych metod byłoby dobrym pomysłem, gdyby wyniki były w jednej tabeli i w jednej jednostce.
+Teraz błędy dla regresji są w zupełnie innej skali niż dla knn co uniemożliwia porównanie tych metod.
+Trudno więc się zgodzić, że knn działa lepiej (a taka sugestia jest w załączniku).
+Pomysł by ważyć odległość dla knn jest ciekawy, ale jak wybrano te wagi dla odległości (podano testy, brakuje wzoru)? I w jakich jednostkach były te zmienne, czy GESTOSC też była w jednostkach 0-1 jak pozostałe? Dla knn odległość jest ważna I należy szczegółowo opisać jak była wybierana.
+
+Brakuje diagnostyki modelu / analizy reszt.

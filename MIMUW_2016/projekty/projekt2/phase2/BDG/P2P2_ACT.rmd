@@ -1,0 +1,573 @@
+---
+title: "Malignant neoplasms of parts of central nervous system"
+author: "Davide Bottoli, Przemysław Dycha, Karolina Gajewska"
+date: "31 maja 2016"
+output: 
+  html_document:
+    toc: True
+---
+
+#Introduction
+
+The main goal of this phase is finding and presenting the predictions for number of cancer cases in different regions of Poland. Identification of outliers. Comparision of results for different models.
+
+#Choosing type of cancer
+
+In order to predicting numbers of choosed cancer case we adding into our dataframe new factors, which can contribute to cancer disease.
+
+We used data from GUS. We have choosed data about:
+
+- normalized value of dust pollution for each subregions
+
+- Causes of deaths -  cancer general
+
+- general population for each subregions and gender.
+
+
+We also creted group of type of cancer, like this:
+
+```{r}
+DT_ACT_C<-load("Cancer.Rda")
+DT_ACT_C
+```
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(sp)
+library(rgdal)
+library(rgeos)
+library(raster)
+library(maptools)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(scales)
+library(plotrix)
+```
+
+Finally, we have:
+```{r, include=F}
+DC_ACT1 <- read.csv2("C:/Users/Karolina Gajewska/Downloads/DC_ACT1.csv", na.strings="#N/D!")
+```
+
+```{r, echo=F}
+head(DC_ACT1,3)
+```
+
+```{r, echo=F, warning=F, message=F}
+library(ggplot2)
+library(scales)
+library(dplyr)
+
+
+# Summarize to get counts and percentages
+
+test.pct = DC_ACT1 %>% group_by(rok, grupa_wiek, CancerGroup,PLEC) %>%
+  summarise(liczba=sum(new)) %>%
+  mutate(pct=liczba/sum(liczba))
+
+
+ggplot(test.pct, aes(grupa_wiek, liczba, fill = PLEC)) + 
+  geom_bar(stat="identity",position="dodge") +
+  facet_grid(rok~CancerGroup) +
+  theme(strip.text.x = element_text(angle = 0, size = 5,
+                                    hjust = 0.5, vjust = 0.5), legend.position = "bottom",text = element_text(size=9),
+                                     axis.text.x = element_text(angle=90, vjust=1)) 
+DC_ACT1<-na.omit(DC_ACT1)
+
+# Summarize to get counts and percentages
+test.pct1 = DC_ACT1 %>% group_by(rok, grupa_wiek, CancerGroup,PLEC) %>%
+  summarise(liczba=sum(WSP)) %>%
+  mutate(pct=liczba/sum(liczba))
+
+
+ggplot(test.pct1, aes(grupa_wiek, liczba, fill = PLEC)) + 
+  geom_bar(stat="identity",position="dodge") +
+  facet_grid(rok~CancerGroup) +
+  theme(strip.text.x = element_text(angle = 0, size = 5,
+                                    hjust = 0.5, vjust = 0.5), legend.position = "bottom",text = element_text(size=9),
+        axis.text.x = element_text(angle=90, vjust=1)) 
+
+```
+
+Based on the charts, we can conclude that the decomposition rate of incidence of cancer of the central nervous system are similar for both women and men, which is why we give them for further analysis.
+
+```{r, include=F}
+DC_ACT1 <- read.csv2("C:/Users/Karolina Gajewska/Downloads/DC_ACT1.csv", na.strings="#N/D!")
+
+DC_CANCER <- which(DC_ACT1$CancerGroup== " Malignant neoplasms of eye, brain and other parts of central nervous system")
+DC_ACT11<-DC_ACT1[DC_CANCER,]
+
+a<-as.data.frame(table(DC_ACT11$CancerGroup))
+
+DC_ACT11<-na.omit(DC_ACT11)
+
+DC_train <- which(DC_ACT11$rok== "2010"|DC_ACT11$rok== "2012")
+train<-DC_ACT11[DC_train,]
+
+DC_test <- which(DC_ACT11$rok== "2012")
+test<-DC_ACT11[DC_test,]
+```
+
+#Linear model
+
+Let's start with a simple linear model:
+```{r, }
+
+lm1 <- lm(new ~ PLEC+grupa_wiek+woj+ZPP+DC, data = DC_ACT11)
+BIC(lm1)
+
+lm2 <- lm(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11)
+BIC(lm2)
+```
+
+We have very similar results, so we use more detalied model with subregions. But let's add stepwise selection:
+```{r, echo=F, warning=F, message=F}
+#On model with TERYT
+bw_m1 <- step(lm1, direction = "backward")
+bt_m1 <- step(lm1, direction = "both")
+fw_m1 <- step(lm1, direction = "forward", scope=(~ .))
+AIC(bw_m1)
+AIC(bt_m1)
+AIC(fw_m1)
+
+bw_m2 <- step(lm2, direction = "backward")
+bt_m2 <- step(lm2, direction = "both")
+fw_m2 <- step(lm2, direction = "forward", scope=(~ .))
+AIC(bw_m2)
+AIC(bt_m2)
+AIC(fw_m2)
+```
+
+It appears preferable to work with regions instead of TERYT.
+Let's calculate the MSE for these models
+
+```{r,echo=F, warning=F, message=F}
+
+x_1 <- model.matrix(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11)[, -1]
+x_2 <- model.matrix(new ~ PLEC+grupa_wiek+woj+ZPP+DC, data = DC_ACT11)[, -1]
+y <- DC_ACT11$new
+
+MSE1 <- c()
+for (i in 1:100){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- y[test]
+    pred1 <- predict(bt_m1, data = DC_ACT11, subset = train)
+    MSE1[i] <- mean((pred1-y.test)^2)
+}
+MSE2 <- c()
+for (i in 1:100){
+    train <-sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+    test <- -train
+    y.test <- y[test]
+    pred2 <- predict(bt_m2, data = DC_ACT11, subset = train)
+    MSE2[i] <- mean((pred2-y.test)^2)
+}
+```
+
+```{r}
+
+boxplot(cbind(MSE1, MSE2))
+ks.test(MSE1, MSE2)
+```
+
+
+Let's continue this patch trying to use Lasso and Ridge
+
+```{r, warning=F, message=F}
+library(glmnet)
+
+#RIDGE1
+grid <- 10 ^ seq(10, -2, length = 100)
+ridge.mod1 <- glmnet(x_1, y, family = "poisson", alpha = 0,  lambda = grid)
+#str(ridge.mod1)
+
+set.seed(1)
+train = sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+test <- -train
+y.test <- y[test]
+
+ridge.mod1<- glmnet(x_1[train,], y[train], alpha = 0, lambda = grid, thresh = 1e-12)
+ridge.pred1 <- predict(ridge.mod1, s = 2, newx = x_1[test,])
+mean((ridge.pred1 - y.test)^2)
+
+cv.out1 <- cv.glmnet(x_1[train,], y[train], alpha = 0)
+plot(cv.out1)
+bestlam1 <- cv.out1$lambda.min
+bestlam1
+ridge.pred1 <- predict(ridge.mod1, s = bestlam1, newx = x_1[test,])
+mean((ridge.pred1 - y.test)^2)
+
+out1 <- glmnet(x_1, y, alpha = 0)
+#predict(out1, type = "coefficients", s = bestlam1)
+
+#RIDGE2
+grid <- 10 ^ seq(10, -2, length = 100)
+ridge.mod2 <- glmnet(x_2, y, alpha = 0,  lambda = grid)
+#str(ridge.mod2)
+
+
+set.seed(1)
+train = sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+test <- -train
+y.test <- y[test]
+
+ridge.mod2<- glmnet(x_2[train,], y[train], alpha = 0, lambda = grid, thresh = 1e-12)
+ridge.pred2 <- predict(ridge.mod2, s = 2, newx = x_2[test,])
+mean((ridge.pred2 - y.test)^2)
+
+cv.out2 <- cv.glmnet(x_2[train,], y[train], alpha = 0)
+plot(cv.out2)
+bestlam2 <- cv.out2$lambda.min
+bestlam2
+ridge.pred2 <- predict(ridge.mod2, s = bestlam2, newx = x_2[test,])
+mean((ridge.pred2 - y.test)^2)
+
+out2 <- glmnet(x_2, y, alpha = 0)
+predict(out2, type = "coefficients", s = bestlam2)
+
+#LASSO1
+lasso.mod1 <- glmnet(x_1[train,], y[train], alpha = 1, lambda = grid)
+plot(lasso.mod1)
+
+cv.out3 <- cv.glmnet(x_1[train,], y[train], alpha = 1)
+plot(cv.out3)
+bestlam3 <- cv.out3$lambda.min
+lasso.pred1 <- predict(lasso.mod1, s = bestlam3, newx = x_1[test,])
+mean((lasso.pred1 - y.test)^2)
+
+out3 <- glmnet(x_1, y, alpha = 1, lambda = grid)
+#predict(out3, type = "coefficients", s = bestlam3)
+
+#LASSO2
+lasso.mod2 <- glmnet(x_2[train,], y[train], alpha = 1, lambda = grid)
+plot(lasso.mod2)
+
+cv.out4 <- cv.glmnet(x_2[train,], y[train], alpha = 1)
+plot(cv.out4)
+bestlam4 <- cv.out4$lambda.min
+lasso.pred2 <- predict(lasso.mod2, s = bestlam3, newx = x_2[test,])
+mean((lasso.pred2 - y.test)^2)
+
+out4 <- glmnet(x_2, y, alpha = 1, lambda = grid)
+predict(out4, type = "coefficients", s = bestlam4)
+```
+
+
+
+```{r, echo=F, warning=F, message=F}
+MSE3 <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- y[test]
+    ridge.pred1 <-predict(ridge.mod1, s = bestlam1, newx = x_1[test,])
+    MSE3[i] <- mean((ridge.pred1 - y.test)^2)
+}
+MSE4 <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+    test <- -train
+    y.test <- y[test]
+    ridge.pred2 <-predict(ridge.mod2, s = bestlam2, newx = x_2[test,])
+    MSE4[i] <- mean((ridge.pred2 - y.test)^2)
+}
+MSE5 <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- y[test]
+    lasso.pred1 <-predict(lasso.mod1, s = bestlam3, newx = x_1[test,])
+    MSE5[i] <- mean((lasso.pred1 - y.test)^2)
+}
+MSE6 <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+    test <- -train
+    y.test <- y[test]
+    lasso.pred2 <-predict(lasso.mod2, s = bestlam4, newx = x_2[test,])
+    MSE6[i] <- mean((lasso.pred2 - y.test)^2)
+}
+boxplot(cbind(MSE3, MSE4, MSE5, MSE6))
+```
+
+Let's try now with Principal component regression and partial least squares
+
+
+```{r, warning=F, message=F}
+#install.packages("pls")
+library(pls)
+#PCR
+#PRINCIPAL COMPONENT REGRESSION 1
+set.seed(2)
+pcr.fit1 <- pcr(new ~ PLEC+grupa_wiek+woj+ZPP+DC, data = DC_ACT11, scale = TRUE, validation = "CV")
+#summary(pcr.fit1)
+validationplot(pcr.fit1, val.type = "MSEP")
+
+set.seed(1)
+train = sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+test <- -train
+y.test <- y[test]
+pcr.fit1 <- pcr(new ~ PLEC+grupa_wiek+woj+ZPP+DC, data = DC_ACT11, subset = train, scale = TRUE, validation = "CV")
+#summary(pcr.fit1)
+validationplot(pcr.fit1, val.type = "MSEP")
+pcr.pred1 = predict(pcr.fit1, x_1[test,])
+mean((pcr.pred1-y.test)^2)
+
+pcr.fit1 <- pcr(new ~ PLEC+grupa_wiek+woj+ZPP+DC, data = DC_ACT11, scale = TRUE)
+#summary(pcr.fit1)
+
+#PRINCIPAL COMPONENT REGRESSION 2
+set.seed(2)
+pcr.fit2 <- pcr(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11, scale = TRUE, validation = "CV")
+summary(pcr.fit2)
+validationplot(pcr.fit2, val.type = "MSEP")
+
+set.seed(1)
+train = sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+test <- -train
+y.test <- y[test]
+pcr.fit2 <- pcr(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11, subset = train, scale = TRUE, validation = "CV")
+summary(pcr.fit2)
+validationplot(pcr.fit2, val.type = "MSEP")
+pcr.pred2 = predict(pcr.fit2, x_2[test,])
+mean((pcr.pred2-y.test)^2)
+
+pcr.fit2 <- pcr(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11, scale = TRUE,)
+summary(pcr.fit2)
+
+#PARTIAL LEAST SQUARES 1
+set.seed(1)
+train = sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+test <- -train
+y.test <- y[test]
+pls.fit1 <- plsr(new ~ PLEC+grupa_wiek+woj+ZPP+DC, data = DC_ACT11, scale = TRUE, validation = "CV")
+#summary(pls.fit1)
+validationplot(pls.fit1, val.type = "MSEP")
+
+pls.pred1 <- predict(pls.fit1, x_1[test,])
+mean((pls.pred1-y.test)^2)
+
+pls.fit1 <- plsr(new ~ PLEC+grupa_wiek+woj+ZPP+DC, data = DC_ACT11, scale = TRUE)
+#summary(pls.fit1)
+
+#PARTIAL LEAST SQUARES 2
+set.seed(1)
+train = sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+test <- -train
+y.test <- y[test]
+pls.fit2 <- plsr(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11, scale = TRUE, validation = "CV")
+summary(pls.fit2)
+validationplot(pls.fit1, val.type = "MSEP")
+
+pls.pred2 <- predict(pls.fit2, x_2[test,], ncomp=6)
+mean((pls.pred2-y.test)^2)
+
+pls.fit2 <- plsr(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11, scale = TRUE, ncomp=6)
+summary(pls.fit2)
+```
+
+The partial least squares need only 19 components for the same result of the pcr wth 386 components!
+
+
+```{r,echo=F, warning=F, message=F}
+MSE7 <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- y[test]
+    pcr.pred1 = predict(pcr.fit1, x_1[test,]) #ncomp = 383)
+    MSE7[i] <- mean((pcr.pred1-y.test)^2)
+}
+MSE8 <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+    test <- -train
+    y.test <- y[test]
+    pcr.pred2 = predict(pcr.fit2, x_2[test,])#, ncomp = 22)
+    MSE8[i] <- mean((pcr.pred2-y.test)^2)
+}
+MSE9 <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- y[test]
+    pls.pred1 <- predict(pls.fit1, x_1[test,])#, ncomp = 19)
+    MSE9[i] <- mean((pls.pred1-y.test)^2)
+}
+MSE10 <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+    test <- -train
+    y.test <- y[test]
+    pls.pred2 <- predict(pls.fit2, x_2[test,], ncomp = 6)
+    MSE10[i] <- mean((pls.pred2-y.test)^2)
+}
+boxplot(cbind(MSE7, MSE8, MSE9, MSE10))
+boxplot(cbind(MSE3, MSE4, MSE5, MSE6, MSE7, MSE8, MSE9, MSE10))
+ks.test(MSE5, MSE6)
+```
+
+#Regression trees
+
+
+```{r}
+#install.packages("tree")
+library(tree)
+#TREE 
+set.seed(1)
+train <-sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+tree.2 <- tree(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11, subset = train)
+summary(tree.2)
+plot(tree.2)
+text(tree.2, pretty = 0)
+
+cv.tree.2 <- cv.tree(tree.2)
+plot(cv.tree.2$size, cv.tree.2$dev, type = "b")
+
+yhat <- as.data.frame(predict(tree.2, newdata = DC_ACT11[-train,]))
+y.test <- DC_ACT11[-train, "new"]
+mean((yhat-y.test)^2)
+
+MSE_tree <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+    test <- -train
+    y.test <- DC_ACT11[-train, "new"]
+    yhat <- predict(tree.2, newdata = DC_ACT11[-train,])
+    MSE_tree[i] <- mean((yhat-y.test)^2)
+}
+boxplot(cbind(MSE7, MSE8, MSE9, MSE10, MSE_tree))
+boxplot(cbind(MSE8, MSE9, MSE10, MSE_tree))
+
+```
+
+#Random Forest
+
+```{r, warning=F, message=F}
+library(randomForest)
+bag.2 <- randomForest(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11, subset = train, mtry = 4, importance = TRUE)
+bag.2
+importance(bag.2)
+varImpPlot(bag.2)
+yhat.bag <- predict(bag.2, newdata = DC_ACT11[-train,])
+mean((yhat.bag-y.test)^2)
+
+MSE_rf <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+    test <- -train
+    y.test <- DC_ACT11[-train, "new"]
+    yhat.bag <- predict(bag.2, newdata = DC_ACT11[-train,])
+    MSE_rf[i] <- mean((yhat.bag-y.test)^2)
+}
+boxplot(cbind(MSE_tree, MSE_rf))
+```
+
+#Boosting
+
+```{r, warning=F, message=F}
+#install.packages("gbm")
+library(gbm)
+set.seed(1)
+boost.2 <- gbm(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11[train,], distribution = "gaussian", n.trees = 5000, interaction.depth = 4)
+summary(boost.2)
+
+yhat.boost <- predict(boost.2, newdata = DC_ACT11[-train,], n.trees = 5000)
+mean((yhat.boost-y.test)^2)
+
+MSE_boost <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_2), round(0.75*nrow(x_2)))
+    test <- -train
+    y.test <- DC_ACT11[-train, "new"]
+    yhat.boost <- predict(boost.2, newdata = DC_ACT11[-train,], n.trees = 5000)
+    MSE_boost[i] <- mean((yhat.boost-y.test)^2)
+}
+boxplot(cbind(MSE_tree, MSE_rf, MSE_boost))
+#boxplot(cbind(MSE1, MSE7, MSE_tree, MSE_rf, MSE_boost))
+```
+
+#Conclusion
+
+The best model is:
+
+```{r, warning=F, message=F }
+bag.2 <- randomForest(new ~ PLEC+grupa_wiek+TERYT4+ZPP+DC, data = DC_ACT11, subset = train, mtry = 4, importance = TRUE)
+bag.2
+```
+
+##Apendix
+##Data preparation
+
+```{r, warning=F, message=F}
+dt<- read.csv2("dane_podstawowe_ICD.csv")
+
+
+row_delete_M <- which((dt$ICD10== "C53"|dt$ICD10== "C54"| dt$ICD10=="C56") & (dt$PLEC=="M"))
+dt1<-dt[-row_delete_M,]
+row_delete_K <- which((dt1$ICD10== "C61"|dt1$ICD10== "C62") & (dt1$PLEC=="K"))
+dt2<-dt1[-row_delete_K,]
+
+library("PogromcyDanych")
+dt3<- dt2 %>% 
+  group_by(ICD10, PLEC, grupa_wiek, TERYT4, woj, pow, rok) %>%
+    summarise(Stage1 = sum(Stage1), 
+            Stage2 = sum(Stage2), 
+            Stage3 = sum(Stage3), 
+            Stage4 = sum(Stage4))
+
+dt3$new<-dt3$Stage1 +dt3$Stage2 +dt3$Stage3 +dt3$Stage4
+
+dt3$CancerGroup<-1
+
+HandN <- which(dt3$ICD10== "C00"|dt3$ICD10== "C01_C02_C03_C04_C05_C06_C09_C10_C14"| 
+                  dt3$ICD10=="C07_C08" |dt3$ICD10=="C11_C12_C13_C30_C31")
+dt3[HandN,]$CancerGroup<-"Malignant neoplasms of head and neck cancer"
+
+deOrg <- which(dt3$ICD10== "C15"|dt3$ICD10== "C16_C26"| dt3$ICD10== "C25"| 
+                 dt3$ICD10=="C20_C21" |dt3$ICD10=="C22" |dt3$ICD10=="C23_C24" |dt3$ICD10== "C18_C19")
+dt3[deOrg,]$CancerGroup<-"Malignant neoplasms of digestive organs"
+
+RandI <- which(dt3$ICD10== "C32"|dt3$ICD10== "C33_C34"| dt3$ICD10== "C43")
+dt3[RandI,]$CancerGroup<-"Malignant neoplasms of respiratory and intrathoracic organs"
+
+NofB <- which(dt3$ICD10== "C50_D05")
+dt3[NofB,]$CancerGroup<-"Malignant neoplasm of breast"
+
+FGO <- which(dt3$ICD10== "C53"|dt3$ICD10== "C54"| dt3$ICD10== "C56")
+dt3[FGO,]$CancerGroup<-"Malignant neoplasms of female genital organs"
+
+MGO <- which(dt3$ICD10== "C61"|dt3$ICD10== "C62")
+dt3[MGO,]$CancerGroup<-"Malignant neoplasms of male genital organs"
+
+NofUT <- which(dt3$ICD10== "C64_C65_C66"|dt3$ICD10== "C67")
+dt3[NofUT,]$CancerGroup<-"Malignant neoplasms of urinary tract"
+
+CNS <- which(dt3$ICD10== "C70_C71_C72")
+dt3[CNS,]$CancerGroup<-"Malignant neoplasms of eye, brain and other parts of central nervous system"
+
+TG <- which(dt3$ICD10== "C73")
+dt3[TG,]$CancerGroup<-"Malignant neoplasm of thyroid gland"
+
+dt3$CancerSex<-"Both"
+
+M <- which(dt3$CancerGroup== "Malignant neoplasms of male genital organs")
+dt3[M,]$CancerSex<-"Men"
+
+K <- which(dt3$CancerGroup== "Malignant neoplasms of female genital organs")
+dt3[K,]$CancerSex<-"Female"
+
+dt_ACT<-as.data.frame(dt3)
+
+save(dt_ACT,file="dataCancer.Rda")
+
+DT_ACT<-load("dataCancer.Rda")
+
+```
+
+

@@ -1,0 +1,167 @@
+---
+title: "Lab10"
+author: "put your name here"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Again, let's work with BRCA data.
+
+```{r}
+load(url("https://github.com/pbiecek/StatystykaII/raw/master/MIMUW_2016/materialy/brca.rda"))
+```
+
+Today we are going to play with two ensembles of classifiers.
+
+* random forest (as in function `randomForest{randomForest}`),
+* gradient boosting (implementation from `xgboost{xgboost}`)
+
+For each of them we will see the decision regions, check variable importance and plot ROC curves.
+
+1. Train both classifiers with two variables: age and ALKBH1. 
+Plot distribution of posterior (as during the last lab). 
+
+How decision regions are different / similar to each other?
+
+Compare results for different values of parameter `nrounds` for `xgboost`.
+
+Note that `xgboost` expects numerical matrix.
+
+2. ROC
+
+Use the `createDataPartition{caret}` function to split the dataset into training/test subsets (proportions 75/25).
+
+Train classifier with all (or all except categorical) variables based on training set. Calculate predictions on test set. ROC curves should be created based on test dataset.
+
+* Try `plotROC` package and functions `calculate_roc`/`ggroc`/`plot_journal_roc` to plot this ggplot version of ROC curves.
+
+* Try `ROCR` package and functions `prediction`/`performance`/`plot` to plot ROC curves ("tpr" vs "fpr"). Compare both classifiers RF/XGB on a single plot (use `add=TRUE` argument).
+
+* Create a LIFT curve for both classifiers ("lift" vs "rpp")
+
+3. Agreement
+
+* Use the `kappa2{irr}` function to calculate agreements between classifier outcomes and true labels. 
+
+* Use the `fisher.test` to evaluate the significance of link between true labels and predictions.
+
+4. Optimal cut points
+
+* Use the `optimal.cutpoints{OptimalCutpoints}` to find the optimal cut point according to Youden J index. The `summary/plot` functions may be useful here.
+
+5. Variable importance
+
+Both ensembles calculate their measure of variable importance.
+For random forest try `importance` and `varImpPlot`. For XGB try `xgb.plot.importance`.
+
+
+
+# If you really need it
+
+Here you have some guides. 
+But use them only if needed (i.e. problems with time).
+
+
+```{r}
+library("xgboost")
+library("randomForest")
+
+rf <- randomForest(outcome~ALKBH1+age, data=brca)
+gb <- xgboost(label=brca$outcome == "death in 3 years", data=as.matrix(brca[,c("ALKBH1","age")]), 
+              objective = "binary:logistic", 
+              nrounds = 2,
+              max.deph = 2)
+
+grid <- expand.grid(ALKBH1=seq(100,900, length.out=100),
+                    age=seq(20,90, length.out=100))
+
+pred_rf <- predict(rf, grid, type="prob")[,1]
+pred_gb <- 1-predict(gb, as.matrix(grid))
+
+
+grid$posterior_rf <- pred_rf
+grid$posterior_gb <- pred_gb
+
+ggplot(grid, aes(age, ALKBH1, color=posterior_rf)) + 
+  geom_point(size=1)
+
+ggplot(grid, aes(age, ALKBH1, color=posterior_gb)) + 
+  geom_point(size=1) 
+
+
+library(caret)
+inds <- createDataPartition(brca$outcome, p = 0.75)
+
+brca_train <- brca[inds[[1]],]
+brca_test  <- brca[-inds[[1]],]
+
+rf <- randomForest(outcome~., data=brca_train[,-(2:4)])
+gb <- xgboost(label=brca_train$outcome == "death in 3 years", data=as.matrix(brca_train[,-(1:4)]), 
+              objective = "binary:logistic", 
+              nrounds = 10,
+              max.deph = 3)
+
+
+library(plotROC)
+pred_rf <- predict(rf, brca_test, type="prob")[,2]
+pred_gb <- 1 - predict(gb, as.matrix(brca_test[,-(1:4)]))
+
+roc.estimate <- calculate_roc(pred_rf, brca_test$outcome)
+single.rocplot <- ggroc(roc.estimate)
+plot_journal_roc(single.rocplot)
+
+library(ROCR)
+
+pred <- prediction( pred_rf, brca_test$outcome)
+perf <- performance(pred,"tpr","fpr")
+plot(perf,col="blue")
+abline(0,1)
+
+pred <- prediction( 1-pred_gb, brca_test$outcome)
+perf <- performance(pred,"tpr","fpr")
+plot(perf, add=TRUE, col="red")
+
+perf <- performance(pred,"lift","rpp")
+plot(perf, col="red")
+
+
+## Cohen kappa - agreement
+library(irr)
+(tab <- table(pred_gb > 0.85, brca_test$outcome))
+
+kappa2(cbind(pred_gb > 0.85, brca_test$outcome))
+
+fisher.test(tab)
+chisq.test(tab)
+
+
+## Optimal cutpoints
+
+library(OptimalCutpoints)
+pref_df <- data.frame(pred_gb, brca_test$outcome)
+oc <- optimal.cutpoints(X = "pred_gb", status = "brca_test.outcome", methods="Youden", data=pref_df, tag.healthy = "death in 3 years")
+
+summary(oc)
+
+plot(oc)
+
+# variable importance
+
+rf <- randomForest(outcome~., data=brca)
+gb <- xgboost(label=brca$outcome == "death in 3 years", data=as.matrix(brca[,-(1:4)]), 
+              objective = "binary:logistic", 
+              nrounds=10,
+              max.deph = 3)
+
+importance(rf)
+varImpPlot(rf)
+
+importance_matrix <- xgb.importance(colnames(brca)[-(1:4)], model = gb)
+xgb.plot.importance(importance_matrix)
+
+
+```
+

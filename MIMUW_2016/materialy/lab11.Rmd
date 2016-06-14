@@ -1,0 +1,33 @@
+---
+title: "Lab11"
+author: "put your name here"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+EURO 2016? 
+Let's play!
+
+We will use data set from paper ,,Predictive Bookmaker Consensus Model for the UEFA Euro 2016''
+http://econpapers.repec.org/paper/innwpaper/2016-15.htm 
+pdf here: http://eeecon.uibk.ac.at/wopec2/repec/inn/wpaper/2016-15.pdf
+
+Find the table 3 here: https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2016/materialy/euro2016_odds.csv
+
+And find the current FIFA ranking here:
+http://www.fifa.com/fifa-world-ranking/ranking-table/men/index.html
+
+Find the tournament table:
+https://en.wikipedia.org/wiki/UEFA_Euro_2016
+
+The goal:
+Calculate winning odds for each possible competitor of Poland.
+
+Work in teams.
+
+Discuss which model will be suitable
+
+

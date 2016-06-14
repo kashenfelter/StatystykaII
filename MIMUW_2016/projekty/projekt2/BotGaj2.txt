@@ -1,0 +1,9 @@
+Your report has more than 13 pages, and the first 50% may be easily skipped. 
+Care more about reader. Do not include meaningless results (dump of traces from stepAIC, instead of this you could just include small table in a fraction of current space).
+
+There is no point in showing mean of MSE with precision of 9 digits. It makes numbers harder to compare. Also sd’s of MSE are not that easy to read as CI for MSE. In the point 5.3 you have plot but without names of 4 bars!
+The key and most interesting part is the point 6. You could work on this table to make it easier to read (which variables are in which model)
+
+Less is more (if the less is carefully selected)!
+
+Having said that I am waiting for the third phase.
