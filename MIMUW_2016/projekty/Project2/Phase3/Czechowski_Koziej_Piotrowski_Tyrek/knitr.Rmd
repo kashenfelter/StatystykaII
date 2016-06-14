@@ -1,0 +1,217 @@
+---
+title: "Predykcja zachorowalności na raka piersi w Polsce"
+author: "Konrad Czechowski, Kamil Koziej, Bartosz Piotrowski, Jakub Tyrek"
+date: "June 14, 2016"
+output: html_document
+---
+
+#Dane
+
+Model predykcyjny zbudowaliśmy w oparciu o następujące dane: 
+* wskaźniki zachorowalności w latach 2010 i 2011, 
+* wskaźniki urbanizacji w powiatach i grupach wiekowych,
+* wielkości powiatów.
+Przesłanką uzasadniającą dołączenie wskaźnika urbanizacji do danych było jego istotne skorelowanie z zachorowalnością. Przykładowe dane:
+
+```{r}
+dane <- read.csv('wskazniki.csv')
+tail(dane)
+```
+
+#Modele predykcyjne
+
+Naszym celem była predykcja na podstawie danych zachorowalności 
+w grupach wiekowych i powiatach w roku 2012. Przetestowaliśmy kilka popularnych modeli, m. in.:
+*model liniowy
+*glmnet
+*lasy losowe 
+*kNN
+*SVM regression
+
+Każdy z modeli to tak naprawdę dwa modele - jeden działa na danych dotyczących kobiet, drugi mężczyzn. Przyczyną takiego działania są znaczne różnice w zachorowalności obu płci.
+Wyżej zaprezentowane dane podzieliliśmy na zbiór teestowy i treningowy w stosunku 70 / 30.
+W celu dobrania odpowiednich parametrów użyliśmy CV.
+Żaden z powyższych modeli nie dawał predykcji lepszej, niż proste branie średniej zachorowalności w danej grupie z dwóch lat poprzednich.
+Porównanie modeli pod względem błędu średniokwadratowego pokazuje wykres słupkowy poniżej.
+Błąd średniokwadratowy na wykresie to średnia MSE po dziesięciokrotnym powtórzeniu procedury: podziel zbiór na podzbiór treningowy / testowy, stwórz model, policz MSE dla modelu.
+
+```{r}
+library(plyr)
+library(ggplot2)
+
+load("data_for_rmd.rda")
+
+
+ggplot(dfaggMSE2,aes(x=names,y=values)) +
+  geom_bar(stat="identity") +
+  scale_y_log10() +
+  ylab("MSE") +
+  xlab("Model") +
+  labs(title = "MSE dla różnych modeli") +
+  geom_hline(aes(yintercept=7), colour="#990000", size=1.2) +
+  geom_text(aes(label = round(values, 2)), vjust = -0.2) +
+  theme(axis.text=element_text(size=12), title=element_text(size=15), axis.title=element_text(size=14,face="bold"))
+```
+
+*Naive* oznacza model biorący średnią z lat poprzednich, natomiast modified.knn  oznacza stworzony przez nas model, który opisujemy poniżej.
+
+#Nasz model
+
+Z powodu niezadowalających wyników dla typowych modeli, skonstruowaliśmy nasz własny, lepiej przystosowany do danych. Jego idea opiera się na następującej obserwacji: w dużych powiatach wariancja zachorowalności w kolejnych latach jest niewielka, więc zasadne jest branie średniej zachorowalności z lat ubiegłych jako predykcję dla roku kolejnego; natomiast 
+w małych powiatach wariancja zachorowalności jest duża (w porównaniu do wielkości populacji), dlatego w ich przypadku taka predykcja obarczona będzie dużym błędem.
+
+**Model działa następująco:**
+Niech G  będzie danym podzbiorem populacji z zadaną płcią, przedziałem wiekowym i powiatem, dla której chcemy wyznaczyć predykcję zachorowalności.
+1. Jeżeli liczebność grupy G  przekracza zadany próg k, model zwraca jako predykcję średnią zachorowalność lat poprzednich w grupie G.
+2. W przeciwnym razie do danej grupy dobieramy N  grup z tego samego województwa i przedziału wiekowego, które mają jak najbliższe wskaźniki urbanizacji, aż do momentu, gdy suma populacji w tych grupach przekroczy zadany próg k. Jako predykcję zwracamy wówczas średnią ważoną zachorowalności w tych grupach w latach poprzednich.
+
+Próg k jest zoptymalizowany dla każdego <płeć, przedział wiekowy> osobno. Przykłady analizy optymalnego k dla konkretnych grup obrazują dwa wykresy poniżej.
+```{r}
+ggplot(k.errors, aes(x=k, y=`85+`))+
+geom_point(size=2)+
+  ggtitle(expression(paste("MSE vs. parametr ",italic("k")," dla grupy <kobiety, 45-54>")))+
+ylab("MSE")+
+  theme(axis.text.x = element_text(angle = 40, hjust = 1), 
+        axis.text=element_text(size=10.5), title=element_text(size=14),
+        axis.title=element_text(size=14,face="bold"))
+
+ggplot(k.errors, aes(x=k, y=`<45-54>`))+
+  geom_point(size=2)+
+  ggtitle(expression(paste("MSE vs. parametr ",italic("k")," dla grupy <kobiety, 85+>")))+
+  ylab("MSE")+
+  theme(axis.text.x = element_text(angle = 40, hjust = 1), 
+        axis.text=element_text(size=10.5), title=element_text(size=14),
+        axis.title=element_text(size=14,face="bold"))
+```
+
+#Kod
+
+```{r, message=FALSE, warning=FALSE, eval = FALSE}
+
+# kod do liczenia naszej metody 'modified knn'
+
+wsk.in.closest.k.populations <- function(i,df, k = 100000){
+  subpop <- df[i,,drop=FALSE]
+  if (subpop$liczba >=k) return(subpop$wsk10_11)
+  wiek <- subpop$wiek; woj <- subpop$woj; urb <- subpop$urb_grupy
+  similar <- df[(df$woj==woj) & (df$wiek ==wiek),]
+  similar <- similar[similar$teryt != subpop$teryt,]
+  closest <- order(abs(urb - similar$urb_grupy))
+  #similar <- similar[order(abs(urb - similar$urb_grupy)),]
+  size <- cumsum(similar$liczba[closest])
+  which.big.enough <- which(subpop$liczba + size > k)
+  if (length(which.big.enough) == 0) which.big.enough = length(size)
+  populations <- rbind(subpop, similar[closest[1:(which.big.enough[1])],])
+  return(sum(populations$wsk10_11 * populations$liczba) / sum(populations$liczba))
+}
+
+try.k <- function(df, k, check = 1:dim(df)[1]){
+  wsk <- sapply(check ,wsk.in.closest.k.populations, k= k, df = df)
+  mean(((wsk - df$wsk_2012[check])*df$liczba[check])^2)
+}
+
+
+
+find.k.for.groups <- function(df, ks){
+  age_groups <- c('<0-44>', '<45-54>', '<55-64>', '<65-74>', '<75-84>', '85+') 
+  naive.err <- rep(NA, length(age_groups))
+  best.k <- rep(NA, length(age_groups))
+  best.k.err <- rep(NA, length(age_groups))
+  i <- 1
+  for(age_group in unique(df$wiek)){
+    errors <- sapply(ks, try.k, df = df[df$wiek==age_group,])
+    best.k[i] <- ks[which.min(errors)]
+    i <- i+1
+  }
+  best.k
+}
+
+predict.mknn <- function(best.k, df, on = 1:dim(df)[1]){
+  age_groups <- c('<0-44>', '<45-54>', '<55-64>', '<65-74>', '<75-84>', '85+')
+  all.predictions <- rep(NA, dim(df)[1])
+  for(j in 1:length(age_groups)){
+    ix <- which(df$wiek == age_groups[j])
+    ix <- ix[ix %in% on]
+    pred <- sapply(ix, wsk.in.closest.k.populations, df = df, k=best.k[j])
+    all.predictions[ix] <- pred
+  }
+  all.predictions[!is.na(all.predictions)]
+}
+
+###################### porownianie roznych modeli
+library(dplyr)
+library(tidyr)
+library(caret)
+library(kernlab)
+library(MASS)
+library(elasticnet)
+library(ranger)
+library(foreach)
+
+
+data <- read.csv('wskazniki.csv')[, 1:8]
+dataK <- data %>% filter(plec == 'K')#kazda analize robie osobno dla mezczyzn i kobiet
+dataM <- data %>% filter(plec == 'M')
+myformula <- as.formula("X2012 ~ X2010 + X2011 + liczba + urb_grupy + wiek")
+
+library(snow)
+cl <- makeCluster(3)
+clusterEvalQ(cl, {
+  library(caret)
+  library(dplyr)
+  library(foreach)
+})
+
+clusterExport(cl, list = list('data', 'dataK', 'dataM', 'get_pred_par', 'get_pred', 'get_pred2', 'pred_to_mse', 'myformula'))
+
+  ######################
+  get_pred <- function(method_str, train_dK, train_dM, test_dK, test_dM, formula){
+    modelK <- train(formula, data = train_dK, method = method_str)
+    modelM <- train(formula, data = train_dM, method = method_str)
+    test_dK$prediction <- predict(modelK, newdata = test_dK[, -8])
+    test_dM$prediction <- predict(modelM, newdata = test_dM[, -8])
+    test_d <- rbind(test_dK, test_dM)
+    return(test_d$pred)
+  }
+  get_pred2 <- function(method_str){
+    return(get_pred(method_str, trainingK, trainingM, testK, testM, myformula))
+  }
+  pred_to_mse <- function(pred){
+    mse <- (pred - test$X2012) ^ 2 %>% mean
+    return(mse)
+  }
+  get_pred_par <- function(methods_str){
+    preds <- foreach(m = methods_str, .combine = 'cbind') %do% (m %>% get_pred2)
+    preds <- preds %>% as.data.frame
+    colnames(preds) <- methods_str
+    return(preds)
+  }
+  #########################################
+
+MSE <- replicate(10,{
+  inTrain <- createDataPartition(data$X2012, p = 0.7, list = FALSE)
+  trainingK <- dataK[inTrain, ] %>% as.data.frame()
+  testK <- dataK[-inTrain, ] %>% as.data.frame()
+  trainingM <- dataM[inTrain, ] %>% as.data.frame()
+  testM <- dataM[-inTrain, ] %>% as.data.frame()
+  test <- rbind(testK, testM)
+  mse <- NULL
+  predictions <- get_pred_par(c('lm','glmnet','knn','svmLinear','ranger'))
+  colMeans((predictions - test$X2012)^2)
+})
+
+#naiwny - srednia z dwoch lat
+naivePrediction <- (data$X2010 + data$X2011) / 2
+msenaive <- mean((naivePrediction - data$X2012)^2)
+
+aggMSE <- colMeans(t(MSE))
+aggMSE$naive <- msenaive
+
+load('mse_modified_knn')
+
+aggMSE$modified.knn <- mse.knn
+
+save(aggMSE, file='MSE_comparison')
+  #########################################
+
+```
