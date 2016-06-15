@@ -1,0 +1,882 @@
+---
+title: "Predykcja zachorowań na nowotwory piersi w Polsce"
+author: "Dominik Ambroziak, Michał Jaworski, Iwona Majewska, Krzysztof Smutek"
+date: "14 czerwca 2016"
+output: 
+  html_document:
+    toc: TRUE
+    number_sections: true
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set( warning = FALSE, cache = TRUE, message=FALSE, echo=FALSE)
+```
+
+
+```{r}
+#Potrzebne pakiety:
+library(tree)
+library(stats)
+library(glmnet)
+library(pls)
+library(caret)
+library("party")
+library(tidyr)
+library(dplyr)
+
+library(scales)
+library(mapoland)
+library(ggmap)
+library('raster')
+library('sp')
+library('rgdal')
+library('rgeos')
+library("ggplot2")
+library("maptools")
+library(dplyr)
+library(openxlsx)
+library(gplots)
+library(reshape)
+library("randomForest")
+library("xgboost")
+library("Ckmeans.1d.dp")
+```
+
+
+
+```{r}
+setwd("C:/Users/Iwona/Desktop/statystyka2/projekt2/faza3")
+load("rak_piersi_2010.Rdata")
+load("rak_piersi_2011.Rdata")
+load("rak_piersi_2012.Rdata")
+
+
+rak.piersi.2010.2 <- rak.piersi.2010 %>%
+  separate(Grupa, c("teryt", "gender", "age"), " ")
+
+rak.piersi.2011.2 <- rak.piersi.2011 %>%
+  separate(Grupa, c("teryt", "gender", "age"), " ")
+
+rak.piersi.2012.2 <- rak.piersi.2012 %>%
+  separate(Grupa, c("teryt", "gender", "age"), " ")
+
+nn <- 12 # liczba kolumn w każdej z tych ramek
+
+
+```
+
+#Wstęp
+Cel, który postawiliśmy sobie w trzeciej fazie projektu to predykcja liczby chorych na nowotwory piersi (C50_D05 według klasyfikacji ICD-10) w roku 2013 w podziale na płeć, grupę wiekową oraz powiaty.
+
+Dostępne dane zawierały informacje o liczbie chorych w zależności od stadium choroby, powiatu, płci i grupy wiekowej dla lat 2010 - 2012 oraz liczbę nowych przypadków. Rozważane grupy wiekowe to:
+
+* 0 - 44 lata
+
+* 45 - 54 lata
+
+* 55 - 64 lata
+
+* 65 - 74 lata
+
+* 75 - 84 lata
+
+* 85+ lat. 
+
+Dane dotyczące liczby chorych w powiatach znormalizowano przez całkowitą liczbę mieszkańców danego powiatu.
+
+Model został stworzony i przetestowany na podstawie danych z lat 2010 - 2012, gdzie dane z roku 2010 i 2011 modelowały zachorowania w roku 2012. Następnie dane z lat 2011 i 2012 zostały użyte do predykcji zachorowań w roku 2013. 
+
+Zbudowany model uwzględniał: 
+
+* zmienną jakościową płeć
+
+* zmienną jakościową grupa wiekowa
+
+* znormalizowaną liczbę chorych w poszczególnych stadiach choroby oraz liczbę nowych przypadków zachorowań 
+
+* stopień urbanizacji powiatów
+
+* stopę bezrobocia w powiatach
+
+* średnie wynagrodzenie w województwach
+
+* procent populacji wojewódzwta mający nadwagę (niezmienny w kolejnych latach)
+
+Stopień urbanizacji powiatów wprowadzono do modelu zamiast obecnej w fazie drugiej projektu zmiennej binarnej rozróżniającej powiaty grodzkie i ziemskie. Stopę bezrobocia i wynagrodzenie wprowadzono do modelu, aby oddać poziom życia w regionach. Poniższa tabela pokazuje przykładową macierz zmiennych w modelu. 
+
+```{r}
+fitchers <- cbind(rak.piersi.2010.2,rak.piersi.2011.2)
+colnames(fitchers)[4:nn] <- paste( colnames(fitchers)[4:nn], "1", sep="_")
+colnames(fitchers)[(nn+4):(2*nn)] <- paste( colnames(fitchers)[(nn+4):(2*nn)], "2", sep="_")
+fitchers <- fitchers[,-c((nn+1):(nn+3), 2*nn)]
+#fitchers <- as.matrix(fitchers)
+
+
+
+fitchers[,c(4:8)] <- fitchers[,c(4:8)] * 10^5
+fitchers[,c((nn+1):(nn+5))] <- fitchers[,c((nn+1):(nn+5))] * 10^5
+head(fitchers[, -1])
+```
+
+
+Aby wybrać model najlepiej stosujący się do naszych danych, przetestowane zostały różne podejścia, zarówno liniowe jak i nieliniowe. 
+
+Modele liniowe: 
+
+* pełny model liniowy
+
+* model liniowy z wyborem parametrów przy pomocy kryterium AIC
+
+* model liniowy z wyborem parametrów przy pomocy kryterium BIC
+
+* model ridge regression (α = 0), lasso (α = 1), half (α = 1/2) 
+
+* principal component regression wełnowymiarowe i z trzema komponentami. 
+
+Modele nieliniowe:
+
+* algorytm k-najbliższych sąsiadów
+
+* drzewa decyzyjne
+
+* lasy losowe
+
+* gradient boosting
+
+Modele były testowane na podstawie dystrybucji błędu średniokwadratowego (MSE). Aby go obliczyć, zbiór danych dzielono na część treningową i testową w proporcji 3:1. Wytrenowany model stosowano do predykcji na zbiorze testowym. Procedurę powtarzano 100 razy.  
+
+Najlepszym modelem pod kątem minimalizacji błędu średniokwadratowego okazały się lasy losowe. 
+
+#Modele liniowe
+
+```{r}
+rak <- rak.piersi.2010 %>%
+  separate(Grupa, c("teryt", "gender", "age"), " ")
+gender <- model.matrix(~ rak$gender)
+gender <- gender[,-1]
+age <- model.matrix(~ rak$age)
+age <- age[,-1]
+```
+
+
+
+```{r}
+fitchers <- cbind(rak.piersi.2010,rak.piersi.2011)
+fitchers <- fitchers[,-c(1,11)]
+fitchers[,c(1,2,3,4,5,10,11,12,13,14)] <- fitchers[,c(1,2,3,4,5,10,11,12,13,14)] * 10^5
+fitchers <- fitchers[,-(ncol(fitchers))]
+fitchers <- cbind(fitchers,age,gender)
+```
+
+
+```{r}
+fitchersP <- cbind(rak.piersi.2011,rak.piersi.2012)
+fitchersP <- fitchersP[,-c(1,11)]
+fitchersP[,c(1,2,3,4,5,10,11,12,13,14)] <- fitchersP[,c(1,2,3,4,5,10,11,12,13,14)] * 10^5
+fitchersP <- fitchersP[,-(ncol(fitchersP))]
+fitchersP <- cbind(fitchersP,age,gender)
+```
+
+
+```{r}
+chore <- fitchersP[,c(10,11,12,13)]
+chore <- chore[,1]+chore[,2]+chore[,3]+chore[,4]
+```
+
+##Pełny model liniowy
+
+Na początku postanowiliśmy wypróbować zwykły (pełny) model liniowy
+```{r}
+dane <- cbind(fitchers,chore)
+dane <- as.data.frame(dane)
+pelny <- lm(dane$chore ~ .,model=TRUE, data=dane)
+summary.lm(pelny)
+predykcjaLM <- predict(pelny, as.data.frame(fitchersP))
+#mean(predykcjaLM)
+```
+
+Istotnymi zmiennymi okazały się te jakościowe wprowadzające podział na płeń i grupy wiekowe, jak róWnież liczba nowych przypadków. 
+
+Aby ograniczyć liczbę parametrów, użyto kryteriów AIC oraz BIC. 
+
+## Optymalny model według kryterium AIC
+```{r}
+optimalAIC <- step(pelny,direction="backward",trace=FALSE)
+summary.lm(optimalAIC)
+predykcjaAIC <- predict(optimalAIC, as.data.frame(fitchersP))
+```
+
+Podczas minimalizacji AIC, wybrane zostały zmienne z jednego roku. Sugeruje to, że zależność liczby chorych od czasu nie jest tak istotna. 
+
+W modelu istotna jest, poza jakościowymi kryteriami płci i wieku oraz informacjami o liczbie chorych w poszczególnych stadiach, urbanizacja powiatu. Inne mierniki jakości życia okazują się nie mieć tak dużego znaczenia. 
+
+## Optymalny model według kryterium BIC
+```{r}
+optimalBIC <- step(pelny,direction="backward",k=log(nrow(fitchers)),trace=FALSE)
+summary.lm(optimalBIC)
+predykcjaBIC <- predict(optimalBIC, as.data.frame(fitchersP))
+```
+
+Model BIC jeszcze bardziej ograniczył liczbę parametrów w potównaniu do AIC. Z dodatkowych parametrów wzięta pod uwagę została tylko urbanizacja. 
+
+
+Wypróbowano też metody regresji z regularyzacją (lasso, ridge i half dla parametru α = 1/2) oraz PCR pełny i trzykomponentowy. Jednak ich jakość oceniana przez wartość MSE jest gorsza, dlatego nie są omawiane bardziej szczegółowo. 
+
+
+```{r}
+modelLASSO <- cv.glmnet(x=as.matrix(fitchers),y=chore, alpha=1)
+modelRIGID <- cv.glmnet(x=as.matrix(fitchers),y=chore, alpha=0)
+modelHALF <- cv.glmnet(x=as.matrix(fitchers),y=chore, alpha=1/2)
+
+predykcjaLASSO <- predict(modelLASSO,as.matrix(fitchersP))
+predykcjaRIGID <- predict(modelRIGID,as.matrix(fitchersP))
+predykcjaHALF <- predict(modelHALF,as.matrix(fitchersP))
+```
+
+
+```{r, include=FALSE}
+#Pelny model z cross-validacja
+modelPCR <- pcr(chore ~ as.matrix(fitchers),model=TRUE,validation="CV",segments=100)
+
+#Model z 3-zmiennymi
+modelPCR3 <- pcr(chore ~ as.matrix(fitchers),model=TRUE,validation="CV",segments=100
+                 ,ncomp=3)
+
+predykcjaPCR <- predict(modelPCR,fitchersP)
+predykcjaPCR3 <- predict(modelPCR3,fitchersP)
+```
+
+
+```{r}
+fitchers <- as.matrix(fitchers)
+fitchersP <- as.matrix(fitchersP)
+```
+
+
+```{r linmse, include=FALSE}
+#estymacja MSE
+
+
+# lm 
+RSSLM <- function(rep)
+{
+result <- numeric(rep)
+licznik <-0 
+while(licznik < rep)
+{
+train.ind <-  sample(1:nrow(fitchers),floor(nrow(fitchers)*0.9))
+train <- fitchers[train.ind,]
+test <- fitchers[-train.ind,]
+train <- cbind(train,chore[train.ind])
+train <- as.data.frame(train)
+test <- cbind(test,chore[-train.ind])
+test <- as.data.frame(test)
+modelLM <- lm(train$V24 ~ .,model=TRUE, data = train)
+result[(licznik+1)] <-  mean((predict.lm(modelLM,test)-chore[-train.ind])^2)
+licznik <- licznik + 1
+}
+return(result)
+}
+
+
+#optimalAIC
+RSSAIC <- function(rep)
+{
+result <- numeric(rep)
+licznik <-0 
+while(licznik < rep)
+{
+train.ind <-  sample(1:nrow(fitchers),floor(nrow(fitchers)*0.9))
+train <- fitchers[train.ind,]
+test <- fitchers[-train.ind,]
+train <- cbind(train,chore[train.ind])
+train <- as.data.frame(train)
+test <- cbind(test,chore[-train.ind])
+test <- as.data.frame(test)
+modelLM <- lm(train$V24 ~ .,model=TRUE, data = train)
+optimalAIC <- step(modelLM,direction="backward",trace=FALSE)
+predykcjaAIC <- predict(optimalAIC, test)
+predykcjaAIC <- as.matrix(predykcjaAIC)
+result[(licznik+1)] <-  mean((predykcjaAIC-chore[-train.ind])^2)
+licznik <- licznik + 1
+}
+return(result)
+}
+
+
+#optimalBIC
+RSSBIC <- function(rep)
+{
+result <- numeric(rep)
+licznik <-0 
+while(licznik < rep)
+{
+train.ind <-  sample(1:nrow(fitchers),floor(nrow(fitchers)*0.9))
+train <- fitchers[train.ind,]
+test <- fitchers[-train.ind,]
+train <- cbind(train,chore[train.ind])
+train <- as.data.frame(train)
+test <- cbind(test,chore[-train.ind])
+test <- as.data.frame(test)
+modelLM <- lm(train$V24 ~ .,model=TRUE, data = train)
+optimalBIC <- step(modelLM,direction="backward",k=log(nrow(fitchers)),trace=FALSE)
+predykcjaBIC <- predict(optimalBIC, test)
+predykcjaBIC <- as.matrix(predykcjaBIC)
+result[(licznik+1)] <-  mean((predykcjaBIC-chore[-train.ind])^2)
+licznik <- licznik + 1
+}
+return(result)
+}
+
+#modelLASSO
+mean(modelLASSO$cvm)
+#modelRIGID
+mean(modelRIGID$cvm)
+#modelHALF
+mean(modelHALF$cvm)
+#modelPCR
+RSSPCR <- function(rep)
+{
+result <- numeric(rep)
+licznik <-0 
+while(licznik < rep)
+{
+train.ind <-  sample(1:nrow(fitchers),floor(nrow(fitchers)*0.9))
+train <- fitchers[train.ind,]
+test <- fitchers[-train.ind,]
+train <- cbind(train,chore[train.ind])
+train <- as.data.frame(train)
+test <- cbind(test,chore[-train.ind])
+test <- as.data.frame(test)
+modelPCR <- pcr(train$V24 ~ .,data=train,model=TRUE,validation="CV",segments=100)
+result[(licznik+1)] <- mean((predict(modelPCR,test)-chore[-train.ind])^2)
+licznik <- licznik + 1
+}
+return(result)
+}
+RSSPCR(10)
+#modelPCR3
+RSSPCR3 <- function(rep)
+{
+result <- numeric(rep)
+licznik <-0 
+while(licznik < rep)
+{
+train.ind <-  sample(1:nrow(fitchers),floor(nrow(fitchers)*0.9))
+train <- fitchers[train.ind,]
+test <- fitchers[-train.ind,]
+train <- cbind(train,chore[train.ind])
+train <- as.data.frame(train)
+test <- cbind(test,chore[-train.ind])
+test <- as.data.frame(test)
+modelPCR3 <- pcr(train$V24 ~ .,data=train,model=TRUE,validation="CV",segments=100,ncomp=3)
+result[(licznik+1)] <- mean((predict(modelPCR3,test)-chore[-train.ind])^2)
+licznik <- licznik + 1
+}
+return(result)
+}
+```
+
+#Porównanie metod liniowych
+
+Poniższa tabela prezentuje średni błąd kwadratowy dla różnych metod liniowych. 
+
+```{r linmseres, include=FALSE}
+MSE <- numeric(8)
+names(MSE) <- c("lm","AIC","BIC","PCR","PCR_3_komponenty","LASSO","RIGID","cv.glment_alpha=2")
+
+MSE_lm <- RSSLM(100)
+
+MSE_AIC <- RSSAIC(100)
+
+MSE_BIC <- RSSBIC(100)
+
+MSE_PCR <- RSSPCR(50)
+
+MSE_PCR3 <- RSSPCR3(100)
+
+MSE[1] <- mean(MSE_lm)
+MSE[2] <- mean(MSE_AIC)
+MSE[3] <- mean(MSE_BIC)
+MSE[4] <- mean(MSE_PCR)
+MSE[5] <- mean(MSE_PCR3)
+MSE[6] <- mean(modelLASSO$cvm)
+MSE[7] <- mean(modelRIGID$cvm)
+MSE[8] <- mean(modelHALF$cvm)
+
+
+```
+
+
+```{r}
+
+ as.data.frame(sort(MSE))
+```
+
+Jako, że metody RIGID i trzykomponentowy PCR wykazują zdecydowanie większe MSE, są pominięte na wykresach dystrybucji błędów.  
+
+```{r}
+
+lm <- data.frame(rep("LM", length(MSE_lm)), MSE_lm)
+colnames(lm) <- c("metoda", "blad")
+
+aic <- data.frame(rep("AIC", length(MSE_AIC)), MSE_AIC)
+colnames(aic) <- c("metoda", "blad")
+
+bic <- data.frame(rep("BIC", length(MSE_BIC)), MSE_BIC)
+colnames(bic) <- c("metoda", "blad")
+
+pcr <- data.frame(rep("PCR", length(MSE_PCR)), MSE_PCR)
+colnames(pcr) <- c("metoda", "blad")
+
+pcr3 <- data.frame(rep("PCR3", length(MSE_PCR3)), MSE_PCR3)
+colnames(pcr3) <- c("metoda", "blad")
+
+lasso <- data.frame(rep("LASSO", length(modelLASSO$cvm)), modelLASSO$cvm)
+colnames(lasso) <- c("metoda", "blad")
+
+rigid <- data.frame(rep("RIGID", length(modelRIGID$cvm)), modelRIGID$cvm)
+colnames(rigid) <- c("metoda", "blad")
+
+half <- data.frame(rep("HALF", length(modelHALF$cvm)), modelHALF$cvm)
+colnames(half) <- c("metoda", "blad")
+
+bledy.lin <- rbind(lm, aic, bic, pcr, lasso, half)
+
+ggplot(bledy.lin, aes( x = reorder(metoda, blad, FUN=mean), y = blad, color=metoda, fill=metoda) ) +
+  geom_boxplot() + coord_cartesian(ylim=c(5, 15)) + 
+  labs(title="Dystrybucja średnich błędów kwadratowych dla metod liniowych", x = "metoda", y = "mean squared error")
+
+```
+
+Najlepszą spośród metod liniowych okazała się ta minimalizująca kryterium BIC, przy czym metody AIC, BIC i LM wypadły bardzo podobnie. Modele z regularyzacją i PCR mają istotnie gorszą jakość. 
+
+#Modele nieliniowe
+
+```{r}
+
+rak.piersi.2010.2 <- rak.piersi.2010 %>%
+  separate(Grupa, c("teryt", "gender", "age"), " ")
+
+rak.piersi.2011.2 <- rak.piersi.2011 %>%
+  separate(Grupa, c("teryt", "gender", "age"), " ")
+
+rak.piersi.2012.2 <- rak.piersi.2012 %>%
+  separate(Grupa, c("teryt", "gender", "age"), " ")
+
+nn <- 12 # liczba kolumn w każdej z tych ramek
+
+fitchers <- cbind(rak.piersi.2010.2,rak.piersi.2011.2)
+colnames(fitchers)[4:nn] <- paste( colnames(fitchers)[4:nn], "1", sep="_")
+colnames(fitchers)[(nn+4):(2*nn)] <- paste( colnames(fitchers)[(nn+4):(2*nn)], "2", sep="_")
+fitchers <- fitchers[,-c((nn+1):(nn+3), 2*nn)]
+#fitchers <- as.matrix(fitchers)
+
+
+
+fitchers[,c(4:8)] <- fitchers[,c(4:8)] * 10^5
+fitchers[,c((nn+1):(nn+5))] <- fitchers[,c((nn+1):(nn+5))] * 10^5
+
+```
+
+```{r, echo=FALSE}
+#tworzymy macierz fitcher-Ăłw 2011-2012
+fitchersP <- cbind(rak.piersi.2011.2,rak.piersi.2012.2)
+colnames(fitchersP)[4:nn] <- paste( colnames(fitchersP)[4:nn], "1", sep="_")
+colnames(fitchersP)[(nn+4):(2*nn)] <- paste( colnames(fitchersP)[(nn+4):(2*nn)], "2", sep="_")
+fitchersP <- fitchersP[,-c((nn+1):(nn+3), 2*nn)]
+#fitchers <- as.matrix(fitchers)
+
+fitchersP[,c(4:8)] <- fitchersP[,c(4:8)] * 10^5
+fitchersP[,c((nn+1):(nn+5))] <- fitchersP[,c((nn+1):(nn+5))] * 10^5
+```
+
+
+```{r, echo=FALSE}
+
+#Tworzymy wektor ktory przechowuje informacje o liczbie 
+#chorych kobiet w 2012 roku (na 100 tys. kobiet-mieszkaĹ„cĂłw )
+chore <- fitchersP[,c(1:3,  c((nn+1):(nn+4)))]
+
+chore <- data.frame(chore[1:3], apply(chore[, 4:7], 1, sum))
+colnames(chore)[4] <- "chore"
+```
+
+
+```{r, echo=FALSE}
+dane <- cbind(fitchers,chore)
+dane <- dane[, -c((2*nn-3):(2*nn-1))]
+```
+##algorytm k-najbliższych sąsiadów
+
+
+Pierwszy wypróbowany model bazował na algorytmie najbliżzych sąsiadów. Aby wyznaczyć optymalną liczbę najbliższych obserwacji k, obliczono błąd średniokwadratowy dla k = 1, ..., 25. 
+```{r knnopt}
+
+fitControl <- trainControl(method = "none")
+RSSknn <- replicate(50, 
+{
+inds <- createDataPartition(dane$chore, p = 0.75)
+train <- dane[inds[[1]], ]
+test <- dane[-inds[[1]], ]
+fit <- train(chore~., data = train[, -1], method = "knn", trControl = fitControl, tuneGrid = data.frame(k = 1))
+pred <- predict(fit, test[, -c(1, 21)])
+mean((pred - test$chore)^2)
+}
+)
+vect <- mean(RSSknn)
+
+for(i in 2:25){
+RSSknn <- replicate(50, 
+{
+inds <- createDataPartition(dane$chore, p = 0.75)
+train <- dane[inds[[1]], ]
+test <- dane[-inds[[1]], ]
+fit <- train(chore~., data = train[, -1], method = "knn", trControl = fitControl, tuneGrid = data.frame(k = i))
+pred <- predict(fit, test[, -c(1, 21)])
+mean((pred - test$chore)^2)
+}
+)
+vect <- c(vect, mean(RSSknn))
+}
+
+which.min(vect) # dla jakiego k model knn ma najniższy błąd
+```
+
+```{r}
+knnopt <- data.frame(c(1:25), vect)
+colnames(knnopt) <- c("k", "mse")
+ggplot(knnopt, aes(x = k, y = mse) ) +
+  geom_point() + geom_line() +
+  labs(title="Srednie błędy kwadratowe w zależności od parametru k ", x = "k", y = "MSE")
+
+```
+
+Otrzymano optymalne k = 11. Dla takiego k przedstawiono dystrybucję MSE w porównaniu do innych modeli na wykresie w rozdziale . 
+```{r}
+
+RSSknn <- replicate(100, 
+{
+inds <- createDataPartition(dane$chore, p = 0.75)
+train <- dane[inds[[1]], ]
+test <- dane[-inds[[1]], ]
+fit <- train(chore~., data = train[, -1], method = "knn", trControl = fitControl, tuneGrid = data.frame(k = 19))
+pred <- predict(fit, test[, -c(1, 21)])
+mean((pred - test$chore)^2)
+}
+)
+
+```
+
+
+```{r}
+#knn do predykcji naszych danych
+
+fitknn <- train(chore~., data = dane[, -1], method = "knn", 
+              trControl = fitControl, 
+              tuneGrid = data.frame(k = 19))
+predknn <- predict(fitknn, fitchersP)
+```
+
+##Drzewa decyzyjne
+Kolejnym wypróbowanym modelem było drzewo decyzyjne. 
+
+```{r tree1}
+
+
+RSStree <- replicate(100, 
+{
+inds <- createDataPartition(dane$chore, p = 0.75)
+train <- dane[inds[[1]], -1]
+test <- dane[-inds[[1]], -1]
+train$gender <- as.factor(train$gender)
+train$age <- as.factor(train$age)
+test$gender <- as.factor(test$gender)
+test$age <- as.factor(test$age)
+fit <- tree(train$chore ~ ., data=train)
+#summary(fit)
+#plot(fit);text(fit)
+pred <- predict(fit, test[, -c( 21)])
+mean((pred - test$chore)^2)
+}
+)
+
+```
+
+
+```{r tree2}
+dane2 <- dane[, -1]
+dane2$gender <- as.factor(dane2$gender)
+dane2$age <- as.factor(dane2$age)
+fitchersP2  <- fitchersP[, -1]
+fitchersP2$gender <- as.factor(fitchersP2$gender)
+fitchersP2$age <- as.factor(fitchersP2$age)
+
+fit.tree <- tree(dane2$chore ~ ., data=dane2)
+summary(fit.tree)
+plot(fit.tree);text(fit.tree)
+pred.tree <- predict(fit.tree, fitchersP2)
+
+```
+
+Zmienne użyte w konstrukcji drzewa to liczba nowych przypadków w dwóch kolejnych latach, grupa wiekowa i współczynnik urbanizacji. Co zaskakujące, nie została wzięta pod uwagę płeć. 
+
+##Lasy losowe
+
+Lasy losowe okażą się najlepszym z prezentowanych modeli (patrz rozdział 4). Jednak niestety użycie ich wiąże się z kosztem obliczeniowym, uzasadnionym obecnością zmiennych jakościowych. 
+
+
+Dla algorytmu lasów losowych wyznaczono ważność zmiennych użytych w modelu. 
+
+```{r rfblad}
+
+
+RSSrf <- replicate(50, 
+{
+inds <- createDataPartition(dane$chore, p = 0.75)
+train <- dane[inds[[1]], -c(1)]
+test <- dane[-inds[[1]], -c(1)]
+train$gender <- as.factor(train$gender)
+train$age <- as.factor(train$age)
+test$gender <- as.factor(test$gender)
+test$age <- as.factor(test$age)
+fit <- randomForest(chore ~ ., data=train)
+pred <- predict(fit, test)
+mean((pred - test$chore)^2)
+}
+)
+
+
+```
+
+
+```{r}
+
+fit.rf <- randomForest(chore ~ ., data=dane2)
+pred.rf <- predict(fit.rf, fitchersP2)
+
+pref.rf.c <- data.frame(pred.rf, dane[, 1:3])
+
+imp <- as.data.frame(importance(fit.rf))
+imp$var <- rownames(imp)
+colnames(imp) <- c("importance", "var")
+
+imp <- arrange(imp, -importance)
+
+nazwy <- c("nowe przypadki (1)", "nowe przypadki (2)", "Stadium 2 (1)", "Stadium 2 (2)", "wiek", "Stadium 3 (2)", "Stadium 3 (1)", "płeć", "urbanizacja (2)", "Stadium 1 (2)", "urbanizacja (1)", "Stadium 1 (1)", "Stadium 4 (2)", "stopa bezrobocia (1)", "Stopa bezrobocia (2)", "Stadium 4 (1)", "nadwaga", "wynagrodzenie (1)", "wynagrodzenie (2)")
+
+imp[, "var"] <- nazwy
+
+
+ggplot(imp, aes(reorder(var, importance), importance)) + geom_bar(position="dodge", stat="identity",  fill="blue") + coord_flip() + labs(title="Ważność zmiennych w modelu Random Forest", y = "ważność", x = "zmienne w modelu")
+
+```
+
+Sprawdzono też, jak wyglądałaby ważność zmiennych, gdyby z modelu wyłączyć różne stadia choroby. 
+
+
+```{r}
+dane4 <- dane2[, -c(3:6, 12:15)]
+fitchersP4 <- fitchersP2[, -c(3:6, 12:15)]
+
+fit.rf2 <- randomForest(chore ~ ., data=dane4)
+pred.rf2 <- predict(fit.rf2, fitchersP4)
+
+imp2 <- as.data.frame(importance(fit.rf2))
+imp2$var <- rownames(imp2)
+colnames(imp2) <- c("importance", "var")
+
+imp2 <- arrange(imp2, -importance)
+
+nazwy2 <- c("nowe przypadki (2)", "nowe przypadki (1)",  "płeć", "wiek", "urbanizacja (1)", "urbanizacja (2)", "stopa bezrobocia (1)", "Stopa bezrobocia (2)", "wynagrodzenie (2)", "wynagrodzenie (1)",  "nadwaga")
+
+imp2[, "var"] <- nazwy2
+
+
+ggplot(imp2, aes(reorder(var, importance), importance)) + geom_bar(position="dodge", stat="identity",  fill="blue") + coord_flip() + labs(title="Ważność zmiennych w modelu Random Forest", y = "ważność", x = "zmienne w modelu")
+
+
+
+
+```
+
+Najważniejszymi zmiennymi są liczby nowych przypadków w dwóch kolejnych latach. Dość istotne są dane ze stadiów 2 i 3, mniej ze stadiów 1 i 4. Wiek i płeć odgrywają kluczową rolę. Z dodatkowych czynników włączonych do modelu najważniejszy okazał się wskaźnik urbanizacji. Mniejszą rolę odgrywa stopa bezrobocia, zaś nadwaga i wynagrodzenie nie okazały się istotne. 
+
+##Gradient boosting
+Aby zbudować model przy pomocy funkcji xgboost, zmienne jekościowe takie jak płeć i wiek zostały przekształcone w dummy variables. 
+
+```{r boostblad, include=FALSE}
+
+dane3 <- dane[, -1]
+plec <- model.matrix(~dane3$gender)
+dane3$gender <- plec[, 2]
+
+wiek <- model.matrix(~dane3$age)[, -1]
+
+dane3 <- cbind(dane3, wiek)
+dane3 <- dane3[, -2]
+
+
+RSSboost <- replicate(100, 
+{
+inds <- createDataPartition(dane3$chore, p = 0.75)
+train <- dane3[inds[[1]], ]
+test <- dane3[-inds[[1]], ]
+fit <- xgboost(label=as.matrix(train$chore) , data=as.matrix(train[, -c( 19)]),
+              objective = "reg:linear", 
+              nrounds = 10,
+              max.deph = 5)
+pred <- predict(fit, as.matrix(test[, -c(19)]))
+mean((pred - test$chore)^2)
+}
+)
+
+```
+
+
+```{r, include=FALSE}
+#predykcja dla naszych danych
+fitchersP3 <- fitchersP
+fitchersP3$gender <- plec[, 2]
+
+
+fitchersP3 <- cbind(fitchersP3, wiek)
+fitchersP3 <- fitchersP3[, -c(1, 3)]
+
+
+fit.boost <- xgboost(label=as.matrix(dane3$chore) , data=as.matrix(dane3[, -c( 19)]),
+              objective = "reg:linear", 
+              nrounds = 10,
+              max.deph = 5)
+
+pred.boost <- predict(fit.boost, as.matrix(fitchersP3))
+
+```
+
+Na podstawie stworzonego modelu została wyznaczona ważność zmiennych. 
+
+```{r}
+importance_matrix <- xgb.importance(colnames(fitchersP3), model = fit.boost)
+xgb.plot.importance(importance_matrix)
+
+```
+Wnioski są podobne, jak w przypadku analogicznego wykresu w metodzie random forest. Najważniejsze okazują się liczby nowych przypadków, istotna jest urbanizacja, zaś mierniki jakości życia są znacznie mniej ważne. 
+Istotna jest grupa wiekowa 55 - 64 lata. 
+
+
+#Porównanie użytych metod
+
+Aby ocenić użyte metody nieliniowe, przedstawiono dystrybucje błędów średniokwadratowych
+
+```{r}
+knn <- data.frame(rep("knn", 100), RSSknn)
+colnames(knn) <- c("metoda", "blad")
+
+tree <- data.frame(rep("tree", 100), RSStree)
+colnames(tree) <- c("metoda", "blad")
+
+rf <- data.frame(rep("randomForest", 50), RSSrf)
+colnames(rf) <- c("metoda", "blad")
+
+boost <- data.frame(rep("xgboost", 100), RSSboost)
+colnames(boost) <- c("metoda", "blad")
+
+bledy <- rbind(knn, tree, rf, boost)
+
+ggplot(bledy, aes(x = reorder(metoda, blad, FUN=mean), y = blad, color=metoda, fill=metoda) ) +
+  geom_boxplot() +
+  labs(title="Dystrybucja średnich błędów kwadratowych dla metod nieliniowych", x = "metoda", y = "mean squared error")
+```
+
+Najniższym błędem charakteryzuje się metoda lasów losowych. Rozkład MSE dla tej metody ma też najniższe odchylenie standardowe. 
+
+Sprawdzono, jak wypadają metody nieliniowe w porównaniu do liniowych. Na wykresie pominięto niektóre metody o wyższym MSE. 
+
+```{r}
+
+bledy2 <- rbind(lm, aic, bic,  lasso,  half,  tree, rf, boost)
+
+
+ggplot(bledy2, aes(x = reorder(metoda, blad, FUN=mean), y = blad, color=metoda, fill=metoda) ) +
+  geom_boxplot() + coord_cartesian(ylim=c(5, 12)) +
+  labs(title="Dystrybucja średnich błędów kwadratowych - porównanie metod", x = "metoda", y = "mean squared error")
+
+
+```
+
+Ze wszystkich sprawdzonych metod najlepsza to lasy losowe. Trochę gorzej i podobnie do siebie wypadają: boosting, LM, AIC oraz BIC. 
+
+```{r}
+#ostateczna predykcja liczbowo
+ludn.pow2013<-read.table(file="Ludnosc_31XII2013.csv", header=TRUE, sep=";")
+ludn.pow2013 <- ludn.pow2013[ ludn.pow2013$X>100,]
+colnames(ludn.pow2013)<-c("Nazwa","Razem","M","K","teryt")
+pred.final <- merge(pref.rf.c, ludn.pow2013[, c("Razem", "teryt")], by="teryt")
+pred.final$pred.rf <- pred.final$pred.rf * pred.final$Razem / 10^5
+pred.final <- pred.final[, -5]
+pred.final <- pred.final[, c(1, 3, 4, 2)]
+colnames(pred.final) <- c("TERYT_CODE", "gender", "age",  "predicted_BRCA_cases" )
+#write.csv(pred.final, file="ambroziak-jaworski-majewska-smutek-predykcja.csv", sep=";")
+
+```
+
+#Predykcja na rok 2013 - prezentacja wyników
+
+Jako, że MSE okazał się najmniejszy dla metody lasów losowych, wyniki przedykcji z użyciem tej metody wykorzystano do wygenerowania poniższych wykresów. 
+
+Na kartogramach przedstawiono zachorowania w powiatach dla kobiet i mężczyzn zagregowane po grupach wekowych. 
+
+```{r mapy}
+powmap.ini <- shapefile("powiaty.shp")
+
+powmap <- fortify(powmap.ini, region="jpt_kod_je")
+#data.pow - tu wstaw dane, ktore maja sie narysowac na mapce
+data.pow <- data.frame(dane[, c(1, 2)], pred.rf)
+data.pow <- data.pow[data.pow$gender=="K", -2]
+data.pow <- data.pow   %>% 
+  group_by(teryt) %>%
+  summarise(pred.rf = sum(pred.rf))
+colnames(data.pow)<- c("id", "data")
+
+data.pow$id <- as.integer(data.pow$id)         
+
+
+powmap$id <- as.integer(powmap$id)
+plotData.pow <- left_join(powmap, data.pow)
+#plotData.pow$data
+
+#pow.names <- aggregate(cbind(long, lat) ~ id, data=plotData.pow, FUN=mean)
+p <- ggplot() +
+  geom_polygon(data = plotData.pow, aes(x = long, y = lat, group = group, fill = data),    color = "black", size = 0.25)  + scale_fill_gradient2(low = "blue", midpoint=mean(data.pow$data) , mid = "white", high = "red", name="Liczba",   breaks = pretty_breaks(n = 5)) +  
+  theme_nothing(legend = TRUE)+
+  labs(title="Zachorowalność kobiet na 100tys. mieszkańców w roku 2013")
+p 
+
+data.pow <- data.frame(dane[, c(1, 2)], pred.rf)
+data.pow <- data.pow[data.pow$gender=="M", -2]
+data.pow <- data.pow   %>% 
+  group_by(teryt) %>%
+  summarise(pred.rf = sum(pred.rf))
+colnames(data.pow)<- c("id", "data")
+
+data.pow$id <- as.integer(data.pow$id)         
+
+
+powmap$id <- as.integer(powmap$id)
+plotData.pow <- left_join(powmap, data.pow)
+#plotData.pow$data
+
+#pow.names <- aggregate(cbind(long, lat) ~ id, data=plotData.pow, FUN=mean)
+p <- ggplot() +
+  geom_polygon(data = plotData.pow, aes(x = long, y = lat, group = group, fill = data),    color = "black", size = 0.25)  + scale_fill_gradient2(low = "blue", midpoint=mean(data.pow$data) , mid = "white", high = "red", name="Liczba",   breaks = pretty_breaks(n = 5)) +  
+  theme_nothing(legend = TRUE)+
+  labs(title="Zachorowalność mężczyzn na 100tys. mieszkańców w roku 2013")
+p 
+
+```
+
+Należy mieć świadomość, że predykcja dla mężczyzn jest obarczona dużym błędem ze względu na niewielką liczbę przypadków choroby. 
+
+#Podsumowanie
+
+W raporcie przedstawione zostały modele predykcyjne dla zachorowań na nowotwory piersi w roku 2013. Metodą o najmniejszym błędzie średniokwadratowym okazały się lasy losowe. Dokładniejsza analiza modeli pozwala wyciągnąć wniosek, że istotnymi czynnikami w analizie predykcyjnej są płeć, wiek, liczba nowych przypadków i przypadków w różnych stadiach choroby oraz wskaźnik urbanizacji. Inne zmienne uwzględnione w modelu mają mniejsze znaczenie. Pozwala to podejrzewać, że model można jeszcze udoskonalić, szukając innych zmiennych mających wpływ na liczbę zachorowań. 
