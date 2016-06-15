@@ -1,0 +1,9 @@
+Dobry raport jest zwięzły i treściwy. Listę 23 pakietów R można by spokojnie pominąć i byłoby tylko lepiej.
+
+Mapy są poprawne (choć zamiast niebieskiego lepszy byłby szary) i trochę szkoda że na 4 mapy wykorzystano 2 różne style zamiast to ujednolicić.
+
+Porównanie kNN z innymi liniowymi metodami to dobry pomysł, ale warto sprawdzić więcej metod (lasy losowe?)
+
+Wykorzystanie innych zmiennych to też dobry pomysł.
+
+Ale zabrakło mi: informacji jaki model został uznany za najlepszy, diagnostyki reszt i modelu.
