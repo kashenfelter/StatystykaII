@@ -706,7 +706,7 @@ modelMatrixPred &lt;- modelMatrixPred[, colnames(modelMatrix)]
 predictions &lt;- predict(xgbModelFinal, xgb.DMatrix(data = modelMatrixPred))
 predictions &lt;- cbind(grid, ifelse(predictions &gt; 0, predictions, 0))
 colnames(predictions) &lt;- c(&quot;TERYT_CODE&quot;, &quot;gender&quot;, &quot;age&quot;, &quot;predicted_BRCA_cases&quot;)
-save(predictions, file = &quot;./RC_AD_AP_AS_predictions.rda&quot;)</code></pre>
+write.csv(predictions, file = &quot;./RC_AD_AP_AS_predictions.csv&quot;, row.names = FALSE)</code></pre>
 </div>
 
 
