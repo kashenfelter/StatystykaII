@@ -1,5 +1,10 @@
 [predictions] 
 
+https://rawgithub.com/pbiecek/StatystykaII/master/MIMUW_2016/projekty/projekt2/phase3/predykcje/predykcje.html
+
+8.868951
+
+7/10
 
 [interpretation] 
 
