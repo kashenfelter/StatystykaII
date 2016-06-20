@@ -9,7 +9,7 @@ knitr::opts_chunk$set( warning = FALSE, cache = TRUE, message=FALSE, echo=FALSE)
 ```
 
 
-```{r}
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 amb_jaw_maj_smu <- read.table("ambroziak-jaworski-majewska-smutek-predykcja-popr.csv", sep=";", header = T)
 
 bot_gaj <- read.table("BDG_prediction.csv", sep=";", header = T)[,c(3,1,2,4)]
@@ -26,5 +26,29 @@ mat_ros_rut_sob <- read.table("predykcje_Matys_Rosa_Rutkowski_Sobiczewska.csv", 
 
 cyl_dab_pal_sit <- read.table("RC_AD_AP_AS_predictions.csv", sep=",",dec=".", header = T)
 
+# load the data
+load("brca2013.rda")
+
+sets <- c("amb_jaw_maj_smu","bot_gaj","cze_pio_tyr","kas_mat_mly","mac_tro_rin_gor","gos_jaw_lis","mat_ros_rut_sob","cyl_dab_pal_sit")
+
+lsets <- lapply(sets, function(set) {
+  x <- get(set)
+  colnames(x) = c("TERYT4", "GENDER", "AGE_GROUP","pred")
+  tmp <- merge(x, brca2013)
+  data.frame(se=(tmp[,4]-tmp[,5])^2, set=set)
+})
+
+lsets <- do.call(rbind, lsets)
+lsets$set <- reorder(lsets$set, lsets$se, mean)
+
+library(ggplot2)
+ggplot(lsets, aes(set, se, fill=set)) + 
+  geom_boxplot() + scale_y_log10() + 
+  coord_flip() + theme_classic()+
+  xlab("") + ylab("")
+
+tmp <- as.data.frame(tapply(lsets$se, lsets$set, mean))
+colnames(tmp) = "MSE"
+tmp
 
 ```
