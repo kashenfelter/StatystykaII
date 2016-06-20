@@ -1,0 +1,30 @@
+---
+title: "Predykcje"
+output: 
+  html_document
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set( warning = FALSE, cache = TRUE, message=FALSE, echo=FALSE)
+```
+
+
+```{r}
+amb_jaw_maj_smu <- read.table("ambroziak-jaworski-majewska-smutek-predykcja-popr.csv", sep=";", header = T)
+
+bot_gaj <- read.table("BDG_prediction.csv", sep=";", header = T)[,c(3,1,2,4)]
+
+cze_pio_tyr <- read.table("Czechowski_Koziej_Piotrowski_Tyrek.csv", sep=",", header = T)
+
+kas_mat_mly <- read.table("Kasprowicz_Matlak_Mlynarczyk_predictions.csv", sep=",", header = T)
+
+mac_tro_rin_gor <- read.table("macias_trojgo_rinowska_gorka.txt", sep=" ", header = T)[,c(1,3,4,2)]
+
+gos_jaw_lis <- read.table("pred_Gos_Jaw_Lis.csv", sep=",", header = T)
+
+mat_ros_rut_sob <- read.table("predykcje_Matys_Rosa_Rutkowski_Sobiczewska.csv", sep=";", header = T)
+
+cyl_dab_pal_sit <- read.table("RC_AD_AP_AS_predictions.csv", sep=",",dec=".", header = T)
+
+
+```
