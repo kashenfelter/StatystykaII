@@ -1,0 +1,25 @@
+[predictions] 
+
+
+[interpretation] 
+
+W opisie listy wybranych czynników brakuje dwóch, które inne grupy uznały za najważniejsze - wieku i płci.
+Sądząc jednak po prawym dolnym wykresie te zmienne zostały uznane za ważne i znalazły się w modelu.
+Dlaczego te opisy nie są spójne?
+
+Wykonanie dwupoziomowego modelu to ciekawy pomysł. Nie wiem czy dobry (to zweryfikuje MSE), ale ciekawy.
+
+Skąd w metodach stochastic gradient boosting? Czy naprawdę używali Państwo tej metody?
+
+Prezentując wyniki modelu dla BIC p-wartości są tym ważniejsze im są mniejsze. Nie ma więc sensu pokazywanie słupkami p-wartości bo duże słupki oznaczają najbardziej nieistotne zmienne. Znacznie lepiej pokazać już -log(p-wartość) ponieważ przyjmuje duże wartości gdy p-wartości są małe.
+Czynniki na tym wykresie należało by uporządkować w kolejności np. od największej do najmniejszej).  Nazwy zmiennych też warto poprawić, teraz as.factor(AGE_GROUP)3 wygląda bardzo nieestetycznie.
+
+Termin ,,Model mieszany'' ma inne znaczenie. 
+
+Pokazali Państwo jakie zmienne są używane przez model BIC, ale jakie są przez boosting?
+
+Otrzymali państwo 1 głos z innych grup
+
+7/10
+
+[methodology] 
