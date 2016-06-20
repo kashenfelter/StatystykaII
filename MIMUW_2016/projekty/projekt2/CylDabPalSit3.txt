@@ -1,0 +1,17 @@
+[predictions] 
+
+
+[interpretation] 
+
+Właściwie poprawny opis. Jedyną pretensję mam co do spójności opisu. 
+Na początku wymieniają państwo 5 modeli do porównania. Na wykresie na środku są już tylko błędy dla 4 i to innych niż wcześniej wymienionych 5. 
+A na lewym dolnym panelu są tylko 3 rozkłady błędów. 
+Jak już porównywać to zawsze te same modele.
+Wykres 'prediction accuracy' mógłby mieć osie po pierwiastkowej transformacji lub logarytmicznej.
+Na opisie wykresy po lewej stronie na dole zabrakło informacji co przedstawia. 
+Tutaj jest to MSE na 100 boostrapowych próbach, a ktoś mógłby pomyśleć że jest to rozkład kwadratów błędów (a MSE to środkowa kropka).
+Otrzymali państwo 5 głosów z innych grup
+
+9/10
+
+[methodology] 

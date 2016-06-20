@@ -1,0 +1,19 @@
+[predictions] 
+
+
+[interpretation] 
+
+Plots are so small. It is almost impossible to read titles or labels.
+It is not clear which models you have compared. In the section 'Methods' you have listed 4 models, but the boxplot has only three elements and none of them looks like the random forest.
+But it looks like the random forest is the model that you have finally selected (even if it was not mentioned before).
+All these are just my guesses, but it should be clearly written.
+I have no idea what is in the plot in the middle on the bottom.
+
+It is not written how the MSE is calculated in your case. 
+Have you divided data into training/test set? 
+
+You've got 3 votes (in total) - 3 team members.
+
+5/10
+
+[methodology] 
