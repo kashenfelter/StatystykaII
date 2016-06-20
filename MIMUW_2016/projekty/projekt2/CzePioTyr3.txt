@@ -1,0 +1,20 @@
+Jaka była rola pana Koziej w fazie 2?
+
+
+[predictions] 
+
+
+[interpretation] 
+
+Przy opisie modeli predykcyjnych, zabrakło informacji jaki zbiór parametrów był sprawdzany. 
+Opisana procedura, redukująca wariancję w małych powiatach jest ciekawa, ale ten sam efekt powinno się osiągnąć stosując regresję grzbietową. Ma ona dokłądnie taki sam cel (redukcja wariancji w małych powiatach) jak panowie opisali.
+Kierunek oczwiście słuszny.
+
+Pierwszy wykres po prawej jest zły. Wykresy pudełkowe można stosować TYLKO jeżeli są zaczepione w zerze. W tym przypadku długości słupków są arbitalne. 
+Ostatni wykres - trafność prognostyczna mógłby mieć obie osie zlogarytmowane - lub po sqrt, nie trzeba by robić dwóch paneli.
+Model działania algortymu można było opisać w bardziej formalny sposób, algorytmem/wzorem a nie tylko słownie.
+Otrzymali państwo 6 głosów z innych grup
+
+9/10
+
+[methodology] 

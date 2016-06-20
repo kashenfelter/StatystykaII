@@ -1,0 +1,16 @@
+[predictions] 
+
+
+[interpretation] 
+
+Zdania w języku polskim zaczynają się dużą literą i kończą kropką. Wyjątkiem są tytuły.
+Na państwa plakacie opisy są szczątkowy i całkowicie dla mnie nie zrozumiałe.
+Piszą państwo o jakimś drzewie decyzyjnym, dlaczego nie jest ono pokazane?
+Dla knn jak liczona była odległość?
+Dodanie linii prostej na środkowym górnym wykresie jest niepoprawne, pojedyncze obserwacja zakłócają cały ten model.
+Plakat jest bardzo niestaranny i nie spełnia swojego celu - nie wyjaśnia jaki model był użyty.
+Otrzymali państwo 1 głos z innych grup
+
+2/10
+
+[methodology] 

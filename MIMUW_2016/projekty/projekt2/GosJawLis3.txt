@@ -1,0 +1,15 @@
+[predictions] 
+
+
+[interpretation] 
+
+Nie jest napisane czy dla modeli była wykonana krosswalidacja, co więcej wydaje się, że nie była.
+Wykres porównujący MSE w rzeczywistości porównuje błędy dla poszczególnych obserwacji, ale to nie jest porównanie MSE na krosswalidacji a jedynie porównanie rozkładów y-\hat y
+Z opisy nie wynika, czy liczba wystąpień była normalizowana przez wielkość powiatu.
+Nie wynika też, czy do predykcji były wybierane województwa/powiaty czy też cały model był oparty o cztery zmienne.
+Podsumowując, opis jest zbyt skąpy i z samych wykresów nie sposób odgadnąć co dokładnie zostało zrobione.
+Otrzymali państwo 1 głos z innych grup
+
+5/10
+
+[methodology] 
