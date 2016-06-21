@@ -19,3 +19,15 @@ Otrzymali państwo -1 głos z innych grup (3 głosy na 4 osoby w zespole)
 6/10
 
 [methodology] 
+
+Dodano nowe zmienne: wynagrodzenie, urbanizacja, bezrobocie, nadwaga 
+Porównano różne modele: model pełny, AIC/BIC/ridge/lasso/pcr
+i modele nieliniowe.
+Opis modeli jest poprawnych, choć na wykresie 'Dystrybucja błędów' zabrakło mediany/średniej.
+Tuning parametrów dla metod nieliniowych też poprawny.
+Choć patrząc na wyniki drzewa decyzyjnego, widać że używanie zmiennej 'new_1' i 'new_2' to dziwny pomysł.
+Za każdym razem zmienne new_1 i new_2 są najważniejsze, ale to powinna być sugestia by je inaczej uwzględnić (szczególnie dla modeli opartych o drzewa).
+
+9/10
+
+
