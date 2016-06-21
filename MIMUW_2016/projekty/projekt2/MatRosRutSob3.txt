@@ -28,3 +28,20 @@ Otrzymali państwo 1 głos z innych grup
 7/10
 
 [methodology] 
+
+Rozważano wiele różnych metod, dodano rozmaite inne czynniki (choć wiele niezrozumiałych, jak np. liczba osób z poradni psychologicznych).
+Końcowy model jest ciekawy (złożenie dwóch modeli).
+Wykres błędów, można by posortować, przecież nei ma sensu sortowanie po kodach teryt.
+
+Zawartość dobra, prezentacje można by poprawić (np. wyniki dwóch regresji liniowych zajmują chyba 3 strony, niepotrzebnie)
+
+regresja liniowa (lasso/ridge)
+gradient boosting
+gradient boosting z selekcją atrybutów
+gradient boosting
+random forest
+knn
+SVM
+
+9.5/10
+
