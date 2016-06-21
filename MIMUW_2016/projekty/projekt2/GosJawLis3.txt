@@ -18,3 +18,16 @@ Otrzymali państwo 1 głos z innych grup
 5/10
 
 [methodology] 
+
+Dodano jedną nową zmienną (urbanizacja), porównano kilka różnych metod:
+Regresja liniowa, Model ridge, Model lasso, Klasyfikacja lda (ale czy to miało sens?), Naive Bayes, Random forest
+
+Zabrakło być może boostingu, który w innych zespołach miał dobre wyniki.
+
+Błąd, które Panie chyba popełniły, to nie zsumowały wyników z tym samym TERYTem (np. tak było dla warszawy)
+
+Opis poprawny i rozbudowany, choć ten wykres skrzypcowy jest wysoce podejrzany,
+nie potrafię jednak znaleźć błędu w kodzie.
+
+
+8/10
