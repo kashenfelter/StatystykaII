@@ -22,3 +22,16 @@ Otrzymali państwo 6 głosów z innych grup
 9/10
 
 [methodology] 
+
+Dodano wskaźniki zachorowalności z poprzednich lat, wskaźnik urbanizacji.
+Rozważono wiele metod:
+knn, lm, glmnet, svm, random forest, knn
+
+Zaproponowany model jest ciekawy.
+Jedyna rzecz, której mi zabrakło to bardziej szczegółowy opis tuningowania parametrów dla poszczególnych metod
+
+9/10
+
+
+
+
