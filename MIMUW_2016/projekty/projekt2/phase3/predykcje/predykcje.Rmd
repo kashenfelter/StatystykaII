@@ -26,10 +26,12 @@ mat_ros_rut_sob <- read.table("predykcje_Matys_Rosa_Rutkowski_Sobiczewska.csv", 
 
 cyl_dab_pal_sit <- read.table("RC_AD_AP_AS_predictions.csv", sep=",",dec=".", header = T)
 
+wer_wir_zia <- read.table("predykcje-Weremczuk_Wirtek_Ziajka.csv", sep=";",dec=".", header = T)
+
 # load the data
 load("brca2013.rda")
 
-sets <- c("amb_jaw_maj_smu","bot_gaj","cze_pio_tyr","kas_mat_mly","mac_tro_rin_gor","gos_jaw_lis","mat_ros_rut_sob","cyl_dab_pal_sit")
+sets <- c("amb_jaw_maj_smu","bot_gaj","cze_pio_tyr","kas_mat_mly","mac_tro_rin_gor","gos_jaw_lis","mat_ros_rut_sob","cyl_dab_pal_sit","wer_wir_zia")
 
 lsets <- lapply(sets, function(set) {
   x <- get(set)
