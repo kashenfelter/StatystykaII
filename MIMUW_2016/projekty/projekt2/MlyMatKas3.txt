@@ -20,3 +20,13 @@ Otrzymali państwo 2 głosy z innych grup
 7/10
 
 [methodology] 
+
+Użyli państwo dodatkowe zmienne dotyczące zanieczyszczenia powietrza, 
+i rozważyli państwo kilka modeli, ale:
+- nie wierzę, że państwo obejrzeli plik worda, który został wysłany. To jeden z najbardziej niechlujnych raportów jaki kiedykolwiek otrzymałem. Wręcz jestem przekonany, że państwo wysłali ten plik przez przypadek a chcieli inny, bardziej dopracowany. Jedyną zaletą pliku word jest to, że można ręcznie poprawić formatowanie, ale ten plik jest tak przygotowany by utrudnić jego czytanie
+- brakuje porównania rozkładów błędów MSE np. na powtarzanych podziałach na zbiór uczący/testowy.
+
+Wybór modelu na podstawie jednego podziału na zbiór uczący/testowy to za mało.
+
+
+5/10
