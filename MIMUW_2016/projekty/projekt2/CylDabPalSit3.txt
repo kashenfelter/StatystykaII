@@ -20,3 +20,14 @@ Otrzymali państwo 5 głosów z innych grup
 9/10
 
 [methodology] 
+
+Wiele różnych modeli, dobry opis i poprawne wnioskowanie
+Linear models (full/AIC/BIC), lasso, 
+Poisson regression, Negative binomial model, Zero-inflated models
+Mixed effects Poisson regression
+Random forest, Boosting
+
+To co można dodatkowo rozważyć, to w ostatnim punkcie 'Prediction for 2013' zestawić wszystkie rozważane modele (a nie tylko te 3)
+
+10/10
+
