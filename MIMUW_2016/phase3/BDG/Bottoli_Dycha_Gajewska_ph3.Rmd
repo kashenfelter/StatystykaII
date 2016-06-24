@@ -1,0 +1,441 @@
+---
+title: "Project_2C"
+author: "Davide Bottoli, Karolina Gajewska, Przemys³aw Dycha"
+date: "13 June 2016"
+output: 
+  html_document:  
+    toc: TRUE
+    
+---
+
+# Introduction
+
+The main goal of this project was finding and presenting the predictions for number of cancer cases in different regions of Poland.
+
+In order to describe new cases of cancer, we chose the following independent variables informed about:
+
+- emission of air pollutants-gases (mainly nitrogen oxides)
+
+- population by gender
+
+- population by gender and age group
+
+- unemployment rate
+
+- population destiny
+
+- salary
+
+We use the same methodology as here [(Phase 2 Project 2)] (https://rawgit.com/pbiecek/StatystykaII/master/MIMUW_2016/projekty/projekt2/phase2/BDG/P2P2_ACT_CV.html)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(sp)
+library(rgdal)
+library(rgeos)
+library(raster)
+library(maptools)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(scales)
+library(plotrix)
+library(glmnet)
+library(pls)
+library(tree)
+library(gbm)
+library(randomForest)
+library(gridExtra)
+
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE}
+data_1 <- read.csv(file = "data2013.csv", header = T, sep = ";", dec = ",", na.strings = "#N/D!")
+data_2013 <- read.csv(file = "data00.csv", header = T, sep = ";", dec = ",", na.strings = "#N/D!")
+year <- rep(2013, 4548)
+data_2013 <- as.data.frame(cbind(data_2013, year))
+#head(data_2013)
+#head(data_1)
+#str(data_1)
+data_1$TERYT4 <- as.factor(data_1$TERYT4)
+data_1$region <- as.factor(data_1$region)
+data_1$subregion <- as.factor(data_1$subregion)
+levels(data_1$region) <- c("Lower Silesia", "Kuyavia-Pomerania", "Lublin", "Lubusz", "Lodz", "Lesser Poland", "Mazovia", "Opole", "Subcarpathia", "Podlaskie", "Pomerania", "Silesia", "Holy Cross", "Warmia-Masuria", "Greater Poland", "West Pomerania")
+data_2013$TERYT4 <- as.factor(data_2013$TERYT4)
+data_2013$region <- as.factor(data_2013$region)
+data_2013$subregion <- as.factor(data_2013$subregion)
+levels(data_2013$region) <- c("Lower Silesia", "Kuyavia-Pomerania", "Lublin", "Lubusz", "Lodz", "Lesser Poland", "Mazovia", "Opole", "Subcarpathia", "Podlaskie", "Pomerania", "Silesia", "Holy Cross", "Warmia-Masuria", "Greater Poland", "West Pomerania")
+
+data_1 <- subset(data_1, select=-c(ICD10, TERYT4, subregion, Voivodeship, County, Stage1,Stage2,Stage3,Stage4))
+#head(data_1)
+data_2013 <- subset(data_2013, select=-c(ICD10, Voivodeship, County,Stage1,Stage2,Stage3,Stage4, new ))
+
+```
+
+# Linear Analysis
+## Linear Regression
+
+The results obtained by simple linear model are the following:
+
+```{r echo=FALSE, warning=FALSE}
+data_model1 <- data_1
+x_1 <- model.matrix(new ~ ., data = data_model1)[, -1]
+y <- data_model1$new
+lm1 <- lm(new ~ ., data = data_model1)
+summary(lm1)
+```
+
+# MOVING BEYOND LINEARITY
+## Regression trees
+
+With cross validation, we see that the deviance is minimized with a number of leaves equal to 12, so we don’t have the necessity to prune the original tree.
+As we see from the summary and the plot, the variables used by this model are only Genderpopulation , Population per group, Gender, Age group.
+
+```{r, echo=FALSE,warning=FALSE, cache=FALSE}
+
+#TREE (from library tree)
+set.seed(1)
+train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+tree.2 <- tree(new ~ ., data = data_model1)
+summary(tree.2)
+
+cv.tree.2 <- cv.tree(tree.2)
+
+cv.tree.2.df<-data.frame(cv.tree.2$size, cv.tree.2$dev)
+
+ggplot(cv.tree.2.df, aes(x=cv.tree.2.size, y=cv.tree.2.dev, group=1)) +
+  geom_line() + geom_point() + ggtitle("Deviance vs Tree Size") +
+  xlab("Size of the tree") + ylab("Deviance")
+
+
+#plot(cv.tree.2$size, cv.tree.2$dev, type = "b",xlab = "Size of the tree", main ="Deviance vs Tree Size")
+
+#plot(tree.2)
+#text(tree.2, pretty = 0, cex=0.65, srt = 0, col = rainbow(1))
+
+
+plot(tree.2, type="uniform")
+text(tree.2, pretty = 30, cex=0.55, srt = 0, col = rainbow(1))
+
+
+yhat <- as.data.frame(predict(tree.2, newdata = data_model1[-train,]))
+
+MSE_tree <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- data_model1[-train, "new"]
+    yhat <- predict(tree.2, newdata = data_model1[-train,])
+    MSE_tree[i] <- mean((yhat-y.test)^2)
+}
+
+#boxplot(MSE_tree)
+```
+
+## Bagging
+
+Trees suffer from a problem of high variance in relation to the division in training and test set, one method for reducing it is the bagging or random forests (the difference is that bagging analyze each variable at each tree split, while random forests only a subset). We decided to apply bagging because of its more precise results. The problem of this approach is the limiteted representation of the model, in fact it’s impossible to plot the results: we loose interpretability in exchange of more precision.
+Anyway we reported here the summary of the model, and a graphic that shows the importance of the variables used. The one on the left is based upon the mean decrease of accuracy in prediction when a given variable is excluded from the model; the one on the right is a measure of the total decrease in node impurity that results from splits over that variable, averaged over all trees.
+
+```{r, echo=FALSE, warning=FALSE, cache=FALSE}
+
+bag.2 <- randomForest(new ~ ., data = data_model1, mtry = 11, importance = TRUE)
+bag.2
+importance(bag.2)
+#varImpPlot(bag.2)
+
+
+data <- as.data.frame(cbind(rownames(bag.2$importance),
+                      round(bag.2$importance[,"IncNodePurity"],1)))
+colnames(data) <- c("Parameters","IncNodePurity")
+data$IncNodePurity <- as.numeric(as.character(data$IncNodePurity))
+
+
+
+p1<-ggplot(data) + geom_point(aes(IncNodePurity,Parameters)) +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1))+
+  #scale_x_continuous(limits=c(3,7),breaks=3:7) + 
+  theme(axis.title.y = element_blank())+
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = 
+          element_line(colour = 'gray', linetype = 'dashed'),
+        panel.background = element_rect(fill='white', colour='black'))
+
+
+
+data2 <- as.data.frame(cbind(rownames(importance(bag.2)),
+                      round(importance(bag.2)[,"%IncMSE"],1)))
+colnames(data) <- c("Parameters","%IncMSE")
+data2$V2 <- as.numeric(as.character(data2$V2))
+
+
+
+p2<-ggplot(data2) + geom_point(aes(V2,V1)) +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1))+
+  #scale_x_continuous(limits=c(3,7),breaks=3:7) + 
+  theme(axis.title.y = element_blank())+
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = 
+          element_line(colour = 'gray', linetype = 'dashed'),
+        panel.background = element_rect(fill='white', colour='black')) +
+  xlab("%IncMSE")
+
+#p2
+
+grid.arrange(p1, p2, nrow=1, top="Importance of parametrs") 
+
+
+MSE_bagg <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- data_model1[-train, "new"]
+    yhat.bag <- predict(bag.2, newdata = data_model1[-train,])
+    MSE_bagg[i] <- mean((yhat.bag-y.test)^2)
+}
+#boxplot(cbind(MSE_tree, MSE_bagg))
+```
+
+## Boosting
+
+While bagging and random forests use bootstrap to build tree independently one from the other, boosting uses the same procedure but the trees are grown sequentially, so each tree is grown using information from previously grown trees.
+We selected a value for the number of trees equal to 5000 (aware that value too big could lead to overfitting), a shrinkage parameter equal to 0.1, and interaction depth equal to 6 that is the number of variables.
+We reported here the influence of each variable in the model; as we previously saw, the most important are Population, Gender Population and Age Range.
+
+
+```{r, echo=FALSE, warning=FALSE, cache=FALSE}
+
+set.seed(1)
+boost.2 <- gbm(new ~ ., data = data_model1, distribution = "gaussian", n.trees = 5000, interaction.depth = 11, shrinkage = 0.01)
+#summary(boost.2)
+
+a<-c("Gender_population",
+"Population_per_group",
+"AGE_GROUP",
+"GENDER",
+"Population",
+"region",
+"Population.density",
+"year",
+"Salary",
+"Unemployment_rate",
+"NO_industral_plants"
+)
+
+b<- c(49.1979094,
+19.8359957,
+12.6990074,
+9.6543407,
+4.4580233,
+1.7133478,
+1.0408664,
+0.4823332,
+0.3430279,
+0.2941258,
+0.2810225
+)
+
+
+df = data.frame(a, b)
+
+
+g <- ggplot(df, aes(a,b))
+# Number of cars in each class:
+g + geom_bar(stat = "identity") + coord_flip() + xlab("var")+ylab("rel.inf")
+
+MSE_boost <- c()
+for (i in 1:1000){
+    train <-sample(1:nrow(x_1), round(0.75*nrow(x_1)))
+    test <- -train
+    y.test <- data_model1[-train, "new"]
+    yhat.boost <- predict(boost.2, newdata = data_model1[-train,], n.trees = 5000)
+    MSE_boost[i] <- mean((yhat.boost-y.test)^2)
+}
+#boxplot(cbind(MSE_tree, MSE_bagg, MSE_boost), main ="Distribution of MSEs for the different non linear models")
+#summary(MSE_boost)
+#summary(MSE_bagg)
+
+```
+
+
+Here we present the distribution of MSEs for these three methods:    
+
+```{r, echo=FALSE,cache=FALSE, warning=FALSE}
+MSE_tree_df<-as.data.frame(MSE_tree)
+MSE_tree_df$type<-"MSE_tree"
+
+MSE_bagg_df<-as.data.frame(MSE_bagg)
+MSE_bagg_df$type<-"MSE_bagg"
+
+MSE_boost_df<-as.data.frame(MSE_boost)
+MSE_boost_df$type<-"MSE_boost"
+
+cols <- c("Value","type")
+colnames(MSE_tree_df) <- cols
+colnames(MSE_bagg_df) <- cols
+colnames(MSE_boost_df) <- cols
+
+
+total2 <- rbind(MSE_tree_df, MSE_bagg_df, MSE_boost_df)
+total3<-rbind(MSE_bagg_df, MSE_boost_df)
+
+p4<-ggplot(total2, aes( x=type, y=Value,fill=type))+
+  geom_boxplot() + xlab("MSE") +ylab("Value of MSE") +
+  theme(axis.text = element_text(size = 6))
+  #ggtitle("Distribution of MSEs for different non linear models" )
+
+p5<-ggplot(total3, aes( x=type, y=Value,fill=type), size=1111)+
+  geom_boxplot() + xlab("MSE") +ylab("Value of MSE") +
+  theme(axis.text = element_text(size = 6))
+  #ggtitle("Distribution of MSEs for different non linear models" )
+
+grid.arrange(p4, p5, nrow=1, top = "Distribution of MSEs for fifferent non linear models") 
+
+
+#boxplot(cbind(MSE_tree, MSE_bagg, MSE_boost), main ="Distribution of MSEs for the different non linear models")
+```
+
+
+#  CONCLUSIONS
+## The best  model
+
+```{r echo=FALSE, warning=FALSE, cache=FALSE}
+Pred_bagging <- predict(bag.2, newdata=data_2013)
+data_2013 <- as.data.frame(cbind(data_2013, Pred_bagging))
+
+
+```
+
+
+
+```{r echo=FALSE,message=FALSE,cache=FALSE,warning=FALSE}
+
+library(randomForest)
+library(miscTools)
+#install.packages("miscTools")
+library(ggplot2)
+
+r2 <- rSquared(data_model1$new, data_model1$new - predict(bag.2, data_model1))
+mse <- mean((data_model1$new - predict(bag.2, data_model1))^2)
+
+
+r2<- round(r2, digits=3)
+
+p <- ggplot(aes(x=actual, y=pred),
+            data=data.frame(actual=data_model1$new, pred=predict(bag.2, data_model1)))
+p + geom_point() +
+  geom_abline(color="red") +
+  ggtitle(paste("RandomForest Regression in R r^2=", r2, sep=""))
+
+bestpredict<-r2
+bestpredict<-as.data.frame(bestpredict)
+bestpredict$mean_predict<- mean(Pred_bagging)
+colnames(bestpredict)<- c('Rsquare','mean_prediction')
+bestpredict
+```
+
+
+# Apendix
+## Maps
+### Teryt maps
+
+```{r echo=FALSE,message=FALSE, warning= FALSE}
+library(spdep)
+
+library(maptools)
+
+library(sp)
+
+library(RColorBrewer)
+
+library(classInt)
+par(mfrow=c(1,1))
+
+
+pl<-readShapePoly("POL_adm0.shp",
+                  
+                  proj4string=CRS("+proj=longlat +ellps=WGS84"))
+
+woj<-readShapePoly("POL_adm1.shp", 
+                   
+                   proj4string=CRS("+proj=longlat +ellps=WGS84"))
+
+pow<-readShapePoly("POL_adm2.shp", 
+                   
+                   proj4string=CRS("+proj=longlat +ellps=WGS84"))
+
+baza00 <- read.csv("baza00.csv", sep=";")
+
+dane<-baza00
+
+#dim(dane)
+
+# konwersja danych
+
+pow.df<-as.data.frame(pow)
+
+# przegl¹danie danych
+
+#summary(dane)
+
+#names(dane)
+
+
+# mapa administracyjna
+
+plot(pow)
+title("Polish counties")
+plot(woj, add=TRUE, lwd=2)
+
+plot(pl, add=TRUE, lwd=3)
+
+# wspó³rzêdne œrodków powiatów
+
+crds<-coordinates(pow)
+
+points(crds, pch=21, bg="red", cex=0.8)
+
+
+zmienna<-dane$my/dane$my2*100000
+
+plot(zmienna, xlab="Teryt4", ylab="rate")
+title(main="Incidence rate for 2013")
+
+summary(zmienna)
+
+```
+
+
+### Incidence rate for 2013
+
+```{r echo=FALSE, message= FALSE, warning=FALSE}
+
+
+przedzialy<-8
+
+kolory<-brewer.pal(przedzialy, "BuPu") # wybór kolorów
+
+klasy<-classIntervals(zmienna, przedzialy, style="fixed",
+                      
+                      fixedBreaks=c(25, 45, 55, 65, 75, 80, 90, 100, 120))
+
+tabela.kolorow<-findColours(klasy, kolory)
+
+plot(pow, col=tabela.kolorow)
+
+plot(woj, lwd=2, add=TRUE)
+
+legend("bottomleft", legend=names(attr(tabela.kolorow,
+                                       
+                                       "table")), fill=attr(tabela.kolorow, "palette"), cex=1, bty="n")
+
+title(main="Incidence rate for 2013")
+```
+
