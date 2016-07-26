@@ -23,6 +23,9 @@ Schedule MIM UW:
 Projects:
 ---------
 
+Power study for selected tests [goodness of fit, anova]
+
 PISA 2015 - from December 6 - segmentation?
 
 USOS - exploration? 
+
