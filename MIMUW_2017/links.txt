@@ -1,0 +1,3 @@
+Exploration:
+http://varianceexplained.org/r/trump-tweets/ [Text analysis of Trump’s tweets confirms he writes only the (angrier) Android half]
+
