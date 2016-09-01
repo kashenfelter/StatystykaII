@@ -25,7 +25,7 @@ Projects:
 
 Power study for selected tests [goodness of fit, anova, for polish matura as a function of sample size / alpha]
 
-PISA 2015 - from December 6 - segmentation?
+PISA 2015 - from December 6 - segmentation of pupils (1) based on behaviour in test taking (2) questionnaire
 
-USOS - exploration? 
+USOS - prediction
 
