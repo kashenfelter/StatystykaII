@@ -29,3 +29,4 @@ PISA 2015 - from December 6 - segmentation of pupils (1) based on behaviour in t
 
 USOS - prediction
 
+Note: Reproducibility is very important. In order to help you develop proper habits you shall be prepared that data for projects will be updated from time to time.
