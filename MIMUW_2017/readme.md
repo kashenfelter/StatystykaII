@@ -4,7 +4,7 @@ Statistics II
 Schedule MIM UW:
 ----------------
 
-* 5 X, W+L: Statystyki opisowe - zmienne jakościowe, test chi2, analiza koresponcdencji
+* 5 X, W+L: Statystyki opisowe - zmienne jakościowe, test chi2, analiza koresponcdencji, [lab1](materialy/lab1.md)
 * 12 X [eRum @ Poznań] L: Eksploracja danych z Diagnoza Społeczna + ggplot2
 * 19 X, W+L: Statystyki opisowe - zmienne ilościowe, testowanie zbioru hipotez
 * 26 X, [Presentations@lab], [Project 1 phase 1] W: Analiza grup - metody kombinatoryczne
@@ -34,7 +34,7 @@ Projekt związany z predykcją, temat tego projektu będzie wkrótce podany.
 Lektura
 -------
 
-* [The Elements of Statistical Learning:](http://statweb.stanford.edu/~tibs/ElemStatLearn/)
+* [The Elements of Statistical Learning](http://statweb.stanford.edu/~tibs/ElemStatLearn/)
 * [Przewodnik](http://pbiecek.github.io/Przewodnik/Analiza/analizadanych_z_programem_r_md.html)
 
 Konsultacje
