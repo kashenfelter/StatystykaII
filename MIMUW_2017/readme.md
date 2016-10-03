@@ -1,10 +1,10 @@
-Statistics II
--------------
+Statystyka II
+----------------
 
 Schedule MIM UW:
 ----------------
 
-* 5 X, W+L: Statystyki opisowe - zmienne jakościowe, test chi2, analiza koresponcdencji, [lab1](materialy/lab1.md)
+* 5 X, W+L: Statystyki opisowe - zmienne jakościowe, test chi2, analiza korespondencji, [lab1](materialy/lab1.md)
 * 12 X [eRum @ Poznań] L: Eksploracja danych z Diagnoza Społeczna + ggplot2
 * 19 X, W+L: Statystyki opisowe - zmienne ilościowe, testowanie zbioru hipotez
 * 26 X, [Presentations@lab], [Project 1 phase 1] W: Analiza grup - metody kombinatoryczne
@@ -23,7 +23,7 @@ Schedule MIM UW:
 Zaliczenie
 ----------
 
-Zaliczenie będzie oparte o wyniki dwóch projektów, jednego dotyczącego eksploracji i jednego dotyczącego predyckji.
+Zaliczenie będzie oparte o wyniki dwóch projektów, jednego dotyczącego eksploracji i jednego dotyczącego predykcji.
 Do zaliczenia wymagana będzie połowa punktów. Maksymalną ocenę, którą można uzyskać z samych projektów jest 4.
 Opcjonalnie można podejść też do egzaminu pisemnego, który może podnieść ocenę o 0 0.5, lub 1 stopień.
 
@@ -41,4 +41,5 @@ Konsultacje
 ----------
 
 Na konsultacje można umawiać się w środy lub czwartki. Proszę o mailowe potwierdzenie terminu spotkania aby mieć pewność, że w tym czasie nie będzie kilku chętnych.
+
 
