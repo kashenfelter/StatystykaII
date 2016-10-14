@@ -41,6 +41,7 @@ Wykorzsytaj tylko w ostatecznośći
 
 Część 1:
 
+```
 alpha <- 0.05
 pvs <- replicate(
   1000,
@@ -49,9 +50,11 @@ pvs <- replicate(
          , mu = 10)$p.value
 )
 mean(pvs < alpha)
+```
 
 Część 2:
 
+```
 alpha <- 0.05
 rejected <- replicate(
   1000, {
@@ -63,9 +66,11 @@ rejected <- replicate(
   }
 )
 mean(rejected)
+```
 
 Część 3:
 
+```
 alpha <- 0.05
 rejected <- replicate(
   1000, {
@@ -77,9 +82,11 @@ rejected <- replicate(
   }
 )
 mean(rejected)
+```
 
 Część 4:
 
+```
 alpha <- 0.05
 rejected <- replicate(
   1000, {
@@ -95,4 +102,4 @@ rejected <- replicate(
   }
 )
 mean(rejected)
-
+```
