@@ -6,7 +6,7 @@ Schedule MIM UW:
 
 * 5 X, W+L: Statystyki opisowe - zmienne jakościowe, test chi2, analiza korespondencji, [lab1](materialy/lab1.md)
 * 12 X [eRum @ Poznań] L: Eksploracja danych z Diagnoza Społeczna + ggplot2
-* 19 X, W+L: Statystyki opisowe - zmienne ilościowe, testowanie zbioru hipotez
+* 19 X, W+L: Statystyki opisowe - zmienne ilościowe, testowanie zbioru hipotez, [lab2](materialy/lab2.md)
 * 26 X, [Presentations@lab], [Project 1 phase 1] W: Analiza grup - metody kombinatoryczne
 * 02 XI, W+L: Analiza grup - metody aglomeracyjne
 * 09 XI, [Presentations@lab], [Project 1 phase 2] W: Reguły decyzyjne
