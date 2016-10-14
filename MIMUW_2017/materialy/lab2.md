@@ -32,3 +32,68 @@ Część hipotez jest fałszywych
 
 Porównaj wyniki z kroków 3.4 i 4.4
 
+
+
+
+Rozwiązania, 
+Znacznie lepiej jest samodzielnie rozwiązać ww zadania.
+Wykorzsytaj tylko w ostatecznośći
+
+
+Część 1:
+
+alpha <- 0.05
+pvs <- replicate(
+  1000,
+  t.test(
+    rnorm(10, 10, 1)
+         , mu = 10)$p.value
+)
+mean(pvs < alpha)
+
+Część 2:
+
+alpha <- 0.05
+rejected <- replicate(
+  1000, {
+    rnd <- replicate(10, {
+      rnorm(10, 10, 1)
+    })
+    pvs1 <- apply(rnd, 2, function(x) t.test(x, mu=10)$p.value)
+    any(pvs1 < alpha)
+  }
+)
+mean(rejected)
+
+Część 3:
+
+alpha <- 0.05
+rejected <- replicate(
+  1000, {
+    rnd <- replicate(10, {
+      rnorm(10, 10, 1)
+    })
+    pvs1 <- apply(rnd, 2, function(x) t.test(x, mu=10)$p.value)
+    any(p.adjust(pvs1, method="fdr") < alpha)
+  }
+)
+mean(rejected)
+
+Część 4:
+
+alpha <- 0.05
+rejected <- replicate(
+  1000, {
+    rnd1 <- replicate(10, {
+      rnorm(10, 10, 1)
+    })
+    rnd2 <- replicate(10, {
+      rnorm(10, 8, 1)
+    })
+    rnd <- cbind(rnd1, rnd2)
+    pvs1 <- apply(rnd, 2, function(x) t.test(x, mu=10)$p.value)
+    any(p.adjust(pvs1, method="fdr")[1:5] < alpha)
+  }
+)
+mean(rejected)
+
