@@ -88,3 +88,4 @@ W trzecim etapie oceniane będą kryteria:
 - tuning algorytmu, przyjęte strategie tuningu, parametry i algorytmy rozważane w wyborze najlepszego algorytmu
 - interpretacja i walidacja otrzymanych wyników.
 
+Dane do projektu [rda](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/GlioblastomaWide.rda), [txt](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/GlioblastomaWide.txt).
