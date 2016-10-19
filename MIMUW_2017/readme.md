@@ -72,8 +72,7 @@ Kolejne kolumny opisują:
 Kroki kolejnych etapów:
 
 Etap 1. 
-Wybierz zbiór genów lub innych cech, które mają różną ekspresję u pacjentów, kórzy przeżyli i tych co nie przeżyli 1 roku.
-(*) Zbadaj stabilność tego wyboru, w zależności od tego czy dane zostały podzielone na podzbiór uczący i testowy.
+Wybierz zbiór genów lub innych cech, które mają różną ekspresję u pacjentów, kórzy przeżyli i tych co nie przeżyli 1 roku. Zbadaj stabilność tego wyboru, w zależności od tego czy dane zostały podzielone na podzbiór uczący i testowy.
 
 Etap 2.
 Zbuduj klasyfikator oparty o istotne geny lub inne cechy dostępne w danych (wiek, klaster). 
