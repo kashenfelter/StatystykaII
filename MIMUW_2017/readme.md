@@ -69,7 +69,23 @@ Kolejne kolumny opisują:
 4 TCGA.02.2485.01 C10-GBM  53   alive     0.693126        0.573   -0.239   -0.943     1.376    -2.800
 5 TCGA.02.2486.01 C10-GBM  64   alive    -0.831874       -1.065   -0.793   -0.726     0.780    -2.444
 ```
+Kroki kolejnych etapów:
 
+Etap 1. 
+Wybierz zbiór genów lub innych cech, które mają różną ekspresję u pacjentów, kórzy przeżyli i tych co nie przeżyli 1 roku.
+(*) Zbadaj stabilność tego wyboru, w zależności od tego czy dane zostały podzielone na podzbiór uczący i testowy.
 
+Etap 2.
+Zbuduj klasyfikator oparty o istotne geny lub inne cechy dostępne w danych (wiek, klaster). 
+Zweryfikuj jakość klasyfikatora krzywą ROC, tabelą kontyngencji, metodą k-fold CV.
 
+Etap 3.
+Zbuduj klasyfikator oparty o model stacking przewidujący prawdopodobny stan pacjenta po roku.
+
+W trzecim etapie oceniane będą kryteria:
+
+- poprawność rozwiązania (czy wykonano cross walidacje, czy zrobiono to poprawnie, czy wyniki uzyskano na odpowiedniej licznie powtórzeń),
+- jakość klasyfikacji, im wyższa końcowa skuteczność tym lepiej,
+- tuning algorytmu, przyjęte strategie tuningu, parametry i algorytmy rozważane w wyborze najlepszego algorytmu
+- interpretacja i walidacja otrzymanych wyników.
 
