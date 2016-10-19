@@ -43,3 +43,33 @@ Konsultacje
 Na konsultacje można umawiać się w środy lub czwartki. Proszę o mailowe potwierdzenie terminu spotkania aby mieć pewność, że w tym czasie nie będzie kilku chętnych.
 
 
+Projekt 1
+---------
+
+Pierwszy projekt dotyczy predykcji.
+
+Celem projektu jest zbudowanie reguły / algorytmu, który na podstawie danych o pacjentach ze zdiagnozowanym nowotworem Glioblastoma będzie mogła możliwie dokładnie oszacować czy pacjent przeżyje 1 rok od diagnozy.
+
+Poniżej przedstawiam fragment zbioru danych. 
+
+Kolejne kolumny opisują: 
+
+- sampleID - unikalny identyfikator pacjenta.
+- Cluster - informacja o podtypie nowotworu.
+- age - wiek w momencie diagnozy.
+- death1y - informacja czy pacjent przeżył 1 rok od diagnozy.
+- pozostałe kolumny (16k) to nazwy różnych genów.
+
+```
+> GlioblastomaWide[1:5,1:10]
+         sampleID Cluster age death1y X..100133144 X..100134869 X..10357 X..10431 X..155060 X..390284
+1 TCGA.02.0047.01 C10-GBM  78   alive    -1.686874       -0.573   -0.986   -0.028     0.534    -2.432
+2 TCGA.02.0055.01 C10-GBM  62    dead           NA        0.642   -1.788   -0.029     0.010    -0.758
+3 TCGA.02.2483.01 C10-GBM  43   alive    -1.747874        0.471   -0.845    0.450    -0.252    -1.974
+4 TCGA.02.2485.01 C10-GBM  53   alive     0.693126        0.573   -0.239   -0.943     1.376    -2.800
+5 TCGA.02.2486.01 C10-GBM  64   alive    -0.831874       -1.065   -0.793   -0.726     0.780    -2.444
+```
+
+
+
+
