@@ -7,17 +7,17 @@ Schedule MIM UW:
 * 5 X, W+L: Statystyki opisowe - zmienne jakościowe, test chi2, analiza korespondencji, [lab1](materialy/lab1.md)
 * 12 X [eRum @ Poznań] L: Eksploracja danych + ggplot2
 * 19 X, W+L: Statystyki opisowe - zmienne ilościowe, testowanie zbioru hipotez, [lab2](materialy/lab2.md)
-* 26 X, [Presentations@lab], [Project 1 phase 1] W: Analiza grup - metody kombinatoryczne
-* 02 XI, W+L: Analiza grup - metody aglomeracyjne
-* 09 XI, [Presentations@lab], [Project 1 phase 2] W: Reguły decyzyjne
-* 16 XI, W+L: Skalowanie wielowymiarowe
-* 23 XI, [Presentations@lectures], [Project 1 phase 3] L: Reguły decyzyjne
-* 30 XI, W+L: Podstawy predykcji, prosta regresja, kNN, drzewa
-* 07 XII, W+L: Metody wyboru modelu, regresja z wieloma zmiennymi
-* 14 XII, [Presentations@lab], [Project 2 phase 1] W: Regularyzacja
-* 21 XII, W+L: Klasyfikacja - podstawy, LDA, QDA, regresja logistyczna
-* 11 I, [Presentations@lab], [Project 2 phase 2] W: Ewaluacja modelu, CV, repeated k-fold CV, itp
-* 18 I, W+L: Bagging, boosting, random forest
+* 26 X, [Presentations@lab], [Project 1 phase 1] W: Podstawy predykcji, prosta regresja, kNN, drzewa
+* 02 XI, W+L: Klasyfikacja - podstawy, LDA, QDA, regresja logistyczna
+* 09 XI, [Presentations@lab], [Project 1 phase 2] W+L: Metody wyboru modelu, regresja z wieloma zmiennymi
+* 16 XI, W+L: Ewaluacja modelu, CV, repeated k-fold CV, itp
+* 23 XI, [Presentations@lectures], [Project 1 phase 3] W+L: Bagging, boosting, random forest
+* 30 XI, W: Regularyzacja
+* 07 XII, W+L: Segmentacja - wprowadzenie
+* 14 XII, [Presentations@lab], [Project 2 phase 1] W: Analiza grup - metody kombinatoryczne
+* 21 XII, W+L: Analiza grup - metody aglomeracyjne
+* 11 I, [Presentations@lab], [Project 2 phase 2] W: Skalowanie wielowymiarowe
+* 18 I, W+L: Reguły decyzyjne
 * 25 I, [Presentations@lectures], [Project 2 phase 3] 
 
 Zaliczenie
