@@ -1,3 +1,8 @@
+p <- runif(10)
+p.adjust(p, method = "fdr")
+p.adjust(p, method = "hochberg")
+sort(p)
+
 alpha <- 0.05
 m1 = 8
 m2 = 12
