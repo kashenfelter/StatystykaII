@@ -9,10 +9,10 @@ Schedule MIM UW:
 * 19 X, W+L: Statystyki opisowe - zmienne ilościowe, testowanie zbioru hipotez, [lab2](materialy/lab2.md)
 * 26 X, [Presentations@lab], [Project 1 phase 1] W: Podstawy predykcji, prosta regresja, kNN, drzewa, [lab3](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab3.md)
 * 02 XI, W+L: Klasyfikacja - podstawy, LDA, QDA, regresja logistyczna
-* 09 XI, [Presentations@lab], [Project 1 phase 2] W+L: Metody wyboru modelu, regresja z wieloma zmiennymi
-* 16 XI, W+L: Ewaluacja modelu, CV, repeated k-fold CV, itp
-* 23 XI, [Presentations@lectures], [Project 1 phase 3] W+L: Bagging, boosting, random forest
-* 30 XI, W: Regularyzacja
+* 09 XI, W+L: Metody wyboru modelu, regresja z wieloma zmiennymi
+* 16 XI, [Presentations@lab], [Project 1 phase 2], W+L: Ewaluacja modelu, CV, repeated k-fold CV, itp
+* 23 XI, W+L: Bagging, boosting, random forest
+* 30 XI, [Presentations@lectures], [Project 1 phase 3], W: Regularyzacja
 * 07 XII, W+L: Segmentacja - wprowadzenie
 * 14 XII, [Presentations@lab], [Project 2 phase 1] W: Analiza grup - metody kombinatoryczne
 * 21 XII, W+L: Analiza grup - metody aglomeracyjne
