@@ -78,8 +78,12 @@ Etap 2.
 Zbuduj klasyfikator oparty o istotne geny lub inne cechy dostępne w danych (wiek, klaster). 
 Zweryfikuj jakość klasyfikatora krzywą ROC, tabelą kontyngencji, metodą k-fold CV.
 
+[Wyniki drugiego etapu można testować na Kaggle](https://inclass.kaggle.com/c/glioma-survival-predictions)
+
 Etap 3.
 Zbuduj klasyfikator oparty o model stacking przewidujący prawdopodobny stan pacjenta po roku.
+
+[Wyniki trzeciego etapu można testować na Kaggle](https://inclass.kaggle.com/c/glioma-survival-predictions)
 
 W trzecim etapie oceniane będą kryteria:
 
