@@ -53,8 +53,8 @@ correct_pval <- p.adjust(gene_pval, method = "fdr")
   }
 length(relevant_genes) # these genes were chosen on the whole sample
 
-alive_smp <- sample(new_genes$sampleID[new_genes$death1y=="alive"], 30)
-dead_smp <- sample(new_genes$sampleID[new_genes$death1y=="dead"], 30)
+alive_smp <- sample(new_genes$sampleID[new_genes$death1y=="alive"], 35)
+dead_smp <- sample(new_genes$sampleID[new_genes$death1y=="dead"], 35)
 
 Dane_alive<-new_genes[new_genes$sampleID %in% alive_smp,]
 Dane_dead<-new_genes[new_genes$sampleID %in% dead_smp,]
