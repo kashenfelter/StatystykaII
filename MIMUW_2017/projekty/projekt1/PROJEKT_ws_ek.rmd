@@ -1,5 +1,5 @@
 ---
-title: "Predykcja umieralnoœci na nowotwór Glioblastoma"
+title: "Predykcja umieralnoÅ›ci na nowotwÃ³r Glioblastoma"
 author: "Ewelina Karbowiak i Wioleta Stojak"
 output:
     html_document:
@@ -8,10 +8,10 @@ output:
           collapsed: false
           smooth_scroll: false
 ---
-**Abstract** Celem projektu jest zbudowanie algorytmu, który na podstawie danych o pacjentach ze zdiagnozowanym nowotworem Glioblastoma bêdzie móg³ mo¿liwie dok³adnie oszacowaæ czy pacjent prze¿yje 1 rok od diagnozy.
+**Abstract** Celem projektu jest zbudowanie algorytmu, ktÃ³ry na podstawie danych o pacjentach ze zdiagnozowanym nowotworem Glioblastoma bÄ™dzie mÃ³gÅ‚ moÅ¼liwie dokÅ‚adnie oszacowaÄ‡ czy pacjent przeÅ¼yje 1 rok od diagnozy.
 
 #Dane
-Dostêpne dane zawiera³y informacje o pacjentach w zale¿noœci od wieku, podtypu nowotworu, stanu pacjenta po pierwszym roku od diagnozy oraz wartoœci ekspresji 16115 genów.
+DostÄ™pne dane zawieraÅ‚y informacje o pacjentach w zaleÅ¼noÅ›ci od wieku, podtypu nowotworu, stanu pacjenta po pierwszym roku od diagnozy oraz wartoÅ›ci ekspresji 16115 genÃ³w.
 
 ```{r setup, include=FALSE,message=FALSE,warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -42,7 +42,7 @@ library(ModelMetrics)
 ```
 
 #Przygotowanie danych
-Na pocz¹tek pacjenci zostali podzieleni na dwie grupy. W pierwszej znaleŸli siê ci, którzy prze¿yli pierwszy rok po postawionej diagnozie, natomiast do drugiej grupy zostali przydzieleni pozostali uczestnicy badania, którzy nie prze¿yli pierwszego roku od diagnozy. W dostêpnych danych usunê³yœmy te kolumny, które zawiera³y wiêcej ni¿ 8 NA w obrêbie swojej grupy i dodaliœmy dodatkow¹ kolumnê zero-jedynkow¹ o nazwie **smierc**, w której 1 jest przypisywana, gdy pacjent prze¿y³ rok od diagnozy, a 0 w przeciwnym przypadku. Pozosta³e wartoœci NA w dalszej czêœci projektu s¹ uzupe³niane przez œredni¹ z kolumny, w której siê znajduj¹.
+Na poczÄ…tek pacjenci zostali podzieleni na dwie grupy. W pierwszej znaleÅºli siÄ™ ci, ktÃ³rzy przeÅ¼yli pierwszy rok po postawionej diagnozie, natomiast do drugiej grupy zostali przydzieleni pozostali uczestnicy badania, ktÃ³rzy nie przeÅ¼yli pierwszego roku od diagnozy. W dostÄ™pnych danych usunÄ™Å‚yÅ›my te kolumny, ktÃ³re zawieraÅ‚y wiÄ™cej niÅ¼ 8 NA w obrÄ™bie swojej grupy i dodaliÅ›my dodatkowÄ… kolumnÄ™ zero-jedynkowÄ… o nazwie **smierc**, w ktÃ³rej 1 jest przypisywana, gdy pacjent przeÅ¼yÅ‚ rok od diagnozy, a 0 w przeciwnym przypadku. PozostaÅ‚e wartoÅ›ci NA w dalszej czÄ™Å›ci projektu sÄ… uzupeÅ‚niane przez Å›redniÄ… z kolumny, w ktÃ³rej siÄ™ znajdujÄ….
 
 ```{r}
  load("C:/Users/ws345465/Downloads/LASSOCV now.rda")
@@ -67,9 +67,9 @@ geny$smierc<-ifelse(geny$death1y=="alive",1,0)
 ```
 
 
-#Identyfikacja istotnych genów
-Do uzyskania informacji o genach i ich istotnoœci pos³u¿y³yœmy siê testem t studenta oraz zastosowa³yœmy **metodê fdr** do estymacji otrzymanych p-value. 
-Ostatecznie wybra³yœmy 30 istotnych genów z najmniejsz¹ p-wartoœci¹.
+#Identyfikacja istotnych genÃ³w
+Do uzyskania informacji o genach i ich istotnoÅ›ci posÅ‚uÅ¼yÅ‚yÅ›my siÄ™ testem t studenta oraz zastosowaÅ‚yÅ›my **metodÄ™ fdr** do estymacji otrzymanych p-value. 
+Ostatecznie wybraÅ‚yÅ›my 30 istotnych genÃ³w z najmniejszÄ… p-wartoÅ›ciÄ….
 
 ```{r message=FALSE, warning=FALSE}
 istotne<-function(z,s){  
@@ -91,13 +91,13 @@ colnames(z[,ist])
 
 #Zbadane modele
 
-Aby wybraæ model najlepiej stosuj¹cy siê do naszych danych, przetestowane zosta³y ró¿ne podejœcia, zarówno liniowe jak i nieliniowe.
+Aby wybraÄ‡ model najlepiej stosujÄ…cy siÄ™ do naszych danych, przetestowane zostaÅ‚y rÃ³Å¼ne podejÅ›cia, zarÃ³wno liniowe jak i nieliniowe.
 
-U¿yte modele :
+UÅ¼yte modele :
 
-*uogólniony model liniowy glm
+*uogÃ³lniony model liniowy glm
 
-*powy¿szy model z wykorzystaniem kryterium BIC
+*powyÅ¼szy model z wykorzystaniem kryterium BIC
 
 *Lasso  
 
@@ -111,8 +111,8 @@ U¿yte modele :
 
 *gradient boosting
 
-Aby wybraæ najlepszy model  ograniczy³yœmy siê do badania b³êdu œredniokwadratowego (MSE) przez 10-fold CV z powtórzeniem 10 krotnym oraz porównania œredniego pola pod wykresami krzywych ROC. Istotne geny by³y wybieranie ze zbioru treningowego, podczas ka¿dej cross walidacji.
-Poni¿ej zamieszczamy przyk³adow¹ funkcj¹, któr¹ do tego wykorzysta³yœmy i przyk³adowe zastosowanie w CV. (Pozosta³e zosta³y w raporcie ukryte).
+Aby wybraÄ‡ najlepszy model  ograniczyÅ‚yÅ›my siÄ™ do badania bÅ‚Ä™du Å›redniokwadratowego (MSE) przez 10-fold CV z powtÃ³rzeniem 10 krotnym oraz porÃ³wnania Å›redniego pola pod wykresami krzywych ROC. Istotne geny byÅ‚y wybieranie ze zbioru treningowego, podczas kaÅ¼dej cross walidacji.
+PoniÅ¼ej zamieszczamy przykÅ‚adowÄ… funkcjÄ…, ktÃ³rÄ… do tego wykorzystaÅ‚yÅ›my i przykÅ‚adowe zastosowanie w CV. (PozostaÅ‚e zostaÅ‚y w raporcie ukryte).
 
 ```{r}
 
@@ -281,7 +281,7 @@ MSEAUCRIDGE<-function(dane,ind){
 }
 ```
 
-Uogólniony model liniowy glm
+UogÃ³lniony model liniowy glm
 ```{r message=FALSE, warning=FALSE, eval = FALSE}
 GLMCV<-replicate(10,{
     jak<-createFolds(geny$death1y,k=10)
@@ -292,7 +292,7 @@ GLMCV<-replicate(10,{
 
 ```
 
-Optymalny model wed³ug kryterium BIC 
+Optymalny model wedÅ‚ug kryterium BIC 
 
 ```{r,message=FALSE,warning=FALSE, eval = FALSE,echo=FALSE}
 
@@ -362,13 +362,13 @@ GBMCV<-replicate(10,{
 
 ```
 
-#Porównanie u¿ytych metod
+#PorÃ³wnanie uÅ¼ytych metod
 
-Poni¿ej przedstawiamy rozk³ad b³êdów œredniokwadratowych oraz AUC dla powy¿szych modeli  dla 10-fold CV powtórzonej 10 razy.
+PoniÅ¼ej przedstawiamy rozkÅ‚ad bÅ‚Ä™dÃ³w Å›redniokwadratowych oraz AUC dla powyÅ¼szych modeli  dla 10-fold CV powtÃ³rzonej 10 razy.
 
-Widzimy, ¿e w przypadku b³êdu MSE jego rozk³ady w modelach s¹ podobne, jednak DRZEWO i GBM wyró¿niaj¹ siê tym, ¿e b³¹d MSE jest zawsze wiêkszy od 0.2. 
+Widzimy, Å¼e w przypadku bÅ‚Ä™du MSE jego rozkÅ‚ady w modelach sÄ… podobne, jednak DRZEWO i GBM wyrÃ³Å¼niajÄ… siÄ™ tym, Å¼e bÅ‚Ä…d MSE jest zawsze wiÄ™kszy od 0.2. 
 
-Dla rozk³adu AUC najlepiej wypad³y metody  RF i LASSO, które charakteryzuj¹ siê polem pod krzyw¹ ROC stale wiêkszym od 0.5.
+Dla rozkÅ‚adu AUC najlepiej wypadÅ‚y metody  RF i LASSO, ktÃ³re charakteryzujÄ… siÄ™ polem pod krzywÄ… ROC stale wiÄ™kszym od 0.5.
 
 
 ```{r,warning=FALSE,message=FALSE,echo=FALSE}
@@ -425,7 +425,7 @@ colnames(LASSO_CV) <- c("metoda", "blad")
 bledycv <- rbind(GBM_CV,glmbic_CV,glm_CV,LASSO_CV,SVM_CV,DRZEWO_CV,RF_CV,NB_CV)
 
 ggplot(bledycv, aes(x = metoda, y = blad, fill = metoda)) + geom_violin() + guides(fill = FALSE) +
-  ggtitle("rozk³ad MSE cv dla ró¿nych modeli") + stat_summary(fun.y = "mean", geom = "point", size = 4) 
+  ggtitle("rozkÅ‚ad MSE cv dla rÃ³Å¼nych modeli") + stat_summary(fun.y = "mean", geom = "point", size = 4) 
 
 glmbic_CV <- data.frame(rep("glmBIC", length(OPICGLMCV)), unlist(OPICGLMCV)[seq(2,length(unlist(OPICGLMCV)),2)])
 colnames(glmbic_CV) <- c("metoda", "AUC")
@@ -448,7 +448,7 @@ colnames(LASSO_CV) <- c("metoda", "AUC")
 bledycv <- rbind(LASSO_CV,RF_CV,DRZEWO_CV,glm_CV,NB_CV ,glmbic_CV,SVM_CV,GBM_CV)
 
 ggplot(bledycv, aes(x = metoda, y = AUC, fill = metoda)) + geom_violin() + guides(fill = FALSE) +
-  ggtitle("rozk³ad AUC cv dla ró¿nych modeli") + stat_summary(fun.y = "mean", geom = "point", size = 4) 
+  ggtitle("rozkÅ‚ad AUC cv dla rÃ³Å¼nych modeli") + stat_summary(fun.y = "mean", geom = "point", size = 4) 
 ```
 
 
@@ -477,9 +477,6 @@ models <- caretList(as.factor(death1y)~.,
                                                               k=log(nrow(dataset))),
                                     glmnet=caretModelSpec(method='glmnet', family="binomial", preProcess=c("center","scale")
                                     ),
-                                    
-                                    glmnet=caretModelSpec(method = 'glmnet',)
-                                    dda=caretModelSpec(method='dda'),
                                     rpart=caretModelSpec(method='rpart') ,
                                     rf=caretModelSpec(method='rf', ntree=25),
                                     nb=caretModelSpec(method='nb'),
@@ -488,7 +485,7 @@ results <- resamples(models)
 
 ```
 
-Poni¿ej znajduje siê podsumowanie skutecznoœci naszych modeli oraz wspó³czynnika kappa, który mo¿emy interpretowaæ jako czêstoœæ trafnoœci klasyfikacji naszego modelu o któr¹ przewy¿sza on trafnoœæ klasyfikacji modelu losowego, 0 oznacza model losowy, a 1 model idealny.
+PoniÅ¼ej znajduje siÄ™ podsumowanie skutecznoÅ›ci naszych modeli oraz wspÃ³Å‚czynnika kappa, ktÃ³ry moÅ¼emy interpretowaÄ‡ jako czÄ™stoÅ›Ä‡ trafnoÅ›ci klasyfikacji naszego modelu o ktÃ³rÄ… przewyÅ¼sza on trafnoÅ›Ä‡ klasyfikacji modelu losowego, 0 oznacza model losowy, a 1 model idealny.
 
 ```{r, warning=FALSE,message=FALSE,}
 load("~/resultdoprojektu.rda")
@@ -496,7 +493,7 @@ summary(results)[3]$statistics$Accuracy
 dotplot(results)
 ```
 
-Widzimy, ¿e model Random Forest tworzy najskuteczniejszy model z accuracy do 75.37%. Glmnet,Naive Bayes oraz GBM posiadaj¹ podobny wynik, jednak dla nich wspó³czynnik Kappa jest gorszy ni¿ dla Random Forest. Reasumuj¹c modelami, które na postawie powy¿szej analizy okazuj¹ siê byæ najlepsze , s¹: RF,GLMNET (lasso),NB. Aby wybraæ modele, które chcemy ze sob¹ po³¹czyæ obliczmy macierz korelacji predykcji tych modeli. Gdy ³¹czymy predykcje ró¿nych modeli chcemy aby prognozy przedstawione przez te modele mia³y niska korelacje, poniewa¿ oznacza to, ¿e modele s¹ równie skuteczne ale na ró¿ne sposoby. Zatem dziêki temu nasz klasyfikator uczy siê jak uzyskaæ najlepsze predykcje w celu udoskonalenia koñcowego modelu.
+Widzimy, Å¼e model Random Forest tworzy najskuteczniejszy model z accuracy do 75.37%. Glmnet,Naive Bayes oraz GBM posiadajÄ… podobny wynik, jednak dla nich wspÃ³Å‚czynnik Kappa jest gorszy niÅ¼ dla Random Forest. ReasumujÄ…c modelami, ktÃ³re na postawie powyÅ¼szej analizy okazujÄ… siÄ™ byÄ‡ najlepsze , sÄ…: RF,GLMNET (lasso),NB. Aby wybraÄ‡ modele, ktÃ³re chcemy ze sobÄ… poÅ‚Ä…czyÄ‡ obliczmy macierz korelacji predykcji tych modeli. Gdy Å‚Ä…czymy predykcje rÃ³Å¼nych modeli chcemy aby prognozy przedstawione przez te modele miaÅ‚y niska korelacje, poniewaÅ¼ oznacza to, Å¼e modele sÄ… rÃ³wnie skuteczne ale na rÃ³Å¼ne sposoby. Zatem dziÄ™ki temu nasz klasyfikator uczy siÄ™ jak uzyskaÄ‡ najlepsze predykcje w celu udoskonalenia koÅ„cowego modelu.
 
 
 ```{r, warning=FALSE,message=FALSE,echo=FALSE,eval=FALSE,results="hide"}
@@ -522,7 +519,7 @@ splom(results1)
 
 ```
 
-Generalnie wszystkie pary predykcji s¹ dosyæ s³abo skorelowane. Zatem ostateczny model stacking budujemy na podstawie tych trzech modeli. Widzimy, ¿e nasz nowy model stacking utworzony metod¹ rf posiada skutecznoœæ a¿ do 82%, co jest ma³ym ulepszeniem modelu Radom Forest.
+Generalnie wszystkie pary predykcji sÄ… dosyÄ‡ sÅ‚abo skorelowane. Zatem ostateczny model stacking budujemy na podstawie tych trzech modeli. Widzimy, Å¼e nasz nowy model stacking utworzony metodÄ… rf posiada skutecznoÅ›Ä‡ aÅ¼ do 82%, co jest maÅ‚ym ulepszeniem modelu Radom Forest.
 
 ```{r, warning=FALSE,message=FALSE,eval=FALSE}
 stackControl <- trainControl(method="repeatedcv", number=10, repeats=10, classProbs=TRUE)
