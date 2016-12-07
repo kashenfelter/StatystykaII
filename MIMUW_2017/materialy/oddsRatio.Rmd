@@ -1,0 +1,139 @@
+---
+title: "Statystyka 2 - predykcja"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+Klasyfikatory oparte o odds ratio
+
+$\pi_1$ - szansa na obserwacje klasy 1 
+$\pi_0 = 1 - \pi_1$ - szansa na obserwacje klasy 0
+
+$odds = \frac{\pi_1}{\pi_0}$ - iloraz szans
+
+$log odds = \log \frac{\pi_1}{\pi_0}$ - iloraz szans
+
+Zastosowanie w predykcji, chcemy opisać szansę dla klasy dla obserwacji o określonych wartościach X.
+
+$log odds (y | X) = \log \frac{\pi_1|X}{\pi_0|X}$ - iloraz szans
+
+
+
+```{r}
+load(url("https://github.com/pbiecek/StatystykaII/raw/master/MIMUW_2016/materialy/brca.rda"))
+```
+
+## LDA
+
+```{r}
+library(MASS)
+library(ggplot2)
+ml <- lda(outcome~ALKBH1+age, data=brca)
+
+grid <- expand.grid(age=seq(20,90, length.out=100),
+               ALKBH1=seq(100,900, length.out=100))
+
+grid$posterior <- predict(ml, grid)$posterior[,1] > 0.9
+
+ggplot(grid, aes(age, ALKBH1)) + 
+  geom_point(aes(color=posterior),size=1) + 
+  geom_point(data=brca, aes(shape=outcome)) 
+```
+```{r}
+ml <- qda(outcome~ALKBH1+age, data=brca)
+
+str(ml$means)
+str(ml$scaling)
+
+grid$posterior <- predict(ml, grid)$posterior[,1] > 0.9
+
+ggplot(grid, aes(age, ALKBH1)) + 
+  geom_point(aes(color=posterior),size=1) + 
+  geom_point(data=brca, aes(shape=outcome)) 
+```
+
+## Naive Bayes
+
+```{r}
+library(e1071)
+nb <- naiveBayes(outcome~age+ALKBH1, data=brca)
+nb
+grid$posterior <- predict(nb, grid, type = "raw")[,1] > 0.9
+
+ggplot(grid, aes(age, ALKBH1)) + 
+  geom_point(aes(color=posterior),size=1) + 
+  geom_point(data=brca, aes(shape=outcome)) 
+
+```
+
+## Naive Bayes
+
+```{r}
+library(klaR)
+nb <- NaiveBayes(outcome~age+ALKBH1, data=brca)
+plot(nb)
+
+```
+
+## GLM
+
+```{r}
+ml <- glm(outcome~age+ALKBH1, data=brca, family = "binomial")
+ml
+grid$posterior <- predict(ml, grid, type = "link") > -4
+
+ggplot(grid, aes(age, ALKBH1)) + 
+  geom_point(aes(color=posterior),size=1) + 
+  geom_point(data=brca, aes(shape=outcome)) 
+
+```
+
+
+# Ile szumu do przeuczenia?
+
+
+```{r}
+N <- 15
+N <- 150
+szum <- as.data.frame(matrix(runif(N * nrow(brca)), nrow = nrow(brca), ncol = N))
+colnames(szum) <- paste0("zm", 1:N)
+szum$outcome <- factor(runif(nrow(brca)) > 0.5, labels = LETTERS[1:2])
+
+ml <- glm(outcome~., data=szum, family = "binomial")
+pred <- predict(ml, szum, type = "response") > .5
+
+tab <- table(pred, szum$outcome)
+sum(diag(tab))/sum(tab)
+
+
+szum <- as.data.frame(matrix(runif(N * nrow(brca)), nrow = nrow(brca), ncol = N))
+colnames(szum) <- paste0("zm", 1:N)
+szum$outcome <- factor(runif(nrow(brca)) > 0.5, labels = LETTERS[1:2])
+
+nb <- naiveBayes(outcome~., data=szum)
+pred <- predict(nb, szum, type = "raw")[,2] > .5
+tab <- table(pred, szum$outcome)
+sum(diag(tab))/sum(tab)
+
+```
+
+```{r}
+NN <- c(2, 4, 6, 8, 10,20,30,40,50,70,90,110,130,150)
+szumy <- sapply(NN, function(N){
+  szum <- as.data.frame(matrix(runif(N * nrow(brca)), nrow = nrow(brca), ncol = N))
+  colnames(szum) <- paste0("zm", 1:N)
+  szum$outcome <- factor(runif(nrow(brca)) > 0.5, labels = LETTERS[1:2])
+  
+  nb <- naiveBayes(outcome~., data=szum)
+  pred <- predict(nb, szum, type = "raw")[,2] > .5
+  tab <- table(pred, szum$outcome)
+  sum(diag(tab))/sum(tab)
+})
+
+df <- data.frame(NN, szumy)
+ggplot(df, aes(NN, szumy)) + 
+  geom_point() + geom_smooth(se=FALSE)
+
+```
+

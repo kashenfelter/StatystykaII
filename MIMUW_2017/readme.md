@@ -7,18 +7,20 @@ Schedule MIM UW:
 * 5 X, W+L: Statystyki opisowe - zmienne jakościowe, test chi2, analiza korespondencji, [lab1](materialy/lab1.md)
 * 12 X [eRum @ Poznań] L: Eksploracja danych + ggplot2
 * 19 X, W+L: Statystyki opisowe - zmienne ilościowe, testowanie zbioru hipotez, [lab2](materialy/lab2.md)
-* 26 X, [Presentations@lab], [Project 1 phase 1] W: Podstawy predykcji, prosta regresja, kNN, drzewa, [lab3](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab3.md)
-* 02 XI, W+L: Klasyfikacja - podstawy, LDA, QDA, regresja logistyczna
-* 09 XI, [Presentations@lab], [Project 1 phase 2] W+L: Metody wyboru modelu, regresja z wieloma zmiennymi
-* 16 XI, W+L: Ewaluacja modelu, CV, repeated k-fold CV, itp
-* 23 XI, [Presentations@lectures], [Project 1 phase 3] W+L: Bagging, boosting, random forest
-* 30 XI, W: Regularyzacja
-* 07 XII, W+L: Segmentacja - wprowadzenie
-* 14 XII, [Presentations@lab], [Project 2 phase 1] W: Analiza grup - metody kombinatoryczne
-* 21 XII, W+L: Analiza grup - metody aglomeracyjne
-* 11 I, [Presentations@lab], [Project 2 phase 2] W: Skalowanie wielowymiarowe
-* 18 I, W+L: Reguły decyzyjne
-* 25 I, [Presentations@lectures], [Project 2 phase 3] 
+* 26 X, [Presentations@lab], [Project 1 phase 1] W: [Podstawy predykcji, prosta regresja, kNN, drzewa](http://pbiecek.github.io/Przewodnik/Predykcja/drzewa_decyzyjne.html)
+* 02 XI, W+L: Klasyfikacja - podstawy, LDA, QDA, regresja logistyczna [Materialy do wykladu](http://pbiecek.github.io/Przewodnik/Predykcja/predykcja.html),  [lab4](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab3.md)
+* 09 XI, W+L: Ewaluacja modelu, CV, repeated k-fold CV, itp, [materiały](http://pbiecek.github.io/Przewodnik/Predykcja/wybor_modelu.html)
+* 16 XI, [Presentations@lab], [Project 1 phase 2], W+L: Bagging, boosting, random forest, [materialy1](http://pbiecek.github.io/Przewodnik/Predykcja/komitety.html), [materialy2](http://pbiecek.github.io/Przewodnik/Predykcja/ROC.html)
+* 23 XI, W+L: Metody wyboru modelu, regresja z wieloma zmiennymi, [materiały](http://pbiecek.github.io/Przewodnik/Predykcja/regularyzacja.html), [lab7](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab7.md)
+* 30 XI, (Będlewo - będą odrobione w innym terminie)
+* 07 XII, [Presentations@lectures], [Project 1 phase 3], W: Regularyzacja, [lab8](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab8.md)
+* 14 XII, W+L: Segmentacja - wprowadzenie
+* 21 XII, [Presentations@lab], [Project 2 phase 1] W: Analiza grup - metody kombinatoryczne
+* 11 I, W+L: Analiza grup - metody aglomeracyjne
+* 18 I, [Presentations@lab], [Project 2 phase 2] W: Skalowanie wielowymiarowe
+* 25 I, W+L: Reguły decyzyjne
+
+[Presentations@lectures], [Project 2 phase 3] 
 
 Zaliczenie
 ----------
@@ -78,8 +80,12 @@ Etap 2.
 Zbuduj klasyfikator oparty o istotne geny lub inne cechy dostępne w danych (wiek, klaster). 
 Zweryfikuj jakość klasyfikatora krzywą ROC, tabelą kontyngencji, metodą k-fold CV.
 
+[Wyniki drugiego etapu można testować na Kaggle](https://inclass.kaggle.com/c/glioma-survival-predictions)
+
 Etap 3.
 Zbuduj klasyfikator oparty o model stacking przewidujący prawdopodobny stan pacjenta po roku.
+
+[Wyniki trzeciego etapu można testować na Kaggle](https://inclass.kaggle.com/c/glioma-survival-predictions)
 
 W trzecim etapie oceniane będą kryteria:
 

@@ -1,0 +1,184 @@
+---
+title: "Regularisation"
+author: "Przemyslaw Biecek"
+output: 
+  html_document:
+    toc: TRUE
+---
+
+# The most important equation
+
+If you remember only one equation from this lecture, it should be:
+
+$$
+E(y - \hat y) = \sigma^2 + Bias^2 + Variance.
+$$
+
+The classical estimator of $$\beta$$ in linear models is BLUE - Best Linear Unbiased Estimator. So we are in the class on unbiased estumators, but possibly with high variance.
+
+How we can reduce variance by introduction of bias?
+
+* Model selection (BIC / AIC / F-test)
+* One-dimensional prefiltering
+* Ridge regression
+* PCA
+* Lasso
+
+# Simulation study
+
+Let's start with simulation study.
+We are going to simulate an artificial dataset with 5 significant variables, 500 observations and 10 non significant variables.
+
+```{r}
+.libPaths("/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+
+load("trainingS.rda")
+stem$scores <- qnorm(stem$scores)
+stemSmall <- stem[!is.infinite(stem$scores),c(1:10,151)]
+
+library(ggplot2)
+ggplot(stemSmall, aes(SYCP1, scores)) +
+  geom_point()
+```
+
+## Let's start with standard BLUE estimator
+
+```{r}
+# let's see the model
+summary(lm(scores ~ ., data=stemSmall))
+```
+
+# Model selection criteria
+
+Akaike information criterion (AIC) and Bayesian information criterion
+ (BIC) are two criteria from family of Generalized Information Criteria.
+Other popular measures of model fit are: R square, Cp Mallows, F-test.
+
+```{r}
+model <- lm(scores ~ ., data=stemSmall)
+
+AIC(model)
+BIC(model)
+summary(model)$r.squared
+```
+
+# Full search
+
+If the number of variables is not larger than 20 one can consider full 
+/ exhaustive search. For larger model one can consider the stepwise algorithm.
+
+```{r, warning=FALSE, message=FALSE}
+# Full search
+library(e1071)
+
+comb <- bincombinations(ncol(stemSmall)-1)[-1,]
+crit <- matrix(0, nrow(comb), 4)
+
+for (i in 1:nrow(comb)) {
+  vnames <- colnames(stemSmall)[which(comb[i,]==1)]
+  form <- paste0("scores~", paste0(vnames, collapse="+"))
+  model <- lm(as.formula(form), data=stemSmall)
+  crit[i,1] <- AIC(model)
+  crit[i,2] <- BIC(model)
+  crit[i,3] <- summary(model)$r.squared
+  crit[i,4] <- sum(comb[i,]==1)
+}
+colnames(crit) <- c("AIC", "BIC", "R2","p")
+crit <- data.frame(crit)
+
+```
+
+## BIC
+
+```{r, warning=FALSE, message=FALSE}
+# How it looks like for BIC
+library(ggplot2)
+ggplot(crit, aes(p,BIC)) + 
+  geom_point() +
+  geom_point(data=crit[which.min(crit$BIC),], color="red", size=5)
+
+```
+
+## AIC
+
+```{r, warning=FALSE, message=FALSE}
+# How it looks like for AIC
+library(ggplot2)
+ggplot(crit, aes(p,AIC)) + 
+  geom_point() +
+  geom_point(data=crit[which.min(crit$AIC),], color="red", size=5)
+
+```
+
+## R2
+
+```{r, warning=FALSE, message=FALSE}
+# How it looks like for R2
+library(ggplot2)
+ggplot(crit, aes(p,R2)) + 
+  geom_point() +
+  geom_point(data=crit[which.max(crit$R2),], color="red", size=5)
+
+```
+
+## Stepwise strategies
+
+What we can do if it is not feasible to consider all possible models?
+
+Stepwise strategies are our friend.
+
+```{r}
+tmpFun = function(fit, aic) {
+  list(size = length(fit$coefficients), bic = BIC(fit))
+  }
+
+n <- nrow(stemSmall)
+path <- step(model, direction="backward", keep=tmpFun, k=log(n))
+
+library(ggplot2)
+(pathDF <- data.frame(size = unlist(path$keep[1,]),
+            bic = unlist(path$keep[2,])))
+
+ggplot(crit, aes(p,BIC)) + 
+  geom_point() +
+  geom_point(data=crit[which.min(crit$BIC),], color="red", size=5) +
+  geom_point(data=pathDF, aes(size-1, bic), color="blue", size=3)+
+  geom_line(data=pathDF, aes(size-1, bic), color="blue")
+
+```
+
+# Shrinkage
+
+There are following shrinkage strategies.
+
+* Subset selection
+* Ridge regression
+* Lasso regression
+* Principal Component Regression
+
+```{r}
+library(glmnet)
+X <- as.matrix(stemSmall[,1:10])
+X <- scale(X)
+
+model <- glmnet(x = X, y = stemSmall$scores, alpha=0)
+plot(model, xvar = "lambda", label = TRUE)
+
+model <- glmnet(x = X, y = stemSmall$scores, alpha=1)
+plot(model, xvar = "lambda", label = TRUE)
+
+coef(model, s=c(0.1, 0.2))
+
+predict(model, newx = X, s=c(0.1,0.05))
+
+cvfit = cv.glmnet(x = X, y = stemSmall$scores)
+plot(cvfit)
+
+coef(cvfit, s = "lambda.min")
+predict(cvfit, newx = X, s="lambda.min")
+
+```
+
+https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html
+
+

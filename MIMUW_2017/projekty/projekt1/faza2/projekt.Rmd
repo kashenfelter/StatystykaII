@@ -1,0 +1,62 @@
+---
+title: "projekt"
+author: '...'
+date: "25 października 2016"
+output: html_document
+---
+
+```{r, warning=FALSE, cache=TRUE, message=FALSE}
+set.seed(123)
+library('tidyr')
+library('dplyr')
+setwd('C:\\Users\\tg332126\\Desktop')
+Dane<-read.csv('GlioblastomaWide.csv', sep=";")
+ 
+#Wybór danych, które nie posiadają za dużo NaN
+ 
+duzo_NaN_alive<-(colSums(is.na(Dane[Dane$death1y=='alive',]))>30)
+duzo_NaN_dead<-(colSums(is.na(Dane[Dane$death1y=='dead',]))>30)
+maska<- (duzo_NaN_alive | duzo_NaN_dead)
+ 
+Dane2<-Dane[,!maska]
+Dane2$death1y<-as.numeric(ifelse(as.character(Dane2$death1y)=='alive',1,0))
+ 
+sumarycznie<-numeric(ncol(Dane2)-4)
+ 
+for (i in 1:50){
+ 
+#Wybieranie próbki testowej
+ 
+alive_smp <- sample(Dane2$sampleID[Dane2$death1y==1], 31)
+dead_smp <- sample(Dane2$sampleID[Dane2$death1y==0], 31)
+ 
+Dane_alive<-Dane2[Dane2$sampleID %in% alive_smp,]
+Dane_dead<-Dane2[Dane2$sampleID %in% dead_smp,]
+ 
+Dane3<-rbind(Dane_alive, Dane_dead)
+ 
+ 
+# na Dane3 wykonujemy testy:
+ 
+# t.test
+ 
+titest<-apply(Dane3[,5:ncol(Dane3)], 2, function(x){t.test(x[1:31],x[32:62], na.omit=TRUE)$p.value})
+names(titest)<-NULL
+log_titest<-titest<0.05
+ 
+ 
+# cor.test
+ 
+kortest<-apply(Dane3[,5:ncol(Dane3)], 2, function(x){cor.test(Dane3[,4],x, method="spearman", na.omit=TRUE, exact=FALSE)$p.value})
+names(kortest)<-NULL
+log_kortest<-kortest<0.05
+ 
+wynik<-log_titest & log_kortest
+sumarycznie<-sumarycznie + wynik
+ 
+}
+ 
+ 
+which(sumarycznie>=40)
+ 
+```
