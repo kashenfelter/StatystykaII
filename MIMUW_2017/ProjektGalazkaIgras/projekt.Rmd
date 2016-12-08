@@ -1,0 +1,1615 @@
+---
+title: "Projekt I - predykcja"
+author: "Tomasz Ga³¹zka, Krystian Igras"
+date: "7 grudnia 2016"
+output:
+  html_document:
+    code_folding: hide
+---
+ 
+##### Wczytujemy potrzebne pakiety i dane:
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+library("caret")
+library("party")
+library("partykit")
+library("rpart")
+library("rpart.plot")
+library("e1071")
+library("ggplot2")
+
+library("pROC")
+library("randomForest")
+library("xgboost")
+library("glmnet")
+setwd('D:\\RStudio\\projekt')
+Dane<-read.csv('GlioblastomaWide.csv', sep=";")
+ 
+set.seed(12345)
+```
+ 
+  
+  
+Pozbywamy sie zmiennych zawierajacych wiecej niz 30 wartosci "NA" dla pacjetow, którzy prze¿yli lub nie prze¿yli 1 roku. Pozostaje nam 15780 zmiennych.  
+
+ 
+```{r, warning=FALSE, cache=TRUE, message=FALSE}
+Dane$death1y<-as.numeric(ifelse(as.character(Dane$death1y)=='alive',1,0))
+ 
+duzo_NaN_alive<-(colSums(is.na(Dane[Dane$death1y==1,]))>30)
+duzo_NaN_dead<-(colSums(is.na(Dane[Dane$death1y==0,]))>30)
+maska<- (duzo_NaN_alive | duzo_NaN_dead)
+ 
+Dane2<-Dane[,!maska]
+
+
+```
+ 
+## Wybór istotnych zmiennych
+
+W celu wyboru genow cechujacy sie rozna ekspresja, wykonalismy 10-krotnie test korelacji spearmana (poprawka 'fdr', poziom istotnosci 80%) przy czym:
+ 
+- Najpierw przeprowadzamy test na wszystkich obserwacjach,
+ 
+- Pozostale 9 na losowo wybranych podzbiorach obserwacji (75% danych, funkcja losowa "createDataPartition").
+ 
+W powy¿szych 10 testach, ka¿da zmienna zosta³a uznana za istotn¹ od 0 do 10 razy. Liczbê tych wyników zawiera wektor, który nazwaliœmy "sumarycznie". Bêdzie on niejednokrotnie wykorzystywany w dalszych testach.
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+sumarycznie<-numeric(ncol(Dane2)-4)
+ 
+kortest<-apply(Dane2[,5:ncol(Dane2)], 2, function(x){cor.test(Dane2[,4],x, method="spearman", na.omit=TRUE, exact=FALSE)$p.value})
+names(kortest)<-NULL
+ 
+log_kortest<-p.adjust(kortest, method="fdr")<0.2
+ 
+wynik<-log_kortest
+sumarycznie<-sumarycznie + wynik
+ 
+for (i in 1:9){
+ 
+#Wybieranie pr?bki testowej
+Podzial<-createDataPartition(Dane2$death1y, times=1, p=0.75, list=FALSE)
+ 
+Dane3 <- Dane2[Podzial,]
+
+kortest<-apply(Dane3[,5:ncol(Dane3)], 2, function(x){cor.test(Dane3[,4],x, method="spearman", na.omit=TRUE, exact=FALSE)$p.value})
+names(kortest)<-NULL
+ 
+log_kortest<-p.adjust(kortest, method="fdr")<0.2
+ 
+wynik<-log_kortest
+sumarycznie<-sumarycznie + wynik
+}
+ 
+y<-which(sumarycznie>=6)+4
+```
+ 
+Przyk³adowo zmienne, które zosta³y uznane za istotne w conajmniej 60%:
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+names(Dane2)[y]
+```
+ 
+Boxploty dla pierwszych 6 spoœród nich:
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+par(mfrow=c(2,3))
+for (i in 1:6) {
+boxplot(Dane2[,y[i]]~Dane2$death1y, main = names(Dane2)[y[i]], names=c("umar³", "prze¿y³"))
+}
+```
+
+Poniewa¿ wiêkszoœæ z wykorzystywanych klasyfikatorów, ma problem z funkcjonowaniem gdy w danych wystêpuj¹ braki, zamienimy NA medianami, a nastêpnie œrednimi.
+
+# Zamiana NA poprzez mediany.
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+mediany<-apply(Dane2[,-(1:4)], 2, function(x){median(x, na.rm = TRUE)})
+for (i in 1:nrow(Dane2)) {
+  Dane2[i,-(1:4)][is.na(Dane2[i,-(1:4)])]<-mediany[is.na(Dane2[i,-(1:4)])]
+}
+```
+
+## Wykorzystane klasyfikatory:
+ 
+Testowaliœmy nastepujace klasyfikatory:
+ 
+- drzewo ctree
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+Dan=Dane2[,c(4,y)]
+Dan$death1y<-as.factor(Dan$death1y)
+drzewo <- ctree(death1y~., data=Dan, control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+plot(drzewo)
+```
+ 
+- drzewo rpart
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+drzewwo <- rpart(death1y~., data=Dan)
+rpart.plot(drzewwo)
+```
+ 
+- naiveBayes
+
+- regresja
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+set.seed(12345)
+
+yreg<-which(sumarycznie>=2)+4
+Danreg<-Dane2[,c(4,yreg)]
+X <- as.matrix(Danreg[,-1])
+X <- scale(X)
+
+cvfit = cv.glmnet(x = X, y = Danreg$death1y == "1", family="binomial")
+plot(cvfit)
+
+c<-coef(cvfit, s = "lambda.min")
+waznereg<-rownames(c)[which(c != 0)[-1]]
+Danreg<-Dane2[,c("death1y",waznereg)]
+```
+ 
+
+Oraz w ramach stacking:
+
+- las losowy, ktory maksymalizuje wspolczynnik F1 (liczba drzew wybrana na podstawie oddzielnych testow)
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+set.seed(12345)
+y2=which(sumarycznie>=3)+4
+Danlas<-Dane2[,c(4,y2)]
+
+c<-list()
+c[[45]] <-matrix(0,2,2)
+wazne<-list()
+  rf <- randomForest(death1y~., data=Danlas, ntree=330)
+for (j in 14:44){
+
+wazne[[j]]<-which(rf$importance>=(j+3)/99)
+c[[j]] <- matrix(0,2,2)
+}
+ 
+for (i in 1:100){
+subset<-createDataPartition(Danlas$death1y, p=0.75)$Resample1
+Dan_ucz<-Danlas[subset,]
+Dan_test<-Danlas[-subset,]
+
+rf<-randomForest(death1y~., data=Dan_ucz, ntree=330)
+pred_rf<-predict(rf, Dan_test)
+
+t<-table(predykcja = pred_rf>.5, prawdziwe = Dan_test[,1])
+c[[45]] = c[[45]]+t
+
+# Zaw??amy baz? do tych zmiennych i wykonujemy to samo
+ 
+for (j in 14:44){
+  
+Dan2<-Dane2[,c(4,y2[wazne[[j]]])]
+
+
+# podzia? na zbiory ucz?ce i testowe robimy taki sam:
+Dan_ucz2<-Dan2[subset,]
+Dan_test2<-Dan2[-subset,]
+ 
+# Tworzenie drzewa
+ 
+rf2<-randomForest(death1y~., data=Dan_ucz2, ntree=330)
+ 
+pred_rf2<-predict(rf2, Dan_test2)
+ 
+ 
+t<-table(predykcja = pred_rf2>.5, prawdziwe = Dan_test2[,1])
+c[[j]]=c[[j]]+t
+}
+}
+for (j in 14:45){
+c[[j]]=c[[j]]/100
+}
+
+d=matrix(0,32,3)
+for (j in 14:45){
+  d[j-13,1]<-c[[j]][1,1]/(c[[j]][1,1]+c[[j]][1,2])
+  d[j-13,2]<-c[[j]][1,1]/(c[[j]][1,1]+c[[j]][2,1])
+  d[j-13,3]<-(2*d[j-13,1]*d[j-13,2])/(d[j-13,1]+d[j-13,2])
+}
+lala<-which((max(d[,3])==d[,3])==TRUE)
+wazne<-wazne[[lala+13]]
+y2<-y2[wazne]
+Danlas<-Dane2[,c(4,y2)]
+```
+
+
+- xgboost, który maksymalizuje wspó³czynnik F1
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+set.seed(12345)
+subset<-createDataPartition(Dane2$death1y, p=0.75, times=100, list=FALSE)
+xgb_test<-function(roundsy, depthy, istotnosc){
+
+y3<-which(sumarycznie>=istotnosc)+4
+
+
+Danregg=Dane2[,c(4,y3)]
+
+
+
+
+igrek = Danregg$death1y == "1"
+X = as.matrix(Danregg[,-1])
+gb <- xgboost(data=X, label=igrek,
+              objective = "binary:logistic", 
+              nrounds = roundsy,
+              max.deph = depthy,
+              verbose=0)
+
+imp <- xgb.importance(colnames(Danregg)[-1], model = gb)
+
+genow<-nrow(imp)
+
+lista<-list()
+for (i in 1:genow){
+  lista[[i]]<-imp$Feature[1:i]
+}
+
+
+
+cs<-numeric(genow)
+
+for (j in 4:(genow)){
+
+  Danexg<-Danregg[,c("death1y",lista[[j]])]
+  for (i in 1:100){
+
+    
+    X = as.matrix(Danexg[subset[,i],-1])
+    gb <- xgboost(data=X, label=igrek[subset[,i]],
+                  objective = "binary:logistic", 
+                  nrounds = roundsy,
+                  max.depth = depthy,
+                  verbose=0)
+    pred<-predict(gb, as.matrix(Danexg[-subset[,i],-1]))
+    
+    t<-table(predykcja = (pred>0.5), prawdziwe = Danexg[-subset[,i],1])
+    p<-t[1,1]/(t[1,1]+t[1,2])
+    r<-t[1,1]/(t[1,1]+t[2,1])
+    
+    cs[j]=cs[j]+(2*p*r)/(p+r)
+    
+  }
+}
+
+return(list(lista[[genow]],cs))
+
+}
+
+
+zmienne<-new.env()
+
+for (k in 3:7){
+  for (l in 3:5) {
+    assign(paste("k",k,"l",l,sep=""), xgb_test(k,l,2), envir = zmienne)
+  }
+}
+
+wyniki<-as.list(zmienne)
+
+maksy<-matrix(0,length(wyniki),3, dimnames=list(as.character(1:length(wyniki)),c("zmienna", "maksF1", "ile.zmiennych")))
+
+for (i in 1:length(wyniki)) {
+  maksy[i,1]<-names(wyniki[i])
+  maksy[i,2]<-max(wyniki[[i]][[2]])
+  maksy[i,3]<-which(wyniki[[i]][[2]]==maksy[i,2])
+}
+
+wiersz<-as.numeric(which(maksy[,2]==max(maksy[,2]))[1])
+nazwy<-wyniki[[wiersz]][[1]][1:maksy[wiersz,3]]
+
+Danxg<-Dane2[,c("death1y",nazwy)]
+```
+
+- XGB + Las (dwukrotna predykcja pacjentów, których wynik XGB by³ zbli¿ony do 0.5 - druga predykcja poprzez Las). Jednak wynik okazal sie przeciety i pominelismy w prezentowanych testach.
+
+## Testowanie klasyfikatorów
+ 
+* One-out leave (n-fold cv)
+* Repeated k-fold CV
+* Tablica kontyngecji (czu³oœæ, specyficznoœæ, F1) oraz ROC (AUC) dla podzialu bootstrap (funkcja createResample)
+* Tablica kontyngecji (czu³oœæ, specyficznoœæ, F1) oraz ROC (AUC) dla podzialu standardowego (funkcja createDataPartition) 
+ 
+**1. n-fold  **
+
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+
+foldy <- createFolds(Dane2$death1y, k=125)
+ 
+wyn<-matrix(0,3,6)
+colnames(wyn)<-c("glm", "ctree", "rpart", "naiveBayes","las", "xgboost")
+rownames(wyn)<-c("1", "0", "-1")
+ 
+errors1 <- lapply(foldy, function(ind) {
+  model <- glm(death1y~., data=Danreg[-ind,], family = "binomial", control = list(maxit = 50))
+predict(model, newdata=Danreg[ind,], "response")- (Danreg[ind,"death1y"] == "1")
+})
+wyn[1,1]<-length(which(round(unlist(errors1))==1))
+wyn[2,1]<-length(which(round(unlist(errors1))==0))
+wyn[3,1]<-length(which(round(unlist(errors1))==-1))
+hist(round(unlist(errors1)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[1]), xlab = paste("Przewidywania dla", colnames(wyn)[1]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+ 
+errors2 <- lapply(foldy, function(ind) {
+  model <- ctree(death1y~., data=Dan[-ind,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+as.numeric(predict(model, newdata=Dan[ind,]))-as.numeric((Dan[ind,"death1y"]))
+})
+wyn[1,2]<-length(which(round(unlist(errors2))==1))
+wyn[2,2]<-length(which(round(unlist(errors2))==0))
+wyn[3,2]<-length(which(round(unlist(errors2))==-1))
+hist(round(unlist(errors2)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[2]), xlab = paste("Przewidywania dla", colnames(wyn)[2]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+ 
+errors3 <- lapply(foldy, function(ind) {
+  model <- rpart(death1y~., data=Dan[-ind,])
+as.numeric(predict(model, newdata=Dan[ind,], type="class"))-as.numeric((Dan[ind,"death1y"]))
+})
+wyn[1,3]<-length(which(round(unlist(errors3))==1))
+wyn[2,3]<-length(which(round(unlist(errors3))==0))
+wyn[3,3]<-length(which(round(unlist(errors3))==-1))
+hist(round(unlist(errors3)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[3]), xlab = paste("Przewidywania dla", colnames(wyn)[3]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+errors4 <- lapply(foldy, function(ind) {
+  model <- naiveBayes(death1y~., data=Dan[-ind,])
+  as.numeric(predict(model, newdata=Dan[ind,]))-as.numeric((Dan[ind,"death1y"]))
+})
+wyn[1,4]<-length(which(round(unlist(errors4))==1))
+wyn[2,4]<-length(which(round(unlist(errors4))==0))
+wyn[3,4]<-length(which(round(unlist(errors4))==-1))
+hist(round(unlist(errors4)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[4]), xlab = paste("Przewidywania dla", colnames(wyn)[4]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+errors5 <- lapply(foldy, function(ind) {
+  model <- randomForest(death1y~., data=Danlas[-ind,], ntree=330)
+  predict(model, newdata=Danlas[ind,], "response")-(Danlas[ind,"death1y"] == "1")
+})
+wyn[1,5]<-length(which(round(unlist(errors5))==1))
+wyn[2,5]<-length(which(round(unlist(errors5))==0))
+wyn[3,5]<-length(which(round(unlist(errors5))==-1))
+hist(round(unlist(errors5)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[5]), xlab = paste("Przewidywania dla", colnames(wyn)[5]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+igrek = Danxg$death1y == "1"
+errors6 <- lapply(foldy, function(ind){
+  X = as.matrix(Danxg[-ind,-1])
+  model <- xgboost(data=X, label=igrek[-ind],
+                  objective = "binary:logistic", 
+                  nrounds=3,
+                  max.depth=4,
+                  verbose=0)
+  predict(model, as.matrix(Danxg[ind,-1]))-(Danxg[ind,"death1y"] == "1")
+})
+wyn[1,6]<-length(which(round(unlist(errors6))==1))
+wyn[2,6]<-length(which(round(unlist(errors6))==0))
+wyn[3,6]<-length(which(round(unlist(errors6))==-1))
+hist(round(unlist(errors6)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[6]), xlab = paste("Przewidywania dla", colnames(wyn)[6]), ylab = "Czêstoœæ", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+
+```
+ 
+Wynik testu:
+ 
+```{r, cache=TRUE, echo=FALSE}
+wyn
+```
+ 
+<hr> 
+ 
+**2. Repeated k-fold CV (100 razy 10-fold)**
+ 
+```{r, cache=TRUE,message=FALSE, warning=FALSE}
+set.seed(12345)
+wynik<-matrix(0,3,6)
+colnames(wynik)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(wynik)<-c("1", "0", "-1")
+ 
+for(i in 1:100){
+ 
+foldy <- createFolds(Dane2$death1y, k=10)
+ 
+errors1 <- lapply(foldy, function(ind) {
+  model <- glm(death1y~., data=Danreg[-ind,], family = "binomial")
+predict(model, newdata=Danreg[ind,], "response")- (Danreg[ind,"death1y"] == "1")
+})
+wynik[1,1]<-wynik[1,1]+length(which(round(unlist(errors1))==1))
+wynik[2,1]<-wynik[2,1]+length(which(round(unlist(errors1))==0))
+wynik[3,1]<-wynik[3,1]+length(which(round(unlist(errors1))==-1))
+ 
+errors2 <- lapply(foldy, function(ind) {
+  model <- ctree(death1y~., data=Dan[-ind,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+as.numeric(predict(model, newdata=Dan[ind,]))-as.numeric((Dan[ind,"death1y"]))
+})
+wynik[1,2]<-wynik[1,2]+length(which(round(unlist(errors2))==1))
+wynik[2,2]<-wynik[2,2]+length(which(round(unlist(errors2))==0))
+wynik[3,2]<-wynik[3,2]+length(which(round(unlist(errors2))==-1))
+ 
+ 
+errors3 <- lapply(foldy, function(ind) {
+  model <- rpart(death1y~., data=Dan[-ind,])
+as.numeric(predict(model, newdata=Dan[ind,], type="class"))-as.numeric((Dan[ind,"death1y"]))
+})
+wynik[1,3]<-wynik[1,3]+length(which(round(unlist(errors3))==1))
+wynik[2,3]<-wynik[2,3]+length(which(round(unlist(errors3))==0))
+wynik[3,3]<-wynik[3,3]+length(which(round(unlist(errors3))==-1))
+ 
+errors4 <- lapply(foldy, function(ind) {
+  model <- naiveBayes(death1y~., data=Dan[-ind,])
+  as.numeric(predict(model, newdata=Dan[ind,]))-as.numeric((Dan[ind,"death1y"]))
+})
+wynik[1,4]<-wynik[1,4]+length(which(round(unlist(errors4))==1))
+wynik[2,4]<-wynik[2,4]+length(which(round(unlist(errors4))==0))
+wynik[3,4]<-wynik[3,4]+length(which(round(unlist(errors4))==-1))
+ 
+errors5 <- lapply(foldy, function(ind) {
+  model <- randomForest(death1y~., data=Danlas[-ind,], ntree=330)
+predict(model, newdata=Danlas[ind,], "response")- (Danlas[ind,"death1y"] == "1")
+})
+wynik[1,5]<-wynik[1,5]+length(which(round(unlist(errors5))==1))
+wynik[2,5]<-wynik[2,5]+length(which(round(unlist(errors5))==0))
+wynik[3,5]<-wynik[3,5]+length(which(round(unlist(errors5))==-1))
+
+errors6 <- lapply(foldy, function(ind){
+  X = as.matrix(Danxg[-ind,-1])
+  model <- xgboost(data=X, label=igrek[-ind],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.depth=4,
+                  verbose=0)
+  predict(model, as.matrix(Danxg[ind,-1]))-(Danxg[ind,"death1y"] == "1")
+})
+wynik[1,6]<-wynik[1,6]+length(which(round(unlist(errors6))==1))
+wynik[2,6]<-wynik[2,6]+length(which(round(unlist(errors6))==0))
+wynik[3,6]<-wynik[3,6]+length(which(round(unlist(errors6))==-1))
+}
+```
+ 
+Wynik testu:
+ 
+```{r, cache=TRUE, echo=FALSE}
+wynik/100
+```
+
+<hr>
+
+
+**3. Krzywe ROC dla podzia³u bootstrap:**
+ 
+```{r, cache=TRUE, message=FALSE, warning=FALSE}
+set.seed(12335)
+subset<-createResample(Dane2$death1y, times = 1, list = FALSE)
+ 
+cs2<-matrix(0,3,6)
+colnames(cs2)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(cs2)<-c("czulosc", "specyficznosc", "auc")
+ 
+ 
+regresja <- glm(death1y~., data=Danreg[subset,], family="binomial", control = list(maxit = 50))
+oceny<-predict(regresja, newdata=Danreg[-subset,], type="response")
+t<-table(predykcja = (oceny > .5), prawdziwe = Danreg[-subset,1])
+ 
+cs2[1,1]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,1]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla regresji
+
+roc_reg<-roc(Danreg[-subset,]$death1y, oceny, direction="<")
+plot(roc_reg, col = "blue", lwd = 3)
+cs2[3,1]=roc_reg$auc
+ 
+  
+drzewo <- ctree(death1y~., data=Dan[subset,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+oceny <- predict(drzewo, newdata=Dan[-subset,])
+ 
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs2[1,2]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,2]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla drzewa 1
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "red", lwd = 3)
+cs2[3,2]=roc_reg$auc
+ 
+  drzewwo <- rpart(death1y~., data=Dan[subset,])
+oceny<-predict(drzewwo, newdata=Dan[-subset,], type="class")
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs2[1,3]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,3]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla drzewa 2
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "green", lwd = 3)
+cs2[3,3]=roc_reg$auc
+ 
+ 
+nb <- naiveBayes(death1y ~., data=Dan[subset,])
+oceny <- predict(nb, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs2[1,4]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,4]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla nb
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "pink", lwd = 3)
+cs2[3,4]=roc_reg$auc
+ 
+rf <- randomForest(death1y~., Danlas[subset,], ntree=330)
+oceny <- predict(rf, newdata=Danlas[-subset,])
+t<-table(predykcja = oceny>.5, prawdziwe = Danlas[-subset,1])
+ 
+cs2[1,5]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,5]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla lasu
+par(new=TRUE)
+roc_reg<-roc(Danlas[-subset,]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "black", lwd = 3)
+cs2[3,5]=roc_reg$auc
+ 
+
+X = as.matrix(Danxg[subset,-1])
+xgb <- xgboost(data=X, label=igrek[subset],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.deph = 4,
+                  verbose=0)
+oceny <- predict(xgb, as.matrix(Danxg[-subset,-1]))
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danxg[-subset,1])
+
+cs2[1,6]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,6]=t[2,2]/(t[2,2]+t[1,2])
+
+#roc dla xgb
+par(new=TRUE)
+roc_reg<-roc(Danxg[-subset,]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "orange", lwd = 3)
+cs2[3,6]=roc_reg$auc
+
+legend(x=0, y=0.5, legend = c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost"), col = c("blue", "red", "green", "pink", "black", "orange"), lwd=c(2, 2))
+```
+
+
+**Weryfikacja powy¿szych wyników poprzez wiêksz¹ liczbê iteracji, i analiza tabeli kontyngencji:**
+
+```{r, cache=TRUE, message=FALSE, warning=FALSE}
+set.seed(12345)
+
+ 
+cs2<-matrix(0,4,6)
+colnames(cs2)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(cs2)<-c("czulosc", "specyficznosc", "auc", "F1")
+ 
+for (i in 1:1000){
+subset<-createResample(Dane2$death1y, times=1, list=FALSE)
+#subset<-createResample(Dane2$death1y, times = 1, list = FALSE)
+ 
+regresja <- glm(death1y~., data=Danreg[subset,], family="binomial", control = list(maxit = 50))
+oceny<-predict(regresja, newdata=Danreg[-subset,], type="response")
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danreg[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs2[1,1]=cs2[1,1]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,1]=cs2[2,1]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,1]=cs2[3,1]+roc(Danreg[-subset,]$death1y, oceny, direction="<")$auc
+cs2[4,1]=cs2[4,1]+(2*p*r)/(p+r) 
+ 
+drzewo <- ctree(death1y~., data=Dan[subset,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+  oceny <- predict(drzewo, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1])
+cs2[1,2]=cs2[1,2]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,2]=cs2[2,2]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,2]=cs2[3,2]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,2]=cs2[4,2]+(2*p*r)/(p+r) 
+
+drzewwo <- rpart(death1y~., data=Dan[subset,])
+oceny<-predict(drzewwo, newdata=Dan[-subset,], type="class")
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs2[1,3]=cs2[1,3]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,3]=cs2[2,3]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,3]=cs2[3,3]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,3]=cs2[4,3]+(2*p*r)/(p+r) 
+
+nb <- naiveBayes(death1y ~., data=Dan[subset,])
+oceny <- predict(nb, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs2[1,4]=cs2[1,4]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,4]=cs2[2,4]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,4]=cs2[3,4]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,4]=cs2[4,4]+(2*p*r)/(p+r) 
+ 
+rf <- randomForest(death1y~., Danlas[subset,])
+oceny <- predict(rf, newdata=Danlas[-subset,], ntree=330)
+t<-table(predykcja = (oceny>.5), prawdziwe = Danlas[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs2[1,5]=cs2[1,5]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,5]=cs2[2,5]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,5]=cs2[3,5]+roc(Danlas[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,5]=cs2[4,5]+(2*p*r)/(p+r)
+
+X = as.matrix(Danxg[subset,-1])
+xgb <- xgboost(data=X, label=igrek[subset],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.depth=4,
+                  verbose=0)
+oceny <- predict(xgb, as.matrix(Danxg[-subset,-1]))
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danxg[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1])
+cs2[1,6]=cs2[1,6]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,6]=cs2[2,6]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,6]=cs2[3,6]+roc(Danxg[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,6]=cs2[4,6]+(2*p*r)/(p+r)
+}
+```
+
+Wynik testu - czulosc (% dobrze przewidzanych jako dead) oraz specyficznosc (% dobrze przewidzianych jako alive), pole pod krzywa ROC i wspolczynnik F1 (opisany na kaggle):
+ 
+```{r, cache=TRUE, echo=FALSE}
+cs2/1000
+```
+
+<hr>
+
+**4. Krzywe ROC dla podzia³u standardowego:**
+
+```{r, cache=TRUE, message=FALSE, warning=FALSE}
+set.seed(12341)
+subset<-createDataPartition(Dane2$death1y, times = 1, list = FALSE)
+ 
+cs<-matrix(0,3,6)
+colnames(cs)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(cs)<-c("czulosc", "specyficznosc", "auc")
+ 
+ 
+regresja <- glm(death1y~., data=Danreg[subset,], family="binomial", control = list(maxit = 50))
+oceny<-predict(regresja, newdata=Danreg[-subset,], type="response")
+t<-table(predykcja = (oceny > .5), prawdziwe = Danreg[-subset,1])
+ 
+cs[1,1]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,1]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla regresji
+
+roc_reg<-roc(Danreg[-subset,]$death1y, oceny, direction="<")
+plot(roc_reg, col = "blue", lwd = 3)
+cs[3,1]=roc_reg$auc
+ 
+ 
+drzewo <- ctree(death1y~., data=Dan[subset,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+oceny <- predict(drzewo, newdata=Dan[-subset,])
+ 
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs[1,2]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,2]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla drzewa 1
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "red", lwd = 3)
+cs[3,2]=roc_reg$auc
+ 
+  drzewwo <- rpart(death1y~., data=Dan[subset,])
+oceny<-predict(drzewwo, newdata=Dan[-subset,], type="class")
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs[1,3]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,3]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla drzewa 2
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "green", lwd = 3)
+cs[3,3]=roc_reg$auc
+ 
+ 
+nb <- naiveBayes(death1y ~., data=Dan[subset,])
+oceny <- predict(nb, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs[1,4]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,4]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla nb
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "pink", lwd = 3)
+cs[3,4]=roc_reg$auc
+ 
+rf <- randomForest(death1y~., Danlas[subset,], ntree=330)
+oceny <- predict(rf, newdata=Danlas[-subset,])
+t<-table(predykcja = oceny>.5, prawdziwe = Danlas[-subset,1])
+ 
+cs[1,5]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,5]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla lasu
+par(new=TRUE)
+roc_reg<-roc(Danlas[-subset,]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "black", lwd = 3)
+cs[3,5]=roc_reg$auc
+ 
+
+X = as.matrix(Danxg[subset,-1])
+xgb <- xgboost(data=X, label=igrek[subset],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.deph = 4,
+                  verbose=0)
+oceny <- predict(xgb, as.matrix(Danxg[-subset,-1]))
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danxg[-subset,1])
+
+cs[1,6]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,6]=t[2,2]/(t[2,2]+t[1,2])
+
+#roc dla xgb
+par(new=TRUE)
+roc_reg<-roc(Danxg[-subset,]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "orange", lwd = 3)
+cs[3,6]=roc_reg$auc
+
+legend(x=0, y=0.5, legend = c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost"), col = c("blue", "red", "green", "pink", "black", "orange"), lwd=c(2, 2))
+```
+
+
+**Weryfikacja powy¿szych wyników poprzez wiêksz¹ liczbê iteracji, i analiza tabeli kontyngencji:**
+ 
+```{r, cache=TRUE, message=FALSE, warning=FALSE}
+set.seed(12345)
+
+ 
+cs<-matrix(0,4,6)
+colnames(cs)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(cs)<-c("czulosc", "specyficznosc", "auc", "F1")
+ 
+for (i in 1:1000){
+subset<-createDataPartition(Dane2$death1y, times=1, p=0.75, list=FALSE)
+#subset<-createResample(Dane2$death1y, times = 1, list = FALSE)
+ 
+regresja <- glm(death1y~., data=Danreg[subset,], family="binomial", control = list(maxit = 50))
+oceny<-predict(regresja, newdata=Danreg[-subset,], type="response")
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danreg[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs[1,1]=cs[1,1]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,1]=cs[2,1]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,1]=cs[3,1]+roc(Danreg[-subset,]$death1y, oceny, direction="<")$auc
+cs[4,1]=cs[4,1]+(2*p*r)/(p+r) 
+ 
+drzewo <- ctree(death1y~., data=Dan[subset,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+  oceny <- predict(drzewo, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1])
+cs[1,2]=cs[1,2]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,2]=cs[2,2]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,2]=cs[3,2]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,2]=cs[4,2]+(2*p*r)/(p+r) 
+
+drzewwo <- rpart(death1y~., data=Dan[subset,])
+oceny<-predict(drzewwo, newdata=Dan[-subset,], type="class")
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs[1,3]=cs[1,3]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,3]=cs[2,3]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,3]=cs[3,3]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,3]=cs[4,3]+(2*p*r)/(p+r) 
+
+nb <- naiveBayes(death1y ~., data=Dan[subset,])
+oceny <- predict(nb, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs[1,4]=cs[1,4]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,4]=cs[2,4]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,4]=cs[3,4]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,4]=cs[4,4]+(2*p*r)/(p+r) 
+ 
+rf <- randomForest(death1y~., Danlas[subset,])
+oceny <- predict(rf, newdata=Danlas[-subset,], ntree=330)
+t<-table(predykcja = (oceny>.5), prawdziwe = Danlas[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs[1,5]=cs[1,5]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,5]=cs[2,5]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,5]=cs[3,5]+roc(Danlas[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,5]=cs[4,5]+(2*p*r)/(p+r)
+
+X = as.matrix(Danxg[subset,-1])
+xgb <- xgboost(data=X, label=igrek[subset],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.depth=4,
+                  verbose=0)
+oceny <- predict(xgb, as.matrix(Danxg[-subset,-1]))
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danxg[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1])
+cs[1,6]=cs[1,6]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,6]=cs[2,6]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,6]=cs[3,6]+roc(Danxg[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,6]=cs[4,6]+(2*p*r)/(p+r)
+}
+```
+ 
+Wynik testu - czulosc (% dobrze przewidzanych jako dead) oraz specyficznosc (% dobrze przewidzianych jako alive), pole pod krzywa ROC i wspolczynnik F1 (opisany na kaggle):
+ 
+```{r, cache=TRUE, echo=FALSE}
+cs/1000
+```
+
+
+# Teraz Zamiana NA poprzez srednie.
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+Dane2<-Dane[,!maska]
+srednie<-apply(Dane2[,-(1:4)], 2, function(x){mean(x, na.rm = TRUE)})
+for (i in 1:nrow(Dane2)) {
+  Dane2[i,-(1:4)][is.na(Dane2[i,-(1:4)])]<-srednie[is.na(Dane2[i,-(1:4)])]
+}
+```
+
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+Dan=Dane2[,c(4,y)]
+Dan$death1y<-as.factor(Dan$death1y)
+drzewo <- ctree(death1y~., data=Dan, control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+
+```
+ 
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+drzewwo <- rpart(death1y~., data=Dan)
+
+```
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+set.seed(12345)
+
+yreg<-which(sumarycznie>=2)+4
+Danreg<-Dane2[,c(4,yreg)]
+X <- as.matrix(Danreg[,-1])
+X <- scale(X)
+
+cvfit = cv.glmnet(x = X, y = Danreg$death1y == "1", family="binomial")
+
+
+c<-coef(cvfit, s = "lambda.min")
+waznereg<-rownames(c)[which(c != 0)[-1]]
+Danreg<-Dane2[,c("death1y",waznereg)]
+```
+ 
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+set.seed(12345)
+y2=which(sumarycznie>=3)+4
+Danlas<-Dane2[,c(4,y2)]
+
+c<-list()
+c[[45]] <-matrix(0,2,2)
+wazne<-list()
+  rf <- randomForest(death1y~., data=Danlas, ntree=330)
+for (j in 14:44){
+
+wazne[[j]]<-which(rf$importance>=(j+3)/99)
+c[[j]] <- matrix(0,2,2)
+}
+ 
+for (i in 1:100){
+subset<-createDataPartition(Danlas$death1y, p=0.75)$Resample1
+Dan_ucz<-Danlas[subset,]
+Dan_test<-Danlas[-subset,]
+
+rf<-randomForest(death1y~., data=Dan_ucz, ntree=330)
+pred_rf<-predict(rf, Dan_test)
+
+t<-table(predykcja = pred_rf>.5, prawdziwe = Dan_test[,1])
+c[[45]] = c[[45]]+t
+
+# Zaw??amy baz? do tych zmiennych i wykonujemy to samo
+ 
+for (j in 14:44){
+  
+Dan2<-Dane2[,c(4,y2[wazne[[j]]])]
+
+
+# podzia? na zbiory ucz?ce i testowe robimy taki sam:
+Dan_ucz2<-Dan2[subset,]
+Dan_test2<-Dan2[-subset,]
+ 
+# Tworzenie drzewa
+ 
+rf2<-randomForest(death1y~., data=Dan_ucz2, ntree=330)
+ 
+pred_rf2<-predict(rf2, Dan_test2)
+ 
+ 
+t<-table(predykcja = pred_rf2>.5, prawdziwe = Dan_test2[,1])
+c[[j]]=c[[j]]+t
+}
+}
+for (j in 14:45){
+c[[j]]=c[[j]]/100
+}
+
+d=matrix(0,32,3)
+for (j in 14:45){
+  d[j-13,1]<-c[[j]][1,1]/(c[[j]][1,1]+c[[j]][1,2])
+  d[j-13,2]<-c[[j]][1,1]/(c[[j]][1,1]+c[[j]][2,1])
+  d[j-13,3]<-(2*d[j-13,1]*d[j-13,2])/(d[j-13,1]+d[j-13,2])
+}
+lala<-which((max(d[,3])==d[,3])==TRUE)
+wazne<-wazne[[lala+13]]
+y2<-y2[wazne]
+Danlas<-Dane2[,c(4,y2)]
+```
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+set.seed(12345)
+subset<-createDataPartition(Dane2$death1y, p=0.75, times=100, list=FALSE)
+xgb_test<-function(roundsy, depthy, istotnosc){
+
+y3<-which(sumarycznie>=istotnosc)+4
+
+
+Danregg=Dane2[,c(4,y3)]
+
+
+
+
+igrek = Danregg$death1y == "1"
+X = as.matrix(Danregg[,-1])
+gb <- xgboost(data=X, label=igrek,
+              objective = "binary:logistic", 
+              nrounds = roundsy,
+              max.deph = depthy,
+              verbose=0)
+
+imp <- xgb.importance(colnames(Danregg)[-1], model = gb)
+
+genow<-nrow(imp)
+
+lista<-list()
+for (i in 1:genow){
+  lista[[i]]<-imp$Feature[1:i]
+}
+
+
+
+cs<-numeric(genow)
+
+for (j in 4:(genow)){
+
+  Danexg<-Danregg[,c("death1y",lista[[j]])]
+  for (i in 1:100){
+
+    
+    X = as.matrix(Danexg[subset[,i],-1])
+    gb <- xgboost(data=X, label=igrek[subset[,i]],
+                  objective = "binary:logistic", 
+                  nrounds = roundsy,
+                  max.depth = depthy,
+                  verbose=0)
+    pred<-predict(gb, as.matrix(Danexg[-subset[,i],-1]))
+    
+    t<-table(predykcja = (pred>0.5), prawdziwe = Danexg[-subset[,i],1])
+    p<-t[1,1]/(t[1,1]+t[1,2])
+    r<-t[1,1]/(t[1,1]+t[2,1])
+    
+    cs[j]=cs[j]+(2*p*r)/(p+r)
+    
+  }
+}
+
+return(list(lista[[genow]],cs))
+
+}
+
+
+zmienne<-new.env()
+
+for (k in 3:7){
+  for (l in 3:5) {
+    assign(paste("k",k,"l",l,sep=""), xgb_test(k,l,2), envir = zmienne)
+  }
+}
+
+wyniki<-as.list(zmienne)
+
+maksy<-matrix(0,length(wyniki),3, dimnames=list(as.character(1:length(wyniki)),c("zmienna", "maksF1", "ile.zmiennych")))
+
+for (i in 1:length(wyniki)) {
+  maksy[i,1]<-names(wyniki[i])
+  maksy[i,2]<-max(wyniki[[i]][[2]])
+  maksy[i,3]<-which(wyniki[[i]][[2]]==maksy[i,2])
+}
+
+wiersz<-as.numeric(which(maksy[,2]==max(maksy[,2]))[1])
+nazwy<-wyniki[[wiersz]][[1]][1:maksy[wiersz,3]]
+
+Danxg<-Dane2[,c("death1y",nazwy)]
+```
+
+ 
+**1. n-fold  **
+
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+
+foldy <- createFolds(Dane2$death1y, k=125)
+ 
+wyn<-matrix(0,3,6)
+colnames(wyn)<-c("glm", "ctree", "rpart", "naiveBayes","las", "xgboost")
+rownames(wyn)<-c("1", "0", "-1")
+ 
+errors1 <- lapply(foldy, function(ind) {
+  model <- glm(death1y~., data=Danreg[-ind,], family = "binomial", control = list(maxit = 50))
+predict(model, newdata=Danreg[ind,], "response")- (Danreg[ind,"death1y"] == "1")
+})
+wyn[1,1]<-length(which(round(unlist(errors1))==1))
+wyn[2,1]<-length(which(round(unlist(errors1))==0))
+wyn[3,1]<-length(which(round(unlist(errors1))==-1))
+hist(round(unlist(errors1)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[1]), xlab = paste("Przewidywania dla", colnames(wyn)[1]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+ 
+errors2 <- lapply(foldy, function(ind) {
+  model <- ctree(death1y~., data=Dan[-ind,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+as.numeric(predict(model, newdata=Dan[ind,]))-as.numeric((Dan[ind,"death1y"]))
+})
+wyn[1,2]<-length(which(round(unlist(errors2))==1))
+wyn[2,2]<-length(which(round(unlist(errors2))==0))
+wyn[3,2]<-length(which(round(unlist(errors2))==-1))
+hist(round(unlist(errors2)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[2]), xlab = paste("Przewidywania dla", colnames(wyn)[2]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+ 
+errors3 <- lapply(foldy, function(ind) {
+  model <- rpart(death1y~., data=Dan[-ind,])
+as.numeric(predict(model, newdata=Dan[ind,], type="class"))-as.numeric((Dan[ind,"death1y"]))
+})
+wyn[1,3]<-length(which(round(unlist(errors3))==1))
+wyn[2,3]<-length(which(round(unlist(errors3))==0))
+wyn[3,3]<-length(which(round(unlist(errors3))==-1))
+hist(round(unlist(errors3)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[3]), xlab = paste("Przewidywania dla", colnames(wyn)[3]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+errors4 <- lapply(foldy, function(ind) {
+  model <- naiveBayes(death1y~., data=Dan[-ind,])
+  as.numeric(predict(model, newdata=Dan[ind,]))-as.numeric((Dan[ind,"death1y"]))
+})
+wyn[1,4]<-length(which(round(unlist(errors4))==1))
+wyn[2,4]<-length(which(round(unlist(errors4))==0))
+wyn[3,4]<-length(which(round(unlist(errors4))==-1))
+hist(round(unlist(errors4)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[4]), xlab = paste("Przewidywania dla", colnames(wyn)[4]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+errors5 <- lapply(foldy, function(ind) {
+  model <- randomForest(death1y~., data=Danlas[-ind,], ntree=330)
+  predict(model, newdata=Danlas[ind,], "response")-(Danlas[ind,"death1y"] == "1")
+})
+wyn[1,5]<-length(which(round(unlist(errors5))==1))
+wyn[2,5]<-length(which(round(unlist(errors5))==0))
+wyn[3,5]<-length(which(round(unlist(errors5))==-1))
+hist(round(unlist(errors5)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[5]), xlab = paste("Przewidywania dla", colnames(wyn)[5]), ylab = "Cz?sto??", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+ 
+igrek = Danxg$death1y == "1"
+errors6 <- lapply(foldy, function(ind){
+  X = as.matrix(Danxg[-ind,-1])
+  model <- xgboost(data=X, label=igrek[-ind],
+                  objective = "binary:logistic", 
+                  nrounds=3,
+                  max.depth=4,
+                  verbose=0)
+  predict(model, as.matrix(Danxg[ind,-1]))-(Danxg[ind,"death1y"] == "1")
+})
+wyn[1,6]<-length(which(round(unlist(errors6))==1))
+wyn[2,6]<-length(which(round(unlist(errors6))==0))
+wyn[3,6]<-length(which(round(unlist(errors6))==-1))
+hist(round(unlist(errors6)), 20, main=paste("Wyniki testu n-fold dla", colnames(wyn)[6]), xlab = paste("Przewidywania dla", colnames(wyn)[6]), ylab = "Czêstoœæ", col="gray", xaxt='n')
+axis(side=1, at=-1:1, labels = c(-1,0,1))
+grid()
+
+```
+ 
+Wynik testu:
+ 
+```{r, cache=TRUE, echo=FALSE}
+wyn
+```
+ 
+<hr> 
+ 
+**2. Repeated k-fold CV (100 razy 10-fold)**
+ 
+```{r, cache=TRUE,message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(12345)
+wynik<-matrix(0,3,6)
+colnames(wynik)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(wynik)<-c("1", "0", "-1")
+ 
+for(i in 1:100){
+ 
+foldy <- createFolds(Dane2$death1y, k=10)
+ 
+errors1 <- lapply(foldy, function(ind) {
+  model <- glm(death1y~., data=Danreg[-ind,], family = "binomial")
+predict(model, newdata=Danreg[ind,], "response")- (Danreg[ind,"death1y"] == "1")
+})
+wynik[1,1]<-wynik[1,1]+length(which(round(unlist(errors1))==1))
+wynik[2,1]<-wynik[2,1]+length(which(round(unlist(errors1))==0))
+wynik[3,1]<-wynik[3,1]+length(which(round(unlist(errors1))==-1))
+ 
+errors2 <- lapply(foldy, function(ind) {
+  model <- ctree(death1y~., data=Dan[-ind,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+as.numeric(predict(model, newdata=Dan[ind,]))-as.numeric((Dan[ind,"death1y"]))
+})
+wynik[1,2]<-wynik[1,2]+length(which(round(unlist(errors2))==1))
+wynik[2,2]<-wynik[2,2]+length(which(round(unlist(errors2))==0))
+wynik[3,2]<-wynik[3,2]+length(which(round(unlist(errors2))==-1))
+ 
+ 
+errors3 <- lapply(foldy, function(ind) {
+  model <- rpart(death1y~., data=Dan[-ind,])
+as.numeric(predict(model, newdata=Dan[ind,], type="class"))-as.numeric((Dan[ind,"death1y"]))
+})
+wynik[1,3]<-wynik[1,3]+length(which(round(unlist(errors3))==1))
+wynik[2,3]<-wynik[2,3]+length(which(round(unlist(errors3))==0))
+wynik[3,3]<-wynik[3,3]+length(which(round(unlist(errors3))==-1))
+ 
+errors4 <- lapply(foldy, function(ind) {
+  model <- naiveBayes(death1y~., data=Dan[-ind,])
+  as.numeric(predict(model, newdata=Dan[ind,]))-as.numeric((Dan[ind,"death1y"]))
+})
+wynik[1,4]<-wynik[1,4]+length(which(round(unlist(errors4))==1))
+wynik[2,4]<-wynik[2,4]+length(which(round(unlist(errors4))==0))
+wynik[3,4]<-wynik[3,4]+length(which(round(unlist(errors4))==-1))
+ 
+errors5 <- lapply(foldy, function(ind) {
+  model <- randomForest(death1y~., data=Danlas[-ind,], ntree=330)
+predict(model, newdata=Danlas[ind,], "response")- (Danlas[ind,"death1y"] == "1")
+})
+wynik[1,5]<-wynik[1,5]+length(which(round(unlist(errors5))==1))
+wynik[2,5]<-wynik[2,5]+length(which(round(unlist(errors5))==0))
+wynik[3,5]<-wynik[3,5]+length(which(round(unlist(errors5))==-1))
+
+errors6 <- lapply(foldy, function(ind){
+  X = as.matrix(Danxg[-ind,-1])
+  model <- xgboost(data=X, label=igrek[-ind],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.depth=4,
+                  verbose=0)
+  predict(model, as.matrix(Danxg[ind,-1]))-(Danxg[ind,"death1y"] == "1")
+})
+wynik[1,6]<-wynik[1,6]+length(which(round(unlist(errors6))==1))
+wynik[2,6]<-wynik[2,6]+length(which(round(unlist(errors6))==0))
+wynik[3,6]<-wynik[3,6]+length(which(round(unlist(errors6))==-1))
+}
+```
+ 
+Wynik testu:
+ 
+```{r, cache=TRUE, echo=FALSE}
+wynik/100
+```
+
+<hr>
+
+
+**3. Krzywe ROC dla podzia³u bootstrap:**
+ 
+```{r, cache=TRUE, message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(12335)
+subset<-createResample(Dane2$death1y, times = 1, list = FALSE)
+ 
+cs2<-matrix(0,3,6)
+colnames(cs2)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(cs2)<-c("czulosc", "specyficznosc", "auc")
+ 
+ 
+regresja <- glm(death1y~., data=Danreg[subset,], family="binomial", control = list(maxit = 50))
+oceny<-predict(regresja, newdata=Danreg[-subset,], type="response")
+t<-table(predykcja = (oceny > .5), prawdziwe = Danreg[-subset,1])
+ 
+cs2[1,1]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,1]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla regresji
+
+roc_reg<-roc(Danreg[-subset,]$death1y, oceny, direction="<")
+plot(roc_reg, col = "blue", lwd = 3)
+cs2[3,1]=roc_reg$auc
+ 
+ 
+drzewo <- ctree(death1y~., data=Dan[subset,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+oceny <- predict(drzewo, newdata=Dan[-subset,])
+ 
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs2[1,2]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,2]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla drzewa 1
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "red", lwd = 3)
+cs2[3,2]=roc_reg$auc
+ 
+  drzewwo <- rpart(death1y~., data=Dan[subset,])
+oceny<-predict(drzewwo, newdata=Dan[-subset,], type="class")
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs2[1,3]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,3]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla drzewa 2
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "green", lwd = 3)
+cs2[3,3]=roc_reg$auc
+ 
+ 
+nb <- naiveBayes(death1y ~., data=Dan[subset,])
+oceny <- predict(nb, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs2[1,4]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,4]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla nb
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "pink", lwd = 3)
+cs2[3,4]=roc_reg$auc
+ 
+rf <- randomForest(death1y~., Danlas[subset,], ntree=330)
+oceny <- predict(rf, newdata=Danlas[-subset,])
+t<-table(predykcja = oceny>.5, prawdziwe = Danlas[-subset,1])
+ 
+cs2[1,5]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,5]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla lasu
+par(new=TRUE)
+roc_reg<-roc(Danlas[-subset,]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "black", lwd = 3)
+cs2[3,5]=roc_reg$auc
+ 
+
+X = as.matrix(Danxg[subset,-1])
+xgb <- xgboost(data=X, label=igrek[subset],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.deph = 4,
+                  verbose=0)
+oceny <- predict(xgb, as.matrix(Danxg[-subset,-1]))
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danxg[-subset,1])
+
+cs2[1,6]=t[1,1]/(t[1,1]+t[2,1])
+cs2[2,6]=t[2,2]/(t[2,2]+t[1,2])
+
+#roc dla xgb
+par(new=TRUE)
+roc_reg<-roc(Danxg[-subset,]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "orange", lwd = 3)
+cs2[3,6]=roc_reg$auc
+
+legend(x=0, y=0.5, legend = c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost"), col = c("blue", "red", "green", "pink", "black", "orange"), lwd=c(2, 2))
+```
+
+
+**Weryfikacja powy¿szych wyników poprzez wiêksz¹ liczbê iteracji, i analiza tabeli kontyngencji:**
+
+```{r, cache=TRUE, message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(12345)
+
+ 
+cs2<-matrix(0,4,6)
+colnames(cs2)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(cs2)<-c("czulosc", "specyficznosc", "auc", "F1")
+ 
+for (i in 1:1000){
+subset<-createResample(Dane2$death1y, times=1, list=FALSE)
+#subset<-createResample(Dane2$death1y, times = 1, list = FALSE)
+ 
+regresja <- glm(death1y~., data=Danreg[subset,], family="binomial", control = list(maxit = 50))
+oceny<-predict(regresja, newdata=Danreg[-subset,], type="response")
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danreg[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs2[1,1]=cs2[1,1]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,1]=cs2[2,1]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,1]=cs2[3,1]+roc(Danreg[-subset,]$death1y, oceny, direction="<")$auc
+cs2[4,1]=cs2[4,1]+(2*p*r)/(p+r) 
+ 
+drzewo <- ctree(death1y~., data=Dan[subset,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+  oceny <- predict(drzewo, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1])
+cs2[1,2]=cs2[1,2]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,2]=cs2[2,2]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,2]=cs2[3,2]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,2]=cs2[4,2]+(2*p*r)/(p+r) 
+
+drzewwo <- rpart(death1y~., data=Dan[subset,])
+oceny<-predict(drzewwo, newdata=Dan[-subset,], type="class")
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs2[1,3]=cs2[1,3]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,3]=cs2[2,3]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,3]=cs2[3,3]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,3]=cs2[4,3]+(2*p*r)/(p+r) 
+
+nb <- naiveBayes(death1y ~., data=Dan[subset,])
+oceny <- predict(nb, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs2[1,4]=cs2[1,4]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,4]=cs2[2,4]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,4]=cs2[3,4]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,4]=cs2[4,4]+(2*p*r)/(p+r) 
+ 
+rf <- randomForest(death1y~., Danlas[subset,])
+oceny <- predict(rf, newdata=Danlas[-subset,], ntree=330)
+t<-table(predykcja = (oceny>.5), prawdziwe = Danlas[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs2[1,5]=cs2[1,5]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,5]=cs2[2,5]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,5]=cs2[3,5]+roc(Danlas[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,5]=cs2[4,5]+(2*p*r)/(p+r)
+
+X = as.matrix(Danxg[subset,-1])
+xgb <- xgboost(data=X, label=igrek[subset],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.depth=4,
+                  verbose=0)
+oceny <- predict(xgb, as.matrix(Danxg[-subset,-1]))
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danxg[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1])
+cs2[1,6]=cs2[1,6]+t[1,1]/(t[1,1]+t[2,1])
+cs2[2,6]=cs2[2,6]+t[2,2]/(t[2,2]+t[1,2])
+cs2[3,6]=cs2[3,6]+roc(Danxg[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs2[4,6]=cs2[4,6]+(2*p*r)/(p+r)
+}
+```
+
+Wynik testu - czulosc (% dobrze przewidzanych jako dead) oraz specyficznosc (% dobrze przewidzianych jako alive), pole pod krzywa ROC i wspolczynnik F1 (opisany na kaggle)::
+ 
+```{r, cache=TRUE, echo=FALSE}
+cs2/1000
+```
+
+<hr>
+
+**4. Krzywe ROC dla podzia³u standardowego:**
+
+```{r, cache=TRUE, message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(12341)
+subset<-createDataPartition(Dane2$death1y, times = 1, list = FALSE)
+ 
+cs<-matrix(0,3,6)
+colnames(cs)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(cs)<-c("czulosc", "specyficznosc", "auc")
+ 
+ 
+regresja <- glm(death1y~., data=Danreg[subset,], family="binomial", control = list(maxit = 50))
+oceny<-predict(regresja, newdata=Danreg[-subset,], type="response")
+t<-table(predykcja = (oceny > .5), prawdziwe = Danreg[-subset,1])
+ 
+cs[1,1]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,1]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla regresji
+
+roc_reg<-roc(Danreg[-subset,]$death1y, oceny, direction="<")
+plot(roc_reg, col = "blue", lwd = 3)
+cs[3,1]=roc_reg$auc
+ 
+ 
+drzewo <- ctree(death1y~., data=Dan[subset,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+oceny <- predict(drzewo, newdata=Dan[-subset,])
+ 
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs[1,2]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,2]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla drzewa 1
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "red", lwd = 3)
+cs[3,2]=roc_reg$auc
+ 
+  drzewwo <- rpart(death1y~., data=Dan[subset,])
+oceny<-predict(drzewwo, newdata=Dan[-subset,], type="class")
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs[1,3]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,3]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla drzewa 2
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "green", lwd = 3)
+cs[3,3]=roc_reg$auc
+ 
+ 
+nb <- naiveBayes(death1y ~., data=Dan[subset,])
+oceny <- predict(nb, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+ 
+cs[1,4]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,4]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla nb
+par(new=TRUE)
+roc_reg<-roc(Dane2[-subset,c(4,y)]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "pink", lwd = 3)
+cs[3,4]=roc_reg$auc
+ 
+rf <- randomForest(death1y~., Danlas[subset,], ntree=330)
+oceny <- predict(rf, newdata=Danlas[-subset,])
+t<-table(predykcja = oceny>.5, prawdziwe = Danlas[-subset,1])
+ 
+cs[1,5]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,5]=t[2,2]/(t[2,2]+t[1,2])
+ 
+#roc dla lasu
+par(new=TRUE)
+roc_reg<-roc(Danlas[-subset,]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "black", lwd = 3)
+cs[3,5]=roc_reg$auc
+ 
+
+X = as.matrix(Danxg[subset,-1])
+xgb <- xgboost(data=X, label=igrek[subset],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.deph = 4,
+                  verbose=0)
+oceny <- predict(xgb, as.matrix(Danxg[-subset,-1]))
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danxg[-subset,1])
+
+cs[1,6]=t[1,1]/(t[1,1]+t[2,1])
+cs[2,6]=t[2,2]/(t[2,2]+t[1,2])
+
+#roc dla xgb
+par(new=TRUE)
+roc_reg<-roc(Danxg[-subset,]$death1y, as.numeric(oceny), direction="<")
+plot(roc_reg, col = "orange", lwd = 3)
+cs[3,6]=roc_reg$auc
+
+legend(x=0, y=0.5, legend = c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost"), col = c("blue", "red", "green", "pink", "black", "orange"), lwd=c(2, 2))
+```
+
+
+**Weryfikacja powy¿szych wyników poprzez wiêksz¹ liczbê iteracji, i analiza tabeli kontyngencji:**
+ 
+```{r, cache=TRUE, message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(12345)
+
+ 
+cs<-matrix(0,4,6)
+colnames(cs)<-c("glm", "ctree", "rpart", "naiveBayes", "las", "xgboost")
+rownames(cs)<-c("czulosc", "specyficznosc", "auc", "F1")
+ 
+for (i in 1:1000){
+subset<-createDataPartition(Dane2$death1y, times=1, p=0.75, list=FALSE)
+#subset<-createResample(Dane2$death1y, times = 1, list = FALSE)
+ 
+regresja <- glm(death1y~., data=Danreg[subset,], family="binomial", control = list(maxit = 50))
+oceny<-predict(regresja, newdata=Danreg[-subset,], type="response")
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danreg[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs[1,1]=cs[1,1]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,1]=cs[2,1]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,1]=cs[3,1]+roc(Danreg[-subset,]$death1y, oceny, direction="<")$auc
+cs[4,1]=cs[4,1]+(2*p*r)/(p+r) 
+ 
+drzewo <- ctree(death1y~., data=Dan[subset,], control=ctree_control(mincriterion = 0.75, testtype="Bonferroni"))
+  oceny <- predict(drzewo, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1])
+cs[1,2]=cs[1,2]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,2]=cs[2,2]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,2]=cs[3,2]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,2]=cs[4,2]+(2*p*r)/(p+r) 
+
+drzewwo <- rpart(death1y~., data=Dan[subset,])
+oceny<-predict(drzewwo, newdata=Dan[-subset,], type="class")
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs[1,3]=cs[1,3]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,3]=cs[2,3]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,3]=cs[3,3]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,3]=cs[4,3]+(2*p*r)/(p+r) 
+
+nb <- naiveBayes(death1y ~., data=Dan[subset,])
+oceny <- predict(nb, newdata=Dan[-subset,])
+t<-table(predykcja = oceny, prawdziwe = Dan[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs[1,4]=cs[1,4]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,4]=cs[2,4]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,4]=cs[3,4]+roc(Dan[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,4]=cs[4,4]+(2*p*r)/(p+r) 
+ 
+rf <- randomForest(death1y~., Danlas[subset,])
+oceny <- predict(rf, newdata=Danlas[-subset,], ntree=330)
+t<-table(predykcja = (oceny>.5), prawdziwe = Danlas[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1]) 
+cs[1,5]=cs[1,5]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,5]=cs[2,5]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,5]=cs[3,5]+roc(Danlas[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,5]=cs[4,5]+(2*p*r)/(p+r)
+
+X = as.matrix(Danxg[subset,-1])
+xgb <- xgboost(data=X, label=igrek[subset],
+                  objective = "binary:logistic", 
+                  nrounds = 3,
+                  max.depth=4,
+                  verbose=0)
+oceny <- predict(xgb, as.matrix(Danxg[-subset,-1]))
+t<-table(predykcja = (oceny>0.5), prawdziwe = Danxg[-subset,1])
+p<-t[1,1]/(t[1,1]+t[1,2])
+r<-t[1,1]/(t[1,1]+t[2,1])
+cs[1,6]=cs[1,6]+t[1,1]/(t[1,1]+t[2,1])
+cs[2,6]=cs[2,6]+t[2,2]/(t[2,2]+t[1,2])
+cs[3,6]=cs[3,6]+roc(Danxg[-subset,]$death1y, as.numeric(oceny), direction="<")$auc
+cs[4,6]=cs[4,6]+(2*p*r)/(p+r)
+}
+```
+ 
+Wynik testu - czulosc (% dobrze przewidzanych jako dead) oraz specyficznosc (% dobrze przewidzianych jako alive), pole pod krzywa ROC i wspolczynnik F1 (opisany na kaggle)::
+ 
+```{r, cache=TRUE, echo=FALSE}
+cs/1000
+```
