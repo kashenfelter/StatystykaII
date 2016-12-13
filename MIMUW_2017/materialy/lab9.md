@@ -18,4 +18,24 @@ Wykorzystamy te dane aby odnaleźć jakąś interesującą strukturę w ocenach.
 W kolejnym kroku warto przyjrzeć się zbiorowi danych 379dde77e1b8446ecdb0e87fc6552909.
 
 
+## W razie potrzeby....
 
+
+```
+library(tidyr)
+library(arules)
+
+oceny <- archivist::aread("pbiecek/Przewodnik/arepo/12b75717051be0ae516b900e1e70c049")
+ocenyL <- spread(oceny, CODE, GRADE, fill = 0)
+ocenyL[1:5,1:5]
+ocenyB <- ocenyL[,-1] >=3
+ocenyT <- as(ocenyB, "transactions")
+trans <-apriori(ocenyT,parameter = list(supp=0.1, conf=0.4))
+trans
+inspect(trans)
+
+library(arulesViz)
+itemFrequencyPlot(ocenyT)
+plot(trans)
+plot(head(sort(trans, by="lift"), 50),  method="graph", control=list(cex=.7))
+```
