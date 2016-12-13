@@ -1,8 +1,8 @@
 Statystyka II
 ----------------
 
-Schedule MIM UW:
-----------------
+Plan MIM UW:
+------------
 
 * 5 X, W+L: Statystyki opisowe - zmienne jakościowe, test chi2, analiza korespondencji, [lab1](materialy/lab1.md)
 * 12 X [eRum @ Poznań] L: Eksploracja danych + ggplot2
@@ -14,11 +14,11 @@ Schedule MIM UW:
 * 23 XI, W+L: Metody wyboru modelu, regresja z wieloma zmiennymi, [materiały](http://pbiecek.github.io/Przewodnik/Predykcja/regularyzacja.html), [lab7](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab7.md)
 * 30 XI, (Będlewo - będą odrobione w innym terminie)
 * 07 XII, [Presentations@lectures], [Project 1 phase 3], W: Regularyzacja, [lab8](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab8.md)
-* 14 XII, W+L: Reguły decyzyjne - [wyklad](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/rules.html)
+* 14 XII, W+L: Reguły decyzyjne - [wyklad](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/rules.html), [lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab9.md)
 * 21 XII, [Presentations@lab], [Project 2 phase 1] W: Analiza grup - metody kombinatoryczne, [k-means](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/kmeans.html), [PAM](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/pam.html)
 * 11 I, W+L: Analiza grup - metody aglomeracyjne, [wyklad](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/agnes.html)
 * 18 I, [Presentations@lab], [Project 2 phase 2] W: Skalowanie wielowymiarowe, [wyklad](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/mds.html)
-* 25 I, W+L: Zobaczymy
+* 25 I, W+L: PCA
 
 [Presentations@lectures], [Project 2 phase 3] 
 
