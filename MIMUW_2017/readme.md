@@ -130,4 +130,11 @@ Każdy wiersz opisuje czas rozwiązywania jednego zadania. Tutaj rozważamy tylk
 * Pozycja – informacja w której części całego testu wystąpiło to zadanie. Cały dwugodzinny test jest podzielony na 4 mniej więcej równe części, a ta kolumna opisuje kod określonej części,
 * Obszar – określa czy zadanie dotyczy czytania czy matematyki.
 
+Kroki kolejnych etapów:
+
+* *Etap 1*. Przedstaw podstawowe wyniki dotyczące czasów rozwiązywania zadań w różnych krajach. Upewnij się, że znasz strukturę danych, wiesz jak traktować wartości skrajne. Sprawdź, czy są różnice pomiędzy krajami.
+
+* *Etap 2*. Zidentyfikuj i nazwij typowe wzorce zachowań (Test-taking behaviors) jeżeli chodzi o czas realizacji zadań w teście. Liczba i nazwa wzorców może być dowolna, ale wymaga uzasadnienia. Poszczególne wzorce będą odpowiadały segmentom studentów.
+
+* *Etap 3*. Sprawdź jak wzorce zachowań (Test-taking behaviors) występują w różnych krajach. Czy i jak różnią się podejścia do rozwiązywania zadań w różnych krajach. Czy ma o związek z końcowymi wynikami (średnimi wynikami z matematyki/czytania) dla krajów.
 
