@@ -95,3 +95,39 @@ W trzecim etapie oceniane będą kryteria:
 - interpretacja i walidacja otrzymanych wyników.
 
 Dane do projektu [rda](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/GlioblastomaWide.rda), [txt](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/GlioblastomaWide.txt).
+
+
+Projekt 2
+---------
+
+Drugi projekt dotyczy analizy struktury danych. Będziemy pracować na danych z projektu PISA 2015 (https://www.oecd.org/pisa/pisaproducts/pisa2015draftframeworks.htm). To dane dla 58 krajów, w których przeprowadzono wśród 15 latków (w sumie ponad 500 000 osób) badanie kompetencji w matematyce, czytaniu ze zrozumieniem i naukach przyrodniczych.
+
+Dane zostały opublikowane w połowie grudnia 2016, więc są bardzo świeże. Typowe analizy dotycząc porównywania średnich wyników w grupach (czy chłopcy są bardziej niż dziewczynki, czy miasta są bardziej niż wsie, czy południe jest bardziej niż północ itp.). Nas jednak będzie interesowała strategia w jakiej uczniowie rozwiązują zadania. Rozwiązanie każdego zadania trwa ileś czasu, niektórzy uczniowie mogą poświęcić więcej czasu na początku testu, inni pod koniec (cały test trwa dwie godziny). 
+
+Surowe dane są na stronie OECD, ale aby dane nadawały się do przetwarzania, trzeba wykonać kilka operacji. Wstępnie przetworzone dane znajdują się na stronie https://www.dropbox.com/s/7lp82urpsfjvg2f/onlyTimingsLong.rda 
+
+Struktura danych jest następująca:
+
+```
+> head(onlyTimingsLong)
+           Kraj  Szkola Student Zestaw    Czas Zadanie Pozycja Obszar
+10737 Australia 3600001 3601769     31  195552 R219Q01       3      R
+10742 Australia 3600001 3605983     85  143354 R219Q01       2      R
+10747 Australia 3600001 3602143     36  206815 R219Q01       4      R
+10759 Australia 3600002 3611016     37  117352 R219Q01       1      R
+10787 Australia 3600003 3605314     36  174955 R219Q01       4      R
+10794 Australia 3600003 3611875     41 1269775 R219Q01       2      R
+```
+
+Każdy wiersz opisuje czas rozwiązywania jednego zadania. Tutaj rozważamy tylko zadania z matematyki i czytania (nauk przyrodniczych jest dużo więcej, więc upraszczamy sobie analizę). Kolejne kolumny to:
+
+* Kraj z którego pochodzi uczeń
+* Szkoła do której chodzi uczeń
+* Student, czyli ID ucznia w danej szkole w danym kraju
+* Zestaw – numer zestawu zadań, które student rozwiązywał (różne zestawy różnią się kolejnością)
+* Czas – w tysięcznych sekundy (uwaga na skrajnie długie czasy które trzeba usunąć)
+* Zadanie – identyfikator zadania, które jest rozwiązywane
+* Pozycja – informacja w której części całego testu wystąpiło to zadanie. Cały dwugodzinny test jest podzielony na 4 mniej więcej równe części, a ta kolumna opisuje kod określonej części,
+* Obszar – określa czy zadanie dotyczy czytania czy matematyki.
+
+
