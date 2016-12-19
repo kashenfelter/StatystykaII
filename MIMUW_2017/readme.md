@@ -15,10 +15,10 @@ Plan MIM UW:
 * 30 XI, (Będlewo - będą odrobione w innym terminie)
 * 07 XII, [Presentations@lectures], [Project 1 phase 3], W: Regularyzacja, [lab8](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab8.md)
 * 14 XII, W+L: Reguły decyzyjne - [wyklad](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/rules.html), [lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab9.md)
-* 21 XII, [Presentations@lab], [Project 2 phase 1] W: [PCA](http://pbiecek.github.io/Przewodnik/Analiza/beznadzoru/mds_pca.html), L: [Hollywood Insider](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab10.md)
+* 21 XII, [Presentations@lab], [Project 2 phase 1] W: [PCA](http://pbiecek.github.io/Przewodnik/Analiza/beznadzoru/mds_pca.html), Skalowanie wielowymiarowe, [MDS](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/mds.html), L: [Hollywood Insider](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab10.md)
 * 11 I, W+L: Analiza grup - metody aglomeracyjne, [wyklad](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/agnes.html)
 * 18 I, [Presentations@lab], [Project 2 phase 2] Analiza grup - metody kombinatoryczne, [k-means](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/kmeans.html), [PAM](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/pam.html)
-* 25 I, W+L: [Presentations@lectures], [Project 2 phase 3] W: Skalowanie wielowymiarowe, [wyklad](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/mds.html)
+* 25 I, W+L: [Presentations@lectures], [Project 2 phase 3] W: Mclust
 
 Zaliczenie
 ----------
