@@ -1,0 +1,501 @@
+---
+title: "Projekt1-etap3"
+author: "Filip Binkiewicz, Wojciech Szymañski"
+output: html_document
+---
+
+```{r,,message=FALSE,warning=FALSE, results="hide",echo=FALSE}
+#Packages
+library("pROC")
+library("randomForest")
+library("ggplot2")
+library("caret")
+library("xgboost")
+library("glmnet")
+library("e1071")
+library("mlbench")
+library("caretEnsemble")
+library("kernlab")
+library("rpart")
+```
+
+##Klasyfikatoy
+Wczytujemy plik Rak, w którym znajduj¹ siê ju¿ oczyszczone dane Glioblastomawide, tzn.
+kolumna `death1y` zawiera wartoœci zerojedynkowe, kolumny, które zaieraj¹ wiêcej ni¿ piêæ wartoœci `NA` dla pacjentów, którzy prze¿yli oraz wiêcej ni¿ piêæ wartoœci `NA` dla pacjentów, którzy nie prze¿yli zosta³y usuniête, a w pozosta³ych kolumnach `NA` zosta³y zast¹pione œrednimi kolumn.
+
+W pierwszej fazie projektu otrzymaliœmy zbiór istotnych zmiennych, który teraz przypiszemy na wektorze `Nazwy`. Na podtawie tych cech zbudujemy kilka klasyfikatorów w celu oceny œmiertelnoœci wœród chorych. 
+
+```{r,message=FALSE,warning=FALSE,cache=FALSE}
+load("C:/Users/ojro72/Desktop/Rak.rda")
+
+Nazwy <- c("death1y","age","ACTR3C","AQP9","CLEC5A","CSNK1D","CTSB","CTSD","GPNMB","HK3","LRRC61","LSP1","MLPH","NCF2","NRG1","PLAUR","SLC11A1","SLC17A9","STAG2","STC1","TBL1XR1")
+Zbior_Cechy <- Rak[,Nazwy]
+Zbior_Cechy$death1y <- as.factor(Zbior_Cechy$death1y)
+```
+
+##Klasyfikatory
+
+###1. Las
+Pierwszym klasyfikatorem jest las losowy, który wywo³amy przy u¿yciu funkcji `randomForest`
+```{r,message=FALSE,warning=FALSE,cache=FALSE}
+set.seed(13)
+LAS<-randomForest(death1y~.,data=Zbior_Cechy)
+LAS
+importance(LAS)
+varImpPlot(LAS)
+```
+
+Powy¿szy wykres przedstawia istotnoœæ cech dla lasu losowego. Widzimy, ¿e najbardziej istotne s¹ `CSNK1D` i `SLC17A9`. Zbudujmy zatem obszar decyzyjny dla tych cech
+
+####Obszar decyzyjny dla `CSNK1D` i `SLC17A9` 
+```{r,,message=FALSE,warning=FALSE, results="hide",echo=FALSE,cache=FALSE}
+RF<-randomForest(death1y~CSNK1D+SLC17A9, data=Zbior_Cechy)
+grid <- expand.grid(CSNK1D=seq(-1.5,1.5, length.out=200), 
+                    SLC17A9=seq(-3.5,2.5, length.out=200))
+pred_RF <- predict(RF, grid, type="prob")[,2]
+grid$posterior_RF <- pred_RF
+ggplot(grid, aes(CSNK1D,SLC17A9, color=posterior_RF)) + geom_point(size=1)
+```
+
+Obszar ten interpretujemy nastêpuj¹co. Jaœniejsze pole oznacza du¿e prawdopodobieñstwo prze¿ycia, natomiast ciemny obszar oznacza ma³e prawdopodobieñstwo przetrwania pacjenta  
+
+####K-fold cross-walidacja dla lasu
+
+Jakoœæ klasyfikotora bêdziemy badaæ porównuj¹c b³¹d cross-walidacji. W naszym przypadku powtórzymy 20-krotnie 10-fold cv. Na ka¿dym z podzbiorów sprawdzamy trafnoœæ predykcji modelu zbudowanego na pozosta³ych zbiorach. `0` oznacza, ¿e model trafnie przewidzia³ stan pacjenta, `-1` oznacza, ¿e model nietrafnie przewidzia³ œmieræ pacjenta, `1` oznacza, ¿e model nietrafnie przewidzia³ prze¿ycie pacjenta. Tworzymy histogram, a nastêpnie uœredniamy b³¹d cross-walidacji. 
+
+```{r,message=FALSE,warning=FALSE,cache=FALSE}
+set.seed(13)
+X <- replicate(20,{
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+lapply(foldy, function(x) {
+  model <- randomForest(death1y~.,data=Zbior_Cechy[-x,])
+  round(as.numeric(predict(model,newdata=Zbior_Cechy[x,], type="prob")[,2])) -
+  (as.numeric(Zbior_Cechy[x,"death1y"])-1)
+})
+})
+
+hist(unlist(X),100, col=c("red","green","red"))
+mean(abs(unlist(X)))
+```
+
+####Krzywa ROC dla lasu
+
+Kolejn¹ metod¹ porównywania jakoœæi klasyfikotorów jest krzywa ROC. Interpretacja tej metody jest prosta, im wiêksze pole pod wykresem tym lepsza predykcja, czyli lepszy klasyfikator
+
+Œrednia krzywa ROC dla 10-fold cv
+
+```{r,message=FALSE,warning=FALSE,results="hide",echo=FALSE,cache=FALSE}
+set.seed(13)
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+K <- lapply(foldy, function(x) {
+model <- randomForest(death1y~.,data=Zbior_Cechy[-x,])
+pred_Las <- predict(model, newdata=Zbior_Cechy[x,], type="prob")[,2]
+roc(Zbior_Cechy[x,1], as.numeric(pred_Las),direction="<")
+})
+D <- K$Fold01  
+
+D$sensitivities <- c(K$Fold01$sensitivities,K$Fold02$sensitivities,K$Fold03$sensitivities,K$Fold04$sensitivities,K$Fold05$sensitivities,K$Fold06$sensitivities,K$Fold07$sensitivities,K$Fold08$sensitivities,K$Fold09$sensitivities,K$Fold10$sensitivities)
+D$specificities <- c(K$Fold01$specificities,K$Fold02$specificities,K$Fold03$specificities,K$Fold04$specificities,K$Fold05$specificities,K$Fold06$specificities,K$Fold07$specificities,K$Fold08$specificities,K$Fold09$specificities,K$Fold10$specificities)
+
+ForestROC <- D 
+plot(ForestROC , main = "Las",col = "green", lwd = 3)
+```
+
+Œrednie pole pod wykresem dla 20-krotnie powtórzonego 10-fold cv
+```{r,message=FALSE,warning=FALSE,echo=FALSE, cache=FALSE}
+set.seed(13)
+L <-replicate(20,{ 
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+lapply(foldy, function(x) {
+model <- randomForest(death1y~.,data=Zbior_Cechy[-x,])
+pred_Las <- predict(model, newdata=Zbior_Cechy[x,], type="prob")[,2]
+roc(Zbior_Cechy[x,1], as.numeric(pred_Las),direction="<")$auc
+})
+})
+AUCForest <- mean(as.numeric(L))
+AUCForest
+```
+
+###2. Xgboost
+
+Kolejnym klasyfikatorem jest xgboost, który wywo³amy przy u¿yciu funkcji `xgboost`
+```{r,message=FALSE,warning=FALSE, results="hide"}
+GB <- xgboost(label=Zbior_Cechy$death1y == "1", 
+              data=as.matrix(Zbior_Cechy[,-1]), 
+              objective = "binary:logistic", 
+              nrounds=10, max.deph = 10)
+```
+
+```{r,message=FALSE,warning=FALSE}
+importance_matrix <- xgb.importance(colnames(Zbior_Cechy)[-1], model = GB)
+xgb.plot.importance(importance_matrix)
+```
+
+Powy¿szy wykres przedstawia istotnoœæ cech dla xgboost. Widzimy, ¿e najbardziej istotne jest `SLC17A9`
+
+####K-fold cross-walidacja dla xgboost (histogram, œredni b³¹d)
+
+```{r,message=FALSE,warning=FALSE,results="hide",cache=FALSE}
+Y <- replicate(20,{
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+lapply(foldy, function(x) {
+    Zbior_Trening <- Zbior_Cechy[-x,]
+    Zbior_Testowy <- Zbior_Cechy[x,]
+model <- xgboost(label=Zbior_Trening$death1y == "1", 
+                 data=as.matrix(Zbior_Trening[,-1]),
+                 objective = "binary:logistic",
+                 nrounds=9, max.deph = 10)
+round(predict(model, as.matrix(Zbior_Testowy[,-1]))) - 
+  (as.numeric(Zbior_Testowy[,"death1y"])-1)
+})
+})
+```
+
+```{r,message=FALSE,warning=FALSE}
+hist(unlist(Y), 100, col=c("red","green","red"))
+mean(abs(unlist(Y)))
+```
+
+####Krzywa ROC dla xgboost
+
+Œrednia krzywa ROC dla 10-fold cv
+
+```{r,message=FALSE,warning=FALSE,results="hide",echo=FALSE,cache=FALSE}
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+K <- lapply(foldy, function(x) {
+    Zbior_Trening <- Zbior_Cechy[-x,]
+    Zbior_Testowy <- Zbior_Cechy[x,]
+model <- xgboost(label=Zbior_Trening$death1y == "1", data=as.matrix(Zbior_Trening[,-1]),objective = "binary:logistic",nrounds=9,
+max.deph = 10)
+pred_xgboost<- predict(model, as.matrix(Zbior_Testowy[,-1]))
+roc(Zbior_Cechy[x,1], as.numeric(pred_xgboost),direction="<")
+})
+D <- K$Fold01  
+
+D$sensitivities <- c(K$Fold01$sensitivities,K$Fold02$sensitivities,K$Fold03$sensitivities,K$Fold04$sensitivities,K$Fold05$sensitivities,K$Fold06$sensitivities,K$Fold07$sensitivities,K$Fold08$sensitivities,K$Fold09$sensitivities,K$Fold10$sensitivities)
+D$specificities <- c(K$Fold01$specificities,K$Fold02$specificities,K$Fold03$specificities,K$Fold04$specificities,K$Fold05$specificities,K$Fold06$specificities,K$Fold07$specificities,K$Fold08$specificities,K$Fold09$specificities,K$Fold10$specificities)
+
+XgboostROC <- D
+plot(XgboostROC , main = "Xgboost",col = "blue", lwd = 3)
+```
+
+Œrednie pole pod wykresem dla 20-krotnie powtórzonego 10-fold cv
+```{r,message=FALSE,warning=FALSE,results="hide",echo=FALSE,cache=FALSE}
+Xg <-replicate(20,{ 
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+lapply(foldy, function(x) {
+    Zbior_Trening <- Zbior_Cechy[-x,]
+    Zbior_Testowy <- Zbior_Cechy[x,]
+model <- xgboost(label=Zbior_Trening$death1y == "1", data=as.matrix(Zbior_Trening[,-1]),objective = "binary:logistic",nrounds=9,
+max.deph = 10)
+pred_xgboost<- predict(model, as.matrix(Zbior_Testowy[,-1]))
+roc(Zbior_Cechy[x,1], as.numeric(pred_xgboost),direction="<")$auc
+})
+})
+AUCXgboost <- mean(as.numeric(Xg))
+```
+
+```{r,message=FALSE,warning=FALSE,echo=FALSE}
+AUCXgboost
+```
+
+###3. LASSO glm
+
+Nastêpnym klasyfikatorem jest LASSO glm wywo³any przy u¿yciu funkcji `cv.glmnet`
+```{r,message=FALSE,warning=FALSE}
+CV<-cv.glmnet(x=as.matrix(Zbior_Cechy[,-1]),
+              y=Zbior_Cechy$death1y == "1", 
+              family="binomial")
+```
+
+Poni¿szy wykres ilustruje b³¹d œredniokwadratowy  w zale¿noœci od wartoœci lambdy ograniczaj¹cej wspó³czynniki w modelu regresji
+```{r,echo=FALSE,cache=FALSE}
+plot(CV)
+```
+
+
+####K-fold cross-walidacja dla LASSO glm (histogram, œredni b³¹d)
+
+```{r,message=FALSE,warning=FALSE,cache=FALSE}
+Z <- replicate(20,{
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+lapply(foldy, function(x) {
+    Zbior_Trening <- Zbior_Cechy[-x,]
+    Zbior_Testowy <- Zbior_Cechy[x,]
+model <- cv.glmnet(x=as.matrix(Zbior_Trening[,-1]),
+                   y=Zbior_Trening$death1y == "1", 
+                   family="binomial")
+round(as.numeric(predict(model, as.matrix(Zbior_Testowy[,-1]), type="response"))) - (as.numeric(Zbior_Testowy$death1y)-1)
+})
+})
+hist(unlist(Z),100, col=c("red","green","red"))
+mean(abs(unlist(Z)))
+```
+
+####Krzywa ROC dla LASSO glm
+
+Œrednia krzywa ROC dla 10-fold cv
+
+```{r,message=FALSE,warning=FALSE,results="hide",echo=FALSE,cache=FALSE}
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+K <- lapply(foldy, function(x) {
+    Zbior_Trening <- Zbior_Cechy[-x,]
+    Zbior_Testowy <- Zbior_Cechy[x,]
+model <- cv.glmnet(x=as.matrix(Zbior_Trening[,-1]),y=Zbior_Trening$death1y == "1", family="binomial")
+pred_LASSO <- predict(model, as.matrix(Zbior_Testowy[,-1]), type="response")
+roc(Zbior_Cechy[x,1], as.numeric(pred_LASSO),direction="<")
+})
+D <- K$Fold01  
+
+D$sensitivities <- c(K$Fold01$sensitivities,K$Fold02$sensitivities,K$Fold03$sensitivities,K$Fold04$sensitivities,K$Fold05$sensitivities,K$Fold06$sensitivities,K$Fold07$sensitivities,K$Fold08$sensitivities,K$Fold09$sensitivities,K$Fold10$sensitivities)
+D$specificities <- c(K$Fold01$specificities,K$Fold02$specificities,K$Fold03$specificities,K$Fold04$specificities,K$Fold05$specificities,K$Fold06$specificities,K$Fold07$specificities,K$Fold08$specificities,K$Fold09$specificities,K$Fold10$specificities)
+
+LASSOROC <- D
+plot(LASSOROC , main = "LASSO",col = "yellow", lwd = 3)
+```
+
+Œrednie pole pod wykresem dla 20-krotnie powtórzonego 10-fold cv
+```{r,message=FALSE,warning=FALSE,echo=FALSE,cache=FALSE}
+Lso <-replicate(20,{ 
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+lapply(foldy, function(x) {
+    Zbior_Trening <- Zbior_Cechy[-x,]
+    Zbior_Testowy <- Zbior_Cechy[x,]
+model <- cv.glmnet(x=as.matrix(Zbior_Trening[,-1]),y=Zbior_Trening$death1y == "1", family="binomial")
+pred_LASSO <- predict(model, as.matrix(Zbior_Testowy[,-1]), type="response")
+roc(Zbior_Cechy[x,1], as.numeric(pred_LASSO),direction="<")$auc
+})
+})
+AUCLASSO <- mean(as.numeric(Lso))
+AUCLASSO
+```
+
+###4. Regresja logistyczna
+
+Kolejny klasyfikator to regresja logistyczna zbudowana przy u¿yciu funkcji `glm`
+```{r,message=FALSE,warning=FALSE}
+Regresja <- glm(death1y~.,Rak[,Nazwy], family="binomial")
+summary(Regresja)
+```
+
+Ostatnia z kolumn opisuj¹cych zmienne objaœniaj¹ce mówi o istotnoœci ka¿dej ze zmiennych. Jak widzimy wiêkszoœæ zmiennych model uznaje jednak za niestotne
+
+####K-fold cross-walidacja dla regresji logistycznej (histogram, œredni b³¹d)
+
+```{r,message=FALSE,warning=FALSE,cache=FALSE}
+W <- replicate(20,{
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+  lapply(foldy, function(x) {
+  model <- glm(death1y~.,data=Rak[-x,Nazwy])
+  round(as.numeric(predict(model,newdata=Rak[x,Nazwy], type="response"))) -
+  (as.numeric(Zbior_Cechy[x,"death1y"])-1)
+})
+})
+
+hist(unlist(W),100, col=c("red","green","red"))
+mean(abs(unlist(W)))
+```
+
+####Krzywa ROC dla regresji logistycznej
+
+Œrednia krzywa ROC dla 10-fold cv
+
+```{r,message=FALSE,warning=FALSE,results="hide",echo=FALSE,cache=FALSE}
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+K <- lapply(foldy, function(x) {
+model <- glm(death1y~.,data=Rak[-x,Nazwy],family="binomial")
+pred_glm <- predict(model,newdata=Rak[x,Nazwy], type="response")
+roc(Zbior_Cechy$death1y[x], as.numeric(pred_glm),direction="<")
+})
+D <- K$Fold01  
+
+D$sensitivities <- c(K$Fold01$sensitivities,K$Fold02$sensitivities,K$Fold03$sensitivities,K$Fold04$sensitivities,K$Fold05$sensitivities,K$Fold06$sensitivities,K$Fold07$sensitivities,K$Fold08$sensitivities,K$Fold09$sensitivities,K$Fold10$sensitivities)
+D$specificities <- c(K$Fold01$specificities,K$Fold02$specificities,K$Fold03$specificities,K$Fold04$specificities,K$Fold05$specificities,K$Fold06$specificities,K$Fold07$specificities,K$Fold08$specificities,K$Fold09$specificities,K$Fold10$specificities)
+
+RegresjaROC <- D
+plot(RegresjaROC , main = "Regresja",col = "red", lwd = 3)
+```
+
+Œrednie pole pod wykresem dla 20-krotnie powtórzonego 10-fold cv
+
+```{r,message=FALSE,warning=FALSE,echo=FALSE,cache=FALSE}
+Regr <-replicate(20,{ 
+foldy <- createFolds(Zbior_Cechy$death1y, k = 10)
+lapply(foldy, function(x) {
+model <- glm(death1y~.,data=Rak[-x,Nazwy],family="binomial")
+pred_glm <- predict(model,newdata=Rak[x,Nazwy], type="response")
+roc(Zbior_Cechy$death1y[x], as.numeric(pred_glm),direction="<")$auc
+})
+})
+AUCRegresja <- mean(as.numeric(Regr))
+AUCRegresja
+```
+
+##Wyniki dla poszczególnych modeli
+
+
+
+###Histogramy w wybranych modelach
+```{r,echo=FALSE}
+par(mfrow=c(2,2))
+
+hist(unlist(X),100, main = "Las", col=c("red","green","red"))
+hist(unlist(Y),100, main = "Xgboost",col=c("red","green","red"))
+hist(unlist(Z),100, main = "LASSO",col=c("red","green","red"))
+hist(unlist(W),100, main ="Regresja",col=c("red","green","red"))
+
+```
+
+###Œrednie krzywe ROC dla modeli dla 10-fold cv
+
+```{r,message=FALSE,warning=FALSE,results="hide",echo=FALSE}
+plot(LASSOROC,col = "yellow", lwd = 3)
+par(new=TRUE)
+plot(RegresjaROC,col = "red", lwd = 3)
+par(new=TRUE)
+plot(XgboostROC,col = "blue", lwd = 3)
+par(new=TRUE)
+plot(ForestROC,col = "green", lwd = 3)
+legend(x=0.2, y=0.4, legend = c("Forest","Xgboost","LASSO_glm","Regresja"), col = c("green", "blue","yellow", "red"), lwd=c(3, 3, 3, 3))
+```
+
+
+###B³êdy k-fold w wybranych modelach dla 20-krotnego 10-fold cv
+```{r,echo=FALSE}
+Errors <- c(Las=mean(abs(unlist(X))), 
+          Xgboost=mean(abs(unlist(Y))), 
+          LASSO=mean(abs(unlist(Z))), 
+          Regresja=mean(abs(unlist(W))))
+Errors
+```
+
+###Œrednie pole pod wykresem krzywych ROC w wybranych modelach dla 20-krotnego 10-fold cv
+```{r,echo=FALSE,cache=FALSE}
+Pole <- c(Las=AUCForest, Xgboost=AUCXgboost, LASSO=AUCLASSO, Regresja=AUCRegresja)
+Pole
+```
+
+Powy¿sze rezultaty pokazuj¹, ¿e regresja logistyczna jest najlepszym klasyfikatorem, poniewa¿ ma najmniejszy b³¹d k-fold i najwiêksze pole pod wykresem œrednich ROC.
+
+
+#Model Stack
+Zbudujemy teraz kilka klasyfikatorów oparte o model stacking wykorzystuj¹cych bibliotekê `caretEnsemble`. Tworzymy listê klasyfikatorów, z których zbudujemy jeden potencjalnie bardziej efektywny model stacking ³¹cz¹c poszczególne klasyfikatory ró¿nymi metodami. Najpierw zbadajmy jednak poszczególne klasyfikatory z wybranej przez nas listy.
+
+
+```{r,message=FALSE,warning=FALSE}
+algorithmList <- c('glm', 'rpart', 'knn', 'rf', 'svmRadial')
+seed <- 10
+```
+
+W naszym modelu 20-krotnie powtórzymy 10-fold cv
+
+```{r,message=FALSE,warning=FALSE}
+control <- trainControl(
+  method="repeatedcv",
+  number=10,
+  repeats=20,
+  savePredictions="final",
+  classProbs=TRUE
+)
+```
+
+Definiujemy nowy zbiór training.data, który ró¿ni siê od Zbior_Cechy tylko tym, ¿e kolumna `death1y` zamiast wartoœci 0 i 1 przyjmuje w training.data wartoœci odpowiednio "dead" i "alive". 
+Do tak utworzonego nowego zbioru dopasowujemy nasze modele wykorzystuj¹c wczeœniej zdefiniowany `control`
+
+```{r,,message=FALSE,warning=FALSE}
+training.data <- Zbior_Cechy
+training.data$death1y <- as.factor(ifelse(training.data$death1y == "1","alive","dead"))
+set.seed(seed)
+models <- caretList(
+  death1y~.,
+  data=training.data,
+  trControl=control,
+  methodList=algorithmList
+)
+results <- resamples(models)
+summary(results)
+```
+
+Widzimy Accuracy i Kappa dla poszczególnych modeli. 
+Wspó³czynnik Accuracy interpretujemy jako skutecznoœæ wybranych modeli, natomiast wspó³czynnik Kappa oznacza czêstoœæ przewy¿szenia trafnoœci klasyfikacji wybranych modeli od trafnoœci klasyfikacji modelu losowego
+
+```{r,message=FALSE,warning=FALSE}
+dotplot(results)
+```
+
+Zauwa¿amy, ¿e model `glm` tworzy najskuteczniejszy model spoœród rozwa¿anych modeli. Ma najwiêkszy wspó³czynnik Accuracy oraz Kappa
+
+```{r}
+```
+
+Poni¿ej przedstawiamy korelacjê pomiêdzy poszczególnymi klasyfikatorami
+
+```{r,message=FALSE,warning=FALSE}
+
+modelCor(results)
+splom(results)
+
+```
+
+Gêsty rozk³ad punktów na przek¹tnej oznacza siln¹ korelacjê pomiêdzy modelami, natomiast rozproszenie punktów oznacza s³ab¹ korelacjê 
+
+
+##Modele stacking
+Przechodzimy teraz do tworzenia modeli stacking zbudowanych ró¿nymi metodami z listy wybranych klasyfikatorów. Zaprezentujemy trzy metody budowy: `glm`, `rf` oraz `gbm`
+```{r}
+```
+
+###1.Model stacking zbudowany metod¹ `glm`
+
+```{r,message=FALSE,warning=FALSE}
+stack.glm <- caretStack(
+  models,
+  method="glm",
+  metric="Accuracy",
+  trControl=control
+)
+
+print(stack.glm)
+```
+
+Jak widzimy wspó³czynnik Accuracy niewiele poprawi³ siê w stosunku do zwyk³ego modelu `glm`
+
+
+###2.Model stacking zbudowany metod¹ `rf`
+
+```{r,message=FALSE,warning=FALSE}
+stack.rf <- caretStack(
+  models,
+  method="rf",
+  metric="Accuracy",
+  trControl=control
+)
+
+print(stack.rf)
+```
+
+Widzimy znacz¹c¹ poprawê modelu. Wspó³czynnik Accuracy wyniós³ oko³o 0.89, co daje znacz¹cy wzrost w stosunku do `glm`. Po³¹czenie kilku klasyfikatorów w jeden zwiêkszy³o efektywnoœæ klasyfikatora
+
+###3.Model stacking zbudowany metod¹ `gbm`
+
+```{r,message=FALSE,warning=FALSE, results="hide"}
+stack.gbm <- caretStack(
+  models,
+  method="gbm",
+  metric="Accuracy",
+  trControl=control
+)
+```
+
+```{r,message=FALSE,warning=FALSE}
+print(stack.gbm)
+```
+
+Widzimy poprawê modelu. Wspó³czynnik Accuracy wyniós³ jest wy¿szy od Accuracy `glm`, co daje wzrost w stosunku do modelu `glm`, ale jest on gorszy od modelu stacking zbudowanego metod¹ `rf` 
+
+```{r}
+```
+
+###Podsumowanie
+
+Badaliœmy jakoœæ poszczególnych klasyfikatorów porównuj¹c œrednie b³êdy 20 krotnie powtórzonych 10-fold cross-walidacji oraz œrednie pola krzywych ROC. Skorzystaliœmy równie¿ z biblioteki `caretEnsemble`, porównuj¹c wspó³czynniki Accuracy i Kappa dla wybranych modeli. Wœród rozwa¿anych modeli najlepsza by³a regresja logistyczna. Buduj¹c jednak model stacking metod¹ `rf` z wybranej listy klasyfikatorów uda³o nam siê zwiêkszyæ efektywnoœæ klasyfikatora. Na podstawie najwiêkszych  wspó³czynników Accuracy oraz Kappa wœród rozwa¿anych modeli stwierdzamy i¿ najlepszym klasyfikatorem okaza³ siê model stacking zbudowany metod¹ `rf`. 

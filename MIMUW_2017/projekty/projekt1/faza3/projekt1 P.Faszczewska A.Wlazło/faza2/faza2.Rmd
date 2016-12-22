@@ -1,0 +1,347 @@
+---
+title: "Projekt 1 etap 2"
+author: "Patrycja Faszczewska, Adrianna Wlazło"
+date: "11 listopada 2016"
+output: html_document
+---
+W drugim etapie najpierw zbudujemy klasyfikatory na zbiorze treningowym , natomiast w kolejnym kroku porównamy jakość przeprowadzonych klasyfikacji. 
+
+W pierwszej fazie projektu uzyskałyśmy ok.30 zmiennych, które uznałyśmy za istotne i które posłużą nam do budowania klasyfiatorów w celu oceny śmiertelności wśród chorych. Zmienne te zapisujemy na wektorze wybrane. 
+Ponadto wybieramy zbiór treningowy oraz testowy, które posłużą nam do przeprowadzenia analizy jakości budowanych klasyfikacji. (Korzystamy z funkcji `createDataPartition`, gdyż bierze ona pod uwagę strukturę zbioru obserwacji, tzn. zachowuje stosunek osób które przeżyły oraz umarły w tworzonych zbiorach)
+
+```{r echo=FALSE}
+load(file="C:\\Users\\Asus\\Desktop\\Stata 2\\cancer.rda")
+cancer$smierc <- as.factor(ifelse(cancer$death1y=="dead",1,0))
+
+```
+
+
+```{r,warning=FALSE, message=FALSE}
+library("caret")
+inTrain<- createDataPartition(y=cancer$death1y,p=0.75, list=FALSE)
+train <- cancer[inTrain,]
+
+wybrane <- c("smierc"
+             ,"SLC17A9", "PLAUR", "LRRC6", "CLEC5A", "TBL1XR1", "BHLHE40",
+             "CTSB", "LSP1","NRG1", "AQP9", "CSNK1D", "HK3", "ACTR3C","age", "SLC11A1",
+             "TM7SF4", "CTF1", "GPNMB", "MLPH", "STC1", "C8orf58", "CPPED1", "CTSD", 
+             "MAP2K3", "NCF2","TNFSF14","ZC3H12A", "LILRB3", "SLC6A6")
+
+wybrane2<-c("SLC17A9", "PLAUR", "LRRC6", "CLEC5A", "TBL1XR1", "BHLHE40",
+             "CTSB", "LSP1","NRG1", "AQP9", "CSNK1D", "HK3", "ACTR3C","age", "SLC11A1","TM7SF4", "CTF1", "GPNMB", "MLPH", "STC1", "C8orf58", "CPPED1", "CTSD", "MAP2K3", "NCF2","TNFSF14","ZC3H12A", "LILRB3", "SLC6A6")
+```
+## Klasyfikatory
+1.Pierwszym klasyfikatorem, który zbudujemy będzie regresja logistyczna, którą wywołamy przy użyciu funkcji `glm`.
+```{r glm, warning=FALSE}
+r <- glm(smierc~.,train[,wybrane], family="binomial")
+summary(r)
+
+
+```
+
+2.Dzięki funkcji summary możemy obejrzeć wyniki przeprowadzoej regresji.  Ostatnia z kolumn opisujących zmienne objaśniające mówi o istotności każdej ze zmiennych. Jak widzimy większość zmiennych model uznaje za niestotne, więc możemy próbować poprawiać przedstawiony klasyfikator, aby optymalnie dobrał liczbę zmiennych użytych do modelu. Zrobimy to przy użyciu funkcji `step`, która kolejno będzie konstruować model stopniowo dodając (odrzucając) kolejne zmienne.
+
+```{r poprawaGLM,results="hide",warning=FALSE}
+r1<-step(r,method="backward")
+
+r2<-step(r,method="forward")
+
+library("coefplot")
+coefplot(r1,lwdInner=1,lwdOuter=0.1, color="blue")
+```
+<br></br>Zamieszczony powyżej wykres przedstawia wartości współczynników otrzymane w poprawionym modelu regresji wraz z przedziałami ufności (zewnętrznymi i wewnętrznymi). Jak widzimy model ten składa się z ok. 10 zmiennych.
+
+<br></br>3. Kolejnym klasyfikatorem, który może posłużyć nam do analizy jest naiwny klasyfikator Bayesowski. Model ten ma jednak pewne ograniczenia : zakłada on bowiem, że łączna gestość jest iloczynem gęstości brzegowych. Zapominając na chwilę o tej "ułomności" modelu konstruujemy go przy pomocy funkcji `NaiveBayes` z pakietu `klaR`.
+
+```{r naiwnyBayes, message=FALSE, warning=FALSE}
+library("klaR")
+NB<-NaiveBayes(smierc~.,data=train[,wybrane])
+```
+Możemy zobrazować obszary decyzyjne otrzymane metodą naiwnego klasyfikatora Bayesowskiego w zależności od 2 zmiennych uznanych przez regresję za najbardziej istotne.
+```{r}
+library("klaR")
+
+
+partimat(smierc~ACTR3C+NRG1,data=cancer[inTrain,wybrane],method="naiveBayes",main="Obszary decyzyjne w modelu ze zmiennymi ACTR3C,NRG1",col.correct = "black", col.wrong = "red",pch=15,image.colors=c("grey","blue1"))
+```
+<br></br>Kolorem szarym oznaczony został obszar odpowiadający klasyfikacji pacjentów, którzy przeżyją pierwszy rok leczenia zgodnie z modelem naiwnego klasyfikatora Bayesa zbudowanym na zmiennych ACTR3C,NRG1. Natomiast kolorem czerwonym oznaczone zostały obserwacje błędnie trafiające we wskazane im obszary decyzyjne. 
+
+4. Kolejnym narzędziem pomocnym w klasyfikacji są drzewa decyzyjne. Są one łatwe w interpetacji, co ułatwia analizę otrzymanych wyników. Charakteryzują się one małą stabilnością, więc można spróbować kontrolować je przy pomocy ustawienia głębokości konstruowanego drzewa, bądź też definiowania warunku stopu. Zdecydowałyśmy się dopuszczać głębokość drzewa na poziomie 10 oraz podział decyzji w drzewie dla każdej cechy, której p-wartość jest mniejsza niż 0.25.
+```{r drzewo,message=FALSE, warning=FALSE}
+library("party")
+drzewo <- ctree(smierc~., data=train[,wybrane], controls= ctree_control(maxdepth=10,testtype = "Bonferroni",mincriterion = 0.75))
+plot(drzewo)
+```
+
+5. Kolejnym klasyfikoterem, który skonstruujemy są lasy losowe, gdyż charakteryzują się one większą stabilnością, zatem powinny być "lepszym" odpowiednikiem drzew decyzyjnych. Jest do konstruowanie drzew decyzyjnych na losowych replikacjach zbioru, tak więc aby odtworzyć wyniki używamy funkcji `set.seed`.
+
+```{r laslos, message=FALSE, warning=FALSE}
+set.seed(1)
+library("randomForest")
+laslos<-randomForest(smierc~.,data=train[,wybrane],importance=TRUE,proximity=TRUE)
+laslos
+varImpPlot(laslos,pch=21,bg="blue",cex=0.75,main="Istotność zmiennych wg lasów losowych")
+```
+<br></br>Błąd tej metody utrzymuje się na poziomie 30%. W porównaniu do pojedynczo zbudowanego drzewa jest to metoda dająca bardziej stabilne efekty, jednak jak się okaże wypadnie ona gorzej od regresji logistycznej
+<br></br>Wykresy przedstawione powyżej prezentują istotność zmiennych mierzoną klasyfikatorem lasów losowych i zostały wywołane przy użyciu funkcji `varImpPlot`.
+Aby porównać stworzone klasyfikatory użyjemy kilku narzędzi m.in. tablic kontygencji. 
+W pierwszym kroku konstruujemy przewidywaną na podstawie skonstruowanych klasyfikatorów śmiertelność dla zbioru testowego przy pomocy `predict`. Później natomiast budujemy odpowiadające im tablice.
+
+## Tablice kontyngencji
+
+Dla regresji logistycznej:
+```{r predykcjeGLM, message=FALSE, warning=FALSE}
+smierc<-cancer[-inTrain,wybrane]$smierc
+predykcja1 <- predict(r, cancer[-inTrain,wybrane],type="response")
+predykcja1 <- round(predykcja1,digits=0)
+table(predykcja1,smierc, dnn=list("predykcja regresji logistycznej","śmierć"))
+```
+
+Dla regresji logistycznej poprawionej metodą backward:
+```{r predykcjeGLMb, message=FALSE, warning=FALSE, echo=FALSE}
+predykcja2.1<-predict(r1,cancer[-inTrain,wybrane],type="response")
+predykcja2 <- round(predykcja2.1,digits=0)
+table(predykcja2,smierc, dnn=list("predykcja rlm (backward)","śmierć"))
+```
+
+Dla regresji logistycznej poprawionej metodą forward:
+```{r predykcjeGLMf, message=FALSE, warning=FALSE, echo=FALSE}
+predykcja2.2 <- predict(r2,newdata=cancer[-inTrain,wybrane],type="response")
+predykcja2 <- round(predykcja2.2,digits=0)
+table(predykcja2,smierc,dnn=list("predykcja rlm (forward)","śmierć"))
+```
+
+Dla drzewa:
+```{r predykcjaTREES, message=FALSE, warning=FALSE, echo=FALSE}
+predykcja3<-predict(drzewo,cancer[-inTrain,wybrane])
+table(predykcja3,smierc, dnn=list("predykcja drzewa","śmierć"))
+```
+
+Dla lasu losowego:
+```{r predykcjeLAS, message=FALSE, warning=FALSE, echo=FALSE}
+predykcja4<-predict(laslos,cancer[-inTrain,wybrane2])
+table(predykcja4,smierc, dnn=list("predykcja lasu","śmierć"))
+```
+Z tablic tych mozemy odczytać liczbę błędnie sklasyfikowanych prób. Jest to suma elementów poza przekątną tablicy. Pozwala to na porównanie klasyfikatorów w zależności od stosunku błędnie zaklasyfkowanych obserwacji. 
+
+
+## Krzywe ROC
+Istnieje jednak wiele innych miar błędu predykcji biorących pod uwagę między innymi czułość modelu (opisuje jaki procent zmarłych po roku zostaje poprawnie sklasyfikowanych), czy też specyficzność (opisuje jaki procent osób, które przeżyły pierwszy rok po leczeniu zostaje poprawnie sklasyfikowana). Od dobrego klasyfikatora oczekujemy możliwie wysokiej czułości i specyficzności.
+
+Aby zilustrować te miary użyjemy krzywej ROC, którą będziemy porównywać między klasyfikatorami.
+```{r krzyweROC, message=FALSE, warning=FALSE, echo=FALSE}
+library("ROCR")
+krzywa1 <- prediction(predykcja1,cancer[-inTrain,"smierc"])
+perf1 <- performance(krzywa1,"sens","spec")
+plot(perf1,ylim=c(0,1),col="red3", lwd=2)
+
+
+krzywa2 <- prediction(predykcja2.1,cancer[-inTrain,"smierc"])
+perf2 <- performance(krzywa2,"sens","spec")
+plot(perf2,col="purple3",lwd=2, add=TRUE)
+
+krzywa3 <- prediction(as.numeric(predykcja3),as.numeric(smierc))
+perf3 <- performance(krzywa3,"sens","spec")
+plot(perf3,col="orange2",lwd=2, add=TRUE)
+
+krzywa4 <- prediction(as.numeric(predykcja4),as.numeric(smierc))
+perf4 <- performance(krzywa4,"sens","spec")
+plot(perf4,col="black",lwd=2, add=TRUE)
+
+legend("bottom",  ncol=2, legend=c("regresja logistyczna","poprawiona reg. log.","drzewo","las losowy"), lty = 1, col = c("red3","purple3","orange2","black"), lwd=2)
+
+
+```
+
+Wykres ten ma bardzo wygodną interpretację - im większe pole pod krzywą ROC, tym lepszy jest klasyfikator. Zatem zgodnie z tą zasadą regresja po raz kolejny wypada najlepiej w porównaniu z pozostalymi klasyfikatorami.
+
+
+Zbadajmy zatem pole pod krzywą replikując 100 razy losowanie zbioru testowego i porównajmy średnie pola otrzymane w krzywych ROC dla każdego z klasyfikatorów.
+
+```{r roc_replikacja,echo=FALSE, warning=FALSE,results="hide"}
+R2<-c()
+R3<-c()
+R4<-c()
+R5<-c()
+
+library("pROC")
+R2<-replicate(100,{inTrain<- createDataPartition(y=cancer$death1y,p=0.75, list=FALSE)
+train <- cancer[inTrain,]
+r <- glm(smierc~.,train[,wybrane], family="binomial")
+r1<-step(r)
+predykcja2.1<-predict(r1,cancer[-inTrain,wybrane2],type="response")
+roc(cancer[-inTrain,"smierc"],predykcja2.1)$auc
+})
+R3<-replicate(100,{inTrain<- createDataPartition(y=cancer$death1y,p=0.75, list=FALSE)
+train <- cancer[inTrain,]
+NB<-NaiveBayes(smierc~.,data=train[,wybrane])
+predykcja3<-predict(NB,newdata=cancer[-inTrain,wybrane2],type="response")$class
+roc(as.numeric(smierc),as.numeric(predykcja3))$auc
+})
+R4<-replicate(100,{inTrain<- createDataPartition(y=cancer$death1y,p=0.75, list=FALSE)
+train <- cancer[inTrain,]
+drzewo<- ctree(smierc~., data=train[,wybrane], controls= ctree_control(maxdepth=10,testtype = "Bonferroni",mincriterion = 0.75))
+predykcja4<-predict(drzewo,cancer[-inTrain,wybrane2])
+roc(as.numeric(smierc),as.numeric(predykcja4))$auc
+})
+R5<-replicate(100,{inTrain<- createDataPartition(y=cancer$death1y,p=0.75, list=FALSE)
+train <- cancer[inTrain,]
+laslos<-randomForest(smierc~.,data=train[,wybrane],importance=TRUE,proximity=TRUE)
+predykcja5<-predict(laslos,cancer[-inTrain,wybrane2])
+roc(as.numeric(smierc),as.numeric(predykcja5))$auc
+})
+
+
+```
+
+```{r pole_koncowe, echo=FALSE}
+cat("Średnie pola pod wykresem krzywej ROC:\n",
+    mean(R2),"  Poprawiona regresja logistyczna\n",
+    mean(R3),"  Naiwny klasyfikator Bayesowski\n",
+    mean(R4),"  Drzewo\n",
+    mean(R5),"  Las losowy")
+
+```
+## K-fold cross-walidacja
+
+Jakość klasyfikotora możemy również badać porównując błąd cross-walidacji (Będziemy korzystać z 10-fold cv). Na każdym z 10-ciu podzbiorów sprawdzamy trafność predykcji modelu zbudowanego na pozostałych zbiorach. Następnie uśredniamy ten błąd aby porównywać kolejne klasyfikatory.
+
+```{r,warning=FALSE,results="hide"}
+set.seed(1313)
+fold <- createFolds(cancer$smierc, k = 10)
+
+errors2 <- lapply(fold, function(x) {
+  model<-step(glm(smierc~.,cancer[-x,wybrane],family="binomial"),method="backward")
+  predykcja1 <- predict(model, cancer[x,wybrane],type="response")
+  p <- round(predykcja1,digits=0)
+  c<- as.numeric(cancer[x, "smierc"])-1
+  mean(abs(p-c))
+})
+
+mean(as.numeric(errors2))
+```
+
+Analogicznie przeprowadzamy cross-walidację dla innych modeli.
+```{r results="hide", warning=FALSE, echo=FALSE}
+errors3 <- lapply(fold, function(x) {
+  model<-NaiveBayes(smierc~.,data=cancer[-x,wybrane])
+  
+  p<-as.numeric(predict(model,newdata=cancer[x,wybrane],type="response")$class)
+  
+  c<-as.numeric(cancer[x,"smierc"])
+  mean(abs(p-c))
+})
+
+library("party")
+errors4 <- lapply(fold, function(x) {
+  model<-ctree(smierc~., data=cancer[-x,wybrane], controls= ctree_control(maxdepth=10,testtype = "Bonferroni",mincriterion = 0.75))
+  
+  p<-as.numeric(predict(model,cancer[x,wybrane]))
+  
+  c<-as.numeric(cancer[x,"smierc"])
+  mean(abs(p-c))
+})
+
+
+library("randomForest")
+errors5 <- lapply(fold, function(x) {
+  model<-randomForest(smierc~.,data=cancer[-x,wybrane],importance=TRUE,proximity=TRUE)
+  
+  p<-as.numeric(predict(model,cancer[x,wybrane]))
+  
+  c<-as.numeric(cancer[x,"smierc"])
+  mean(abs(p-c))
+})
+
+
+```
+
+```{r, echo=FALSE}
+par(mfrow=c(2,2))
+hist(as.numeric(errors2),col="grey",main="histogram błedów metody regresji",xlim=c(0,0.6),xlab="błędy regresji",breaks=5)
+hist(as.numeric(errors3),col="grey",main="histogram błedów metody Bayesa",xlim=c(0,0.6),xlab="błędy met. Bayesa",breaks=5)
+hist(as.numeric(errors4),col="grey",main="histogram błedów metody drzew",xlim=c(0,0.6),xlab="błędy drzewa decyzyjnego",breaks=5)
+hist(as.numeric(errors5),col="grey",main="histogram błedów metody lasów losowych",xlim=c(0,0.6),xlab="błedy lasów losowych",breaks=c(0,0.1,0.2,0.3,0.4,0.5,0.6))
+```
+
+
+```{r srednie_koncowe, echo=FALSE}
+cat("Średnie błędy klasyfikatorów:\n",
+    mean(as.numeric(errors2)),"  Poprawiona regresja logistyczna\n",
+    mean(as.numeric(errors3)),"  Naiwny klasyfikator Bayesowski\n",
+    mean(as.numeric(errors4)),"  Drzewo\n",
+    mean(as.numeric(errors5)),"  Las losowy")
+
+```
+Wnioski są oczywiste: najlepszym ze zbudowanych przez nas jest klasyfikator poprawionej regresji logprawidłowo przewiduje stan pacjenata po roku. Potwierdzają to również histogramy błędów.
+<br></br> N-fold cross-walidacja
+```{r,warning=FALSE,results="hide"}
+set.seed(1313)
+fold <- createFolds(cancer$smierc, k = 125)
+
+errors2 <- lapply(fold, function(x) {
+  model<-step(glm(smierc~.,cancer[-x,wybrane],family="binomial"),method="backward")
+  predykcja1 <- predict(model, cancer[x,wybrane],type="response")
+  p <- round(predykcja1,digits=0)
+  c<- as.numeric(cancer[x, "smierc"])-1
+  mean(abs(p-c))
+})
+
+mean(as.numeric(errors2))
+```
+
+Analogicznie przeprowadzamy cross-walidację dla innych modeli.
+```{r results="hide", warning=FALSE, echo=FALSE}
+errors3 <- lapply(fold, function(x) {
+  model<-NaiveBayes(smierc~.,data=cancer[-x,wybrane])
+  
+  p<-as.numeric(predict(model,newdata=cancer[x,wybrane],type="response")$class)
+  
+  c<-as.numeric(cancer[x,"smierc"])
+  mean(abs(p-c))
+})
+
+library("party")
+errors4 <- lapply(fold, function(x) {
+  model<-ctree(smierc~., data=cancer[-x,wybrane], controls= ctree_control(maxdepth=10,testtype = "Bonferroni",mincriterion = 0.75))
+  
+  p<-as.numeric(predict(model,cancer[x,wybrane]))
+  
+  c<-as.numeric(cancer[x,"smierc"])
+  mean(abs(p-c))
+})
+
+
+library("randomForest")
+errors5 <- lapply(fold, function(x) {
+  model<-randomForest(smierc~.,data=cancer[-x,wybrane],importance=TRUE,proximity=TRUE)
+  
+  p<-as.numeric(predict(model,cancer[x,wybrane]))
+  
+  c<-as.numeric(cancer[x,"smierc"])
+  mean(abs(p-c))
+})
+
+
+```
+
+
+```{r, echo=FALSE}
+par(mfrow=c(2,2))
+hist(as.numeric(errors2),col="grey",main="histogram błedów metody regresji",xlab="błędy regresji")
+hist(as.numeric(errors3),col="grey",main="histogram błedów metody Bayesa",xlab="błędy met. Bayesa",breaks=5)
+hist(as.numeric(errors4),col="grey",main="histogram błedów metody drzew",xlab="błędy drzewa decyzyjnego",breaks=5)
+hist(as.numeric(errors5),col="grey",main="histogram błedów metody lasów losowych",xlab="błędy lasów losowych",breaks=5)
+```
+
+
+```{r srednie_koncowe2, echo=FALSE}
+cat("Średnie błędy klasyfikatorów:\n",
+    mean(as.numeric(errors2)),"  Poprawiona regresja logistyczna\n",
+    mean(as.numeric(errors3)),"  Naiwny klasyfikator Bayesowski\n",
+    mean(as.numeric(errors4)),"  Drzewo\n",
+    mean(as.numeric(errors5)),"  Las losowy")
+
+```
+
+W drugim etapie skupiłyśmy się na prezentacji następujących klasyfikatorów: regresja, regresja poprawiona funkcją step, naiwny klasyfikator Bayesowski, drzewa losowe oraz lasy losowe.Porównałyśmy wymienione klasyfikatory analizując tablice kontyngencji, średnie pole pod krzywą (przy 100-krotnym losowaniu zbiorów treningowych) jak również błędy otrzymane w krosswalidacji (10-fold oraz leave-one- out). Miary te skłaniają nas do wyboru poprawionej regresji jako modelu najlepiej przewidującego stan pacjenta po roku spośród przedstawionych wyżej sposobów klasyfikacji. Ze względu na mało satysfakcjonujące wyniki, wynikające chociażby z możliwości przeuczenia modelu, w następnym etapie użyjemy bardziej zaawansowanych modeli z nadzieją na osiągnięcie lepszych rezultatów.
