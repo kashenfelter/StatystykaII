@@ -46,6 +46,8 @@ Na konsultacje można umawiać się w środy lub czwartki. Proszę o mailowe pot
 Projekt 1
 ---------
 
+[Punkty za zadania z projektu 1](https://docs.google.com/spreadsheets/d/1GYif4Tva2cy0iXYGoFbIG663uxL_Dhsc7cwPpODZGc8/edit?usp=sharing)
+
 Pierwszy projekt dotyczy predykcji.
 
 Celem projektu jest zbudowanie reguły / algorytmu, który na podstawie danych o pacjentach ze zdiagnozowanym nowotworem Glioblastoma będzie mogła możliwie dokładnie oszacować czy pacjent przeżyje 1 rok od diagnozy.
