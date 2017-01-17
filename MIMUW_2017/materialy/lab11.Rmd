@@ -1,0 +1,141 @@
+---
+title: "Lab 11"
+author: "Przemyslaw Biecek"
+date: "10 styczeń 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Rozgrzewka
+
+Pakiet `mlbench` to zbiór danych i generatorów do badania algorytmów Machine Learning
+
+Ten pakiet zawiera zbiór funkcji do generowania sztucznych zbiorów danych. Nazwy tych funkcji zaczynają się od `mlbench.`.
+
+Zadania: 
+
+Wylosuj po 600 obserwacji z algorytmu `mlbench.cassini()`, `mlbench.cuboids()`, `mlbench.spirals()` i  `mlbench.smiley()`. 
+
+Narysuj każdy z tych zbiorów danych. Zauważ, że każda z tych funkcji zwraca listę z dwoma elementami: `x` - współrzędnymi i  `classes` - składowymi. Zaznacz składowe na wykresu za pomocą kolorów.
+
+
+```{r}
+# tutaj umieść swoje rozwiązania
+
+```
+
+## Grupowanie aglomeracyjne - symulacje
+
+Rozpocznij od grupowania hierarchicznego. Skorzystaj z funkcji `hclust{stats}` lub `agnes{cluster}`, obie robią podobne rzeczy.
+
+Porównaj wyniki dla różnych metod łączenia. Zacznij od `single`, `complete`, `average` i `ward`. 
+
+Zastosuj każdą z tych metod do zbioru danych wygenerowanego przez `mlbench.cassini()`. Przetnij dendrogram na 4 grupy używając funkcji `cutree()`. 
+
+Porównaj te cztery znalezione grupy z oryginalnymi składowymi.
+
+Która z tych czterech metod łączenia dają ‘najlepsze’ wyniki?
+
+```{r}
+# tutaj umieść swoje rozwiązania
+
+```
+
+A teraz spróbuj powtórzyć to samo z danymi wygenerowanymi przez funkcję `mlbench.spirals()`.
+
+Który ze zbiorów danych daje najlepsze wyniki?
+
+```{r}
+# tutaj umieść swoje rozwiązania
+
+```
+
+## Dane rzeczywiste
+
+Będziemy pracować z danymi o głosowaniach posłów w VII kadencji sejmu. Poniższa instrukcja pobiera dane, usuwa wartości brakujące i pozostawia zbiór gotowy do dalszej analizy.
+
+Porównaj różne metody grupowania hierarchicznego, który z tych dendrogramów wygląda najlepiej?
+
+```{r}
+library(archivist)
+
+votings <- archivist::aread("pbiecek/Przewodnik/arepo/9175ec8b23098c4364495afde9a2cc17")
+votings[is.na(votings)] <- "Not present"
+
+# tutaj umieść swoje rozwiązania
+
+```
+
+Porównaj wyniki z funkcją `fviz_dend{factoextra}` do wizualizacji dendrogramów. 
+Tutaj jest instrukcja, jak zainstalować ten pakiet.
+
+```{r}
+# library(devtools)
+# install_github("kassambara/factoextra")
+```
+
+## Skalowanie wielowymiarowe 
+
+Zacznijmy ponownie od sztucznego zbioru danych. Funkcja `mlbench.cuboids()` generuje dane z 3-wymiarowej przestrzeni, wykonajmy rzut na 2-wymiarową przestrzeń.
+
+Wykorzystaj funkcję `cmdscale{MASS}` (transformacja liniowa), `isoMDS{MASS}` (transformacja zachowująca odległości) aby znaleźć nową reprezentację dla danych. Obie funkcje pracują na macierzach odległości i zwracają nową niskowymiarową reprezentacje danych.
+
+```{r, echo=FALSE}
+# tutaj umieść swoje rozwiązania
+
+```
+
+## Diagnostyka
+
+Użyj funkcji `Shepard{MASS}` aby wyznaczyć jak bardzo znaleziona transformacja zniekształca odległości. Narysuj te zniekształcenia.
+
+## Dane rzeczywiste
+
+Raz jeszcze, wykorzystaj dane o głosowaniach posłów.
+
+Wykonaj transformacje odległości pomiędzy profilami głosowań posłów na 2-wymiarową przestrzeń. Narysuj nowe współrzędne reprezentujące posłów. Pokoloruj posłów w zależności d klubu, do którego należą..
+
+Czy taka reprezentacja 2-wymiarowa ma jakieś zalety nad grupowaniem hierarchicznym?
+
+```{r, echo=FALSE}
+# tutaj umieść swoje rozwiązania
+
+```
+
+## Backup
+
+W ostateczności…
+
+```{r}
+library(mlbench)
+
+plot(mlbench.cassini(150))
+plot(mlbench.cuboids(150))
+plot(mlbench.spirals(150))
+plot(mlbench.smiley(150))
+
+dat <- mlbench.cassini(600)
+
+library(cluster)
+
+tree1 <- agnes(dat$x, method = "ward")
+plot(tree1)
+ndf <- data.frame(dat$x, clust=factor(cutree(tree1, 4)))
+table(ndf$clust, dat$classes)
+
+library(ggplot2)
+ggplot(ndf, aes(X1, X2, color=clust)) + geom_point()
+
+dat <- mlbench.cuboids(600)
+
+library(MASS)
+newcoord <- isoMDS(dist(dat$x))
+
+ndf <- data.frame(newcoord$points, class = dat$classes)
+ggplot(ndf, aes(X1, X2, color=class)) + geom_point()
+
+```
+
