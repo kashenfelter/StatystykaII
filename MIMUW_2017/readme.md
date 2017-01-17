@@ -1,8 +1,8 @@
 Statystyka II
 ----------------
 
-Schedule MIM UW:
-----------------
+Plan MIM UW:
+------------
 
 * 5 X, W+L: Statystyki opisowe - zmienne jakościowe, test chi2, analiza korespondencji, [lab1](materialy/lab1.md)
 * 12 X [eRum @ Poznań] L: Eksploracja danych + ggplot2
@@ -10,15 +10,15 @@ Schedule MIM UW:
 * 26 X, [Presentations@lab], [Project 1 phase 1] W: [Podstawy predykcji, prosta regresja, kNN, drzewa](http://pbiecek.github.io/Przewodnik/Predykcja/drzewa_decyzyjne.html)
 * 02 XI, W+L: Klasyfikacja - podstawy, LDA, QDA, regresja logistyczna [Materialy do wykladu](http://pbiecek.github.io/Przewodnik/Predykcja/predykcja.html),  [lab4](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab3.md)
 * 09 XI, W+L: Ewaluacja modelu, CV, repeated k-fold CV, itp, [materiały](http://pbiecek.github.io/Przewodnik/Predykcja/wybor_modelu.html)
-* 16 XI, [Presentations@lab], [Project 1 phase 2], W+L: Bagging, boosting, random forest
-* 23 XI, W+L: Metody wyboru modelu, regresja z wieloma zmiennymi
-* 30 XI, [Presentations@lectures], [Project 1 phase 3], W: Regularyzacja
-* 07 XII, W+L: Segmentacja - wprowadzenie
-* 14 XII, [Presentations@lab], [Project 2 phase 1] W: Analiza grup - metody kombinatoryczne
-* 21 XII, W+L: Analiza grup - metody aglomeracyjne
-* 11 I, [Presentations@lab], [Project 2 phase 2] W: Skalowanie wielowymiarowe
-* 18 I, W+L: Reguły decyzyjne
-* 25 I, [Presentations@lectures], [Project 2 phase 3] 
+* 16 XI, [Presentations@lab], [Project 1 phase 2], W+L: Bagging, boosting, random forest, [materialy1](http://pbiecek.github.io/Przewodnik/Predykcja/komitety.html), [materialy2](http://pbiecek.github.io/Przewodnik/Predykcja/ROC.html)
+* 23 XI, W+L: Metody wyboru modelu, regresja z wieloma zmiennymi, [materiały](http://pbiecek.github.io/Przewodnik/Predykcja/regularyzacja.html), [lab7](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab7.md)
+* 30 XI, (Będlewo - będą odrobione w innym terminie)
+* 07 XII, [Presentations@lectures], [Project 1 phase 3], W: Regularyzacja, [lab8](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab8.md)
+* 14 XII, W+L: Reguły decyzyjne - [wyklad](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/rules.html), [lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab9.md)
+* 21 XII, [Presentations@lab], [Project 2 phase 1] W: [PCA](http://pbiecek.github.io/Przewodnik/Analiza/beznadzoru/mds_pca.html), Skalowanie wielowymiarowe, [MDS](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/mds.html), L: [Hollywood Insider](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab10.md)
+* 11 I, W+L: Analiza grup - metody aglomeracyjne, [wyklad](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/agnes.html), [lab](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/lab11.Rmd)
+* 18 I, [Presentations@lab], [Project 2 phase 2] Analiza grup - metody kombinatoryczne, [k-means](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/kmeans.html), [PAM](https://pbiecek.gitbooks.io/przewodnik/content/Analiza/beznadzoru/pam.html), [Lab](https://raw.githubusercontent.com/pbiecek/StatystykaII/master/MIMUW_2017/materialy/lab12.Rmd)
+* 25 I, W+L: [Presentations@lectures], [Project 2 phase 3] W: [Mclust](http://pbiecek.github.io/Przewodnik/Analiza/beznadzoru/mclust.html), [EM](http://pbiecek.github.io/Przewodnik/Analiza/beznadzoru/em.html)
 
 Zaliczenie
 ----------
@@ -45,6 +45,8 @@ Na konsultacje można umawiać się w środy lub czwartki. Proszę o mailowe pot
 
 Projekt 1
 ---------
+
+[Punkty za zadania z projektu 1](https://docs.google.com/spreadsheets/d/1GYif4Tva2cy0iXYGoFbIG663uxL_Dhsc7cwPpODZGc8/edit?usp=sharing)
 
 Pierwszy projekt dotyczy predykcji.
 
@@ -93,3 +95,46 @@ W trzecim etapie oceniane będą kryteria:
 - interpretacja i walidacja otrzymanych wyników.
 
 Dane do projektu [rda](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/GlioblastomaWide.rda), [txt](https://github.com/pbiecek/StatystykaII/blob/master/MIMUW_2017/materialy/GlioblastomaWide.txt).
+
+
+Projekt 2
+---------
+
+Drugi projekt dotyczy analizy struktury danych. Będziemy pracować na danych z projektu PISA 2015 (https://www.oecd.org/pisa/pisaproducts/pisa2015draftframeworks.htm). To dane dla 58 krajów, w których przeprowadzono wśród 15 latków (w sumie ponad 500 000 osób) badanie kompetencji w matematyce, czytaniu ze zrozumieniem i naukach przyrodniczych.
+
+Dane zostały opublikowane w połowie grudnia 2016, więc są bardzo świeże. Typowe analizy dotycząc porównywania średnich wyników w grupach (czy chłopcy są bardziej niż dziewczynki, czy miasta są bardziej niż wsie, czy południe jest bardziej niż północ itp.). Nas jednak będzie interesowała strategia w jakiej uczniowie rozwiązują zadania. Rozwiązanie każdego zadania trwa ileś czasu, niektórzy uczniowie mogą poświęcić więcej czasu na początku testu, inni pod koniec (cały test trwa dwie godziny). 
+
+Surowe dane są na stronie OECD, ale aby dane nadawały się do przetwarzania, trzeba wykonać kilka operacji. Wstępnie przetworzone dane znajdują się na stronie https://www.dropbox.com/s/7lp82urpsfjvg2f/onlyTimingsLong.rda 
+
+Struktura danych jest następująca:
+
+```
+> head(onlyTimingsLong)
+           Kraj  Szkola Student Zestaw    Czas Zadanie Pozycja Obszar
+10737 Australia 3600001 3601769     31  195552 R219Q01       3      R
+10742 Australia 3600001 3605983     85  143354 R219Q01       2      R
+10747 Australia 3600001 3602143     36  206815 R219Q01       4      R
+10759 Australia 3600002 3611016     37  117352 R219Q01       1      R
+10787 Australia 3600003 3605314     36  174955 R219Q01       4      R
+10794 Australia 3600003 3611875     41 1269775 R219Q01       2      R
+```
+
+Każdy wiersz opisuje czas rozwiązywania jednego zadania. Tutaj rozważamy tylko zadania z matematyki i czytania (nauk przyrodniczych jest dużo więcej, więc upraszczamy sobie analizę). Kolejne kolumny to:
+
+* Kraj z którego pochodzi uczeń
+* Szkoła do której chodzi uczeń
+* Student, czyli ID ucznia w danej szkole w danym kraju
+* Zestaw – numer zestawu zadań, które student rozwiązywał (różne zestawy różnią się kolejnością)
+* Czas – w tysięcznych sekundy (uwaga na skrajnie długie czasy które trzeba usunąć)
+* Zadanie – identyfikator zadania, które jest rozwiązywane
+* Pozycja – informacja w której części całego testu wystąpiło to zadanie. Cały dwugodzinny test jest podzielony na 4 mniej więcej równe części, a ta kolumna opisuje kod określonej części,
+* Obszar – określa czy zadanie dotyczy czytania czy matematyki.
+
+Kroki kolejnych etapów:
+
+* *Etap 1*. Przedstaw podstawowe wyniki dotyczące czasów rozwiązywania zadań w różnych krajach. Upewnij się, że znasz strukturę danych, wiesz jak traktować wartości skrajne. Sprawdź, czy są różnice pomiędzy krajami.
+
+* *Etap 2*. Zidentyfikuj i nazwij typowe wzorce zachowań (Test-taking behaviors) jeżeli chodzi o czas realizacji zadań w teście. Liczba i nazwa wzorców może być dowolna, ale wymaga uzasadnienia. Poszczególne wzorce będą odpowiadały segmentom studentów.
+
+* *Etap 3*. Sprawdź jak wzorce zachowań (Test-taking behaviors) występują w różnych krajach. Czy i jak różnią się podejścia do rozwiązywania zadań w różnych krajach. Czy ma o związek z końcowymi wynikami (średnimi wynikami z matematyki/czytania) dla krajów.
+
