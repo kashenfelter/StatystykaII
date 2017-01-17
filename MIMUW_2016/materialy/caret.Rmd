@@ -1,0 +1,98 @@
+---
+title: "Caret"
+author: "Przemyslaw Biecek"
+output: 
+  html_document:
+    toc: TRUE
+---
+
+```{r}
+library("klaR")
+library("caret")
+
+load("trainingS.rda")
+stem$scores <- ifelse(runif(length(stem$scores)) < 0.05, 
+                      1 - stem$scores,
+                      stem$scores)
+stem$scores <- factor(ifelse(stem$scores < 0.5, "non-stem", "stem"))
+
+stem <- stem[,c(1:25,143:151)]
+
+table(stem$scores)
+
+```
+
+# Logistic regression
+
+```{r}
+model <- glm(scores~., data=stem, family="binomial")
+summary(model)
+
+predict(model, newdata=stem, type="response")
+predict(model, newdata=stem, type="link")
+
+table(predict(model, newdata=stem, type="response") < 0.5,
+      stem$scores)
+
+```
+
+# LDA / QDA
+
+```{r}
+lda.model <- lda(scores~., data=stem)
+
+table(predict(model, newdata=stem), 
+      stem$score)
+
+
+library(MASS)
+library(ISLR)
+head(Smarket)
+
+lda.model <- lda(Direction~Lag1 + Lag2, data=Smarket)
+lda.model
+
+lda.pred <- predict(lda.model, Smarket)
+names(lda.pred)
+
+table(predicted = lda.pred$class, real = Smarket$Direction)
+
+qda.model <- qda(Direction ~ Lag1 + Lag2, data = Smarket)
+qda.model
+
+
+qda.class <- predict(qda.model, Smarket)$class
+table(predicted = qda.class, real = Smarket$Direction)
+
+library(caret)
+
+modelFit<- train(Direction~Lag1+Lag2, method='lda',preProcess=c('scale', 'center'), data=Smarket)
+
+confusionMatrix(Smarket$Direction, predict(modelFit, Smarket))
+
+
+mat <- sapply(c('lda', 'qda'), function (met) {
+  modelFit<- train(Direction~Lag1+Lag2, method=met,preProcess=c('scale', 'center'), data=Smarket)
+  confusionMatrix(Smarket$Direction, predict(modelFit, Smarket))$overall
+})
+
+round(mat*100,2)
+
+
+```
+
+# Naive Bayes
+
+```{r}
+model <- train(scores~., data=stem, 'nb', trControl=trainControl(method='cv', number=10))
+
+model
+
+scs <- predict(model$finalModel, stem[,-ncol(stem)])
+scc <- predict(model$finalModel, stem[,-ncol(stem)])$class
+
+table(prediced = predict(model$finalModel, stem[,-ncol(stem)])$class,
+      true = stem$scores)
+
+```
+

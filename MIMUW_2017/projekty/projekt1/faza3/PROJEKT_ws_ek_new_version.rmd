@@ -1,0 +1,596 @@
+---
+title: "Predykcja umieralnoœci na nowotwór Glioblastoma"
+author: "Ewelina Karbowiak i Wioleta Stojak"
+
+output:
+    html_document:
+         toc: true
+         toc_float:
+          collapsed: false
+          smooth_scroll: false
+---
+**Abstract** Celem projektu jest zbudowanie algorytmu, który na podstawie danych o pacjentach ze zdiagnozowanym nowotworem Glioblastoma bêdzie móg³ mo¿liwie dok³adnie oszacowaæ czy pacjent prze¿yje 1 rok od diagnozy.
+
+#Dane
+Dostêpne dane zawiera³y informacje o pacjentach w zale¿noœci od wieku, podtypu nowotworu, stanu pacjenta po pierwszym roku od diagnozy oraz wartoœci ekspresji 16115 genów.
+
+```{r setup, include=FALSE,message=FALSE,warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(glmnet)
+library(ggplot2)
+library("e1071")
+library(party)
+library(rpart)
+library(rpart.plot)
+library(hydroGOF)
+library(vioplot)
+library(caret)
+library(knitr)
+library(SDMTools)
+library(ROCR)
+library(ipred)
+library(xtable)
+library(MASS)
+library("reshape2")
+library(klaR)
+library("pROC")
+library("randomForest")
+library(xgboost)
+library(clusterSim)
+library("caretEnsemble")
+library(ModelMetrics)
+```
+
+#Przygotowanie danych
+Na pocz¹tek pacjenci zostali podzieleni na dwie grupy. W pierwszej znaleŸli siê ci, którzy prze¿yli pierwszy rok po postawionej diagnozie, natomiast do drugiej grupy zostali przydzieleni pozostali uczestnicy badania, którzy nie prze¿yli pierwszego roku od diagnozy. W dostêpnych danych usunê³yœmy te kolumny, które zawiera³y wiêcej ni¿ 8 NA w obrêbie swojej grupy i dodaliœmy dodatkow¹ kolumnê zero-jedynkow¹ o nazwie **smierc**, w której 1 jest przypisywana, gdy pacjent prze¿y³ rok od diagnozy, a 0 w przeciwnym przypadku. Pozosta³e wartoœci NA w dalszej czêœci projektu s¹ uzupe³niane przez œredni¹ z kolumny, w której siê znajduj¹.
+
+```{r}
+ load("C:/Users/Wioleta/Downloads/PROJEKTY/GlioblastomaWide.rda")
+ load("C:/Users/Wioleta/Downloads/NBCVnowF.rda")
+ load("C:/Users/Wioleta/Downloads/SVMCVnowF.rda")
+ load("C:/Users/Wioleta/Downloads/RFCVnowF.rda")
+ load("C:/Users/Wioleta/Downloads/GBMCVnowF.rda")
+ load("C:/Users/Wioleta/Downloads/LASSOCVnowF.rda")
+ load("C:/Users/Wioleta/Downloads/MSECVtreenowF.rda")
+ load("C:/Users/Wioleta/Downloads/OPICGLMCVnowF.rda")
+ load("C:/Users/Wioleta/Downloads/GLMCVnowF.rda")
+geny<-GlioblastomaWide
+z<-geny
+ILOSCNAa<-(colSums(is.na(z[z$death1y=='alive',]))> 8)
+ILOSCNAd<-(colSums(is.na(z[z$death1y=='dead',]))>8)
+maska<- (ILOSCNAd | ILOSCNAa)
+z<-z[,!maska]
+geny<-z
+geny$smierc<-ifelse(geny$death1y=="alive",1,0)
+```
+
+
+#Identyfikacja istotnych genów
+Do uzyskania informacji o genach i ich istotnoœci pos³u¿y³yœmy siê testem **t studenta** oraz zastosowa³yœmy **metodê fdr** do estymacji otrzymanych p-value. 
+Ostatecznie wybra³yœmy 25 istotnych genów z najmniejsz¹ p-wartoœci¹.
+
+```{r message=FALSE, warning=FALSE}
+istotne<-function(z,s){  
+pvalue<-NULL
+dead2<-z[z$death1y == "dead",]
+alive2<-z[z$death1y == "alive",]
+  
+for (i in 5:ncol(z)){
+  x<-dead2[,i]
+  y<-alive2[,i]
+  pvalue[i]<- t.test(x,y,alternative = "two.sided")$p.value
+}
+pvalue_poprawka<-p.adjust(pvalue, method = "fdr")
+posortowane<-order(pvalue_poprawka,decreasing = FALSE)
+ist<-posortowane[1:s]
+colnames(z[,ist])
+}
+```
+
+#Zbadane modele
+
+Aby wybraæ model najlepiej stosuj¹cy siê do naszych danych, przetestowane zosta³y ró¿ne podejœcia, zarówno liniowe jak i nieliniowe.
+
+U¿yte modele :
+<ul>
+<li>uogólniony model liniowy glm</li>
+
+<li>powy¿szy model z wykorzystaniem kryterium BIC</li>
+
+<li>Lasso</li>  
+
+<li>drzewo decyzyjne z wykorzystaniem funkcji rpart</li>
+
+<li>SVM</li>
+
+<li>Naive Bayes</li>
+
+<li>las losowy</li>
+
+<li>gradient boosting</li>
+</ul>
+Aby wybraæ najlepszy model  ograniczy³yœmy siê do badania b³êdu œredniokwadratowego (MSE),AUC,F1,Acurracy i Kappy poprzez wykonanie **10-fold CV** z powtórzeniem 10 krotnym. Istotne geny by³y wybieranie ze zbioru treningowego, podczas ka¿dej cross walidacji.
+Poni¿ej zamieszczamy przyk³adow¹ funkcjê, któr¹ do tego wykorzysta³yœmy i przyk³adowe zastosowanie w CV. (Pozosta³e zosta³y w raporcie ukryte).
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE}
+
+
+f1<-function(pred,rzeczyw){
+  retrieved <- sum(pred)
+  precision <- sum(pred & rzeczyw) / retrieved
+  recall <- sum(pred & rzeczyw) / sum(rzeczyw)
+  2 * precision * recall / (precision + recall)
+}
+```
+
+```{r}
+
+MSEAUCGLM<-function(geny,ind){
+    train<-geny[-ind,]
+    test<-geny[ind,]
+        for(i in 5:(ncol(train)-1)){
+          train[which(is.na(train[,i])),i] <- mean(train[,i], na.rm = TRUE)
+        }
+    istotne<-istotne(train[-ind,-ncol(train)],25)
+    train<-train[,c("age","death1y",istotne,"smierc")]
+    test<-test[,c("age","death1y",istotne,"smierc")]
+        for(j in 3:(ncol(test)-1)){
+          test[which(is.na(test[,j])), j] <-mean(test[,j], na.rm = TRUE)
+        }
+    model_GLM<-glm(smierc~.,data=train[,-2],family = binomial(link="logit"),control =    list(maxit = 50))
+    predy <-round(predict (model_GLM,newdata = test[,-2],type = "response"))
+    
+    c(mse(predy,test[,"smierc"]), roc(test[,"smierc"],predy)$auc,f1(predy,test[,"smierc"]))
+}
+```
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE}
+MSEAUCBICGLM<-function(dane,ind){
+    train<-geny[-ind,]
+    test<-geny[ind,]
+        for(i in 5:(ncol(train)-1)){
+          train[which(is.na(train[,i])),i] <- mean(train[,i], na.rm = TRUE)
+        }
+    istotne<-istotne(train[-ind,-ncol(train)],25)
+    
+    train<-train[,c("age","death1y",istotne,"smierc")]
+    test<-test[,c("age","death1y",istotne,"smierc")]
+        
+        for(j in 3:(ncol(test)-1)){
+          test[which(is.na(test[,j])), j] <-mean(test[,j], na.rm = TRUE)
+        }
+    
+    model_GLM<-glm(smierc~.,data=train[,-2],family="binomial")
+    optimalBICGLM<-step(model_GLM,direction = "backward",trace = FALSE,k=log(nrow(train)))
+    predy<-round(predict(optimalBICGLM,newdata=test[,-2],type="response"))
+    
+    c(mse(predy,test[,"smierc"]),roc(test[,"smierc"],predy)$auc,f1(predy,test[,"smierc"]))
+}
+
+MSEAUCTREE<-function(dane,ind){
+    train<-geny[-ind,]
+    test<-geny[ind,]
+        for(i in 5:(ncol(train)-1)){
+          train[which(is.na(train[,i])),i] <- mean(train[,i], na.rm = TRUE)
+        }
+    istotne<-istotne(train[-ind,-ncol(train)],25)
+    
+    train<-train[,c("age","death1y",istotne,"smierc")]
+    test<-test[,c("age","death1y",istotne,"smierc")]
+        for(j in 3:(ncol(test)-1)){
+          test[which(is.na(test[,j])), j] <-mean(test[,j], na.rm = TRUE)
+        }
+    model_RP<-rpart(smierc~.,data=train[,-2])
+    predy<-round(predict(model_RP,newdata = test[,-2]))
+    
+    c(mse(predy,test[,"smierc"]),roc(test[,"smierc"],predy)$auc,f1(predy,test[,"smierc"]))
+}
+MSEAUCNB<-function(dane,ind){
+    train<-geny[-ind,]
+    test<-geny[ind,]
+        for(i in 5:(ncol(train)-1)){
+          train[which(is.na(train[,i])),i] <- mean(train[,i], na.rm = TRUE)
+        }
+    istotne<-istotne(train[-ind,-ncol(train)],25)
+    
+    train<-train[,c("age","death1y",istotne,"smierc")]
+    test<-test[,c("age","death1y",istotne,"smierc")]
+        for(j in 3:(ncol(test)-1)){
+          test[which(is.na(test[,j])), j] <-mean(test[,j], na.rm = TRUE)
+        }
+    model_NB<-naiveBayes(as.factor(smierc)~.,data=train[,-2])
+    predy_NB<-predict(model_NB,newdata=test[,-2])
+    predy<-as.numeric(as.vector(predy_NB))
+    
+    c(mse(predy,test[,"smierc"]), roc(test[,"smierc"],predy)$auc,f1(predy,test[,"smierc"]))
+}
+MSEAUCRF<-function(dane,ind){
+    train<-geny[-ind,]
+    test<-geny[ind,]
+        for(i in 5:(ncol(train)-1)){
+          train[which(is.na(train[,i])),i] <- mean(train[,i], na.rm = TRUE)
+        }
+    istotne<-istotne(train[-ind,-ncol(train)],25)
+    
+    train<-train[,c("age","death1y",istotne,"smierc")]
+    test<-test[,c("age","death1y",istotne,"smierc")]
+        for(j in 3:(ncol(test)-1)){
+          test[which(is.na(test[,j])), j] <-mean(test[,j], na.rm = TRUE)
+        }
+    model_RF<-randomForest(as.factor(smierc)~.,data=train[,-2],ntree=25)
+    predy<-as.numeric(as.matrix(predict(model_RF,newdata = test[,-2])))
+    
+    c(mse(predy,test[,"smierc"]),roc(predy,test[,"smierc"])$auc,f1(predy,test[,"smierc"]))
+}
+
+MSEAUCGB<-function(dane,ind){
+    train<-geny[-ind,]
+    test<-geny[ind,]
+        for(i in 5:(ncol(train)-1)){
+          train[which(is.na(train[,i])),i] <- mean(train[,i], na.rm = TRUE)
+        }
+    istotne<-istotne(train[-ind,-ncol(train)],25)
+    
+    train<-train[,c("age","death1y",istotne,"smierc")]
+    test<-test[,c("age","death1y",istotne,"smierc")]
+        for(j in 3:(ncol(test)-1)){
+          test[which(is.na(test[,j])), j] <-mean(test[,j], na.rm = TRUE)
+        }
+   modGBM <- gbm(smierc ~., data = train[,-2], distribution = "bernoulli")
+   predy <-round(predict(modGBM, test[,-2], n.trees=100, type="response"))
+    
+   c(mse(predy,test[,"smierc"]),roc(test[,"smierc"],predy)$auc,f1(predy,test[,"smierc"]))
+}
+
+MSEAUCSVM<-function(dane,ind){
+    train<-geny[-ind,]
+    test<-geny[ind,]
+        for(i in 5:(ncol(train)-1)){
+          train[which(is.na(train[,i])),i] <- mean(train[,i], na.rm = TRUE)
+        }
+    istotne<-istotne(train[-ind,-ncol(train)],25)
+    
+    train<-train[,c("age","death1y",istotne,"smierc")]
+    test<-test[,c("age","death1y",istotne,"smierc")]
+        for(j in 3:(ncol(test)-1)){
+          test[which(is.na(test[,j])), j] <-mean(test[,j], na.rm = TRUE)
+        }
+    X<-as.matrix(train[,-2])
+    Y<-as.matrix(test[,-2])
+    model_SVM<-svm(smierc~.,data=X)
+    predy<-round(predict(model_SVM,newdata = Y))
+    
+    c(mse(predy,test[,"smierc"]),roc(test[,"smierc"],predy)$auc,f1(predy,test[,"smierc"]))
+}
+MSEAUCLASSO<-function(dane,ind){
+    train<-geny[-ind,]
+    test<-geny[ind,]
+        for(i in 5:(ncol(train)-1)){
+          train[which(is.na(train[,i])),i] <- mean(train[,i], na.rm = TRUE)
+        }
+    istotne<-istotne(train[-ind,-ncol(train)],25)
+    
+    train<-train[,c("age","death1y",istotne,"smierc")]
+    test<-test[,c("age","death1y",istotne,"smierc")]
+        for(j in 3:(ncol(test)-1)){
+          test[which(is.na(test[,j])), j] <-mean(test[,j], na.rm = TRUE)
+        }
+    X<-as.matrix(train[,-c(2,ncol(train))])
+    X<-scale(X)
+    Y<-as.matrix(test[,-c(2,ncol(test))])
+    Y<-scale(Y)
+    modelLASSO<-cv.glmnet(x=X,y=train[,"smierc"],type.measure='mse', keep=TRUE,    alpha=1,family="binomial")
+    lambda.lasso<-modelLASSO$lambda.min
+    predy <- round(predict(modelLASSO, s = lambda.lasso, newx =Y,type="response") )
+    
+    c(mse(predy,test[,"smierc"]),roc(predy,test[,"smierc"])$auc,f1(predy,test[,"smierc"]))
+}
+
+```
+
+
+```{r message=FALSE, warning=FALSE, eval = FALSE}
+GLMCV<-replicate(10,{
+    jak<-createFolds(geny$death1y,k=10)
+    error<-lapply(jak,function(ind) {
+    MSEAUCGLM(geny,ind)
+        })
+})
+
+```
+
+
+
+```{r,message=FALSE,warning=FALSE, eval = FALSE,echo=FALSE}
+
+OPICGLMCV<-replicate(10,{
+     jak<-createFolds(geny$death1y,k=10)
+     error<-lapply(jak,function(ind) {
+     MSEAUCBICGLM(geny,ind)
+  })
+})
+
+LASSOCV<-replicate(10,{
+     jak<-createFolds(geny$death1y,k=10)
+     error<-lapply(jak,function(ind) {
+     MSEAUCLASSO(geny,ind)
+  })
+})
+
+
+
+
+MSECVtree <- replicate(10, {
+     jak<-createFolds(geny$death1y,k=10)
+     error<-lapply(jak,function(ind) {
+     MSEAUCTREE(geny,ind)  
+  })
+}
+)
+
+
+SVMCV<-replicate(10,{
+     jak<-createFolds(geny$death1y,k=10)
+     error<-lapply(jak,function(ind) {
+     MSEAUCSVM(geny,ind)
+  })
+})
+
+
+
+NBCV<-replicate(10,{
+     jak<-createFolds(geny$death1y,k=10)
+     error<-lapply(jak,function(ind) {
+     MSEAUCNB(geny,ind)
+  })
+})
+
+
+RFCV<-replicate(10,{
+     jak<-createFolds(geny$death1y,k=10)
+     error<-lapply(jak,function(ind) {
+     MSEAUCRF(geny,ind)    
+  })
+})
+
+
+GBMCV<-replicate(10,{
+     jak<-createFolds(geny$death1y,k=10)
+     error<-lapply(jak,function(ind) {
+     MSEAUCGB(geny,ind)
+  })
+
+})
+
+```
+
+#Porównanie u¿ytych metod
+
+Poni¿ej przedstawiamy rozk³ad b³êdów œredniokwadratowych, AUC i F1 dla powy¿szych modeli  dla 10-fold CV powtórzonej 10 razy.
+
+Najwieksz¹ wartoœci¹ F1 charakteryzuj¹ siê modele Lasso, NB i RF. Posiadaj¹ one równie¿ niskie odchylenia standardowe co wskazuje na to ¿e wartoœci F1 roz³o¿one s¹ blisko œredniej.
+
+Widzimy, ¿e w przypadku b³êdu MSE jego rozk³ady w modelach s¹ podobne. NB, LASSO, SVM i RF prezentuj¹ siê najlepiej.
+
+Dla rozk³adu AUC najlepiej wypad³y metody  RF i LASSO, które charakteryzuj¹ siê polem pod krzyw¹ ROC stale wiêkszym od 0.5.
+
+
+```{r,warning=FALSE,message=FALSE,echo=FALSE}
+METODY<-c("glm_CV","glmbic_CV","DRZEWO_CV","NB_CV","RF_CV","GBM_CV","SVM_CV","LASSO_CV")
+liczbamet<-numeric(8)
+
+
+F1sd<-liczbamet
+names(F1sd)<-METODY
+
+F1sd[1]<-sd(unlist(GLMCV)[seq(3,length(unlist(GLMCV)),3)],na.rm=T)
+F1sd[2]<-sd(unlist(OPICGLMCV)[seq(3,length(unlist(OPICGLMCV)),3)],na.rm=T)
+F1sd[3]<-sd(unlist(MSECVtree)[seq(3,length(unlist(MSECVtree)),3)],na.rm=T)
+F1sd[4]<-sd(unlist(NBCV)[seq(3,length(unlist(NBCV)),3)],na.rm=T)
+F1sd[5]<-sd(unlist(RFCV)[seq(3,length(unlist(RFCV)),3)],na.rm=T)
+F1sd[6]<-sd(unlist(GBMCV)[seq(3,length(unlist(GBMCV)),3)],na.rm=T)
+F1sd[7]<-sd(unlist(SVMCV)[seq(3,length(unlist(SVMCV)),3)],na.rm=T)
+F1sd[8]<-sd(unlist(LASSOCV)[seq(3,length(unlist(LASSOCV)),3)],na.rm=T)
+
+F1mean<-liczbamet
+names(F1mean)<-METODY
+
+F1mean[1]<-mean(unlist(GLMCV)[seq(3,length(unlist(GLMCV)),3)],na.rm=T)
+F1mean[2]<-mean(unlist(OPICGLMCV)[seq(3,length(unlist(OPICGLMCV)),3)],na.rm=T)
+F1mean[3]<-mean(unlist(MSECVtree)[seq(3,length(unlist(MSECVtree)),3)],na.rm=T)
+F1mean[4]<-mean(unlist(NBCV)[seq(3,length(unlist(NBCV)),3)],na.rm=T)
+F1mean[5]<-mean(unlist(RFCV)[seq(3,length(unlist(RFCV)),3)],na.rm=T)
+F1mean[6]<-mean(unlist(GBMCV)[seq(3,length(unlist(GBMCV)),3)],na.rm=T)
+F1mean[7]<-mean(unlist(SVMCV)[seq(3,length(unlist(SVMCV)),3)],na.rm=T)
+F1mean[8]<-mean(unlist(LASSOCV)[seq(3,length(unlist(LASSOCV)),3)],na.rm=T)
+
+kolejnosc<-order(as.data.frame(cbind(F1mean,F1sd))[,1],decreasing = T)
+```
+
+```{r}
+kable(as.data.frame(cbind(F1mean,F1sd))[kolejnosc,])
+```
+
+```{r,warning=FALSE,message=FALSE,echo=FALSE}
+MSEcv<-liczbamet
+names(MSEcv)<-METODY
+
+MSEcv[1]<-mean(unlist(GLMCV)[seq(1,length(unlist(GLMCV)),3)])
+MSEcv[2]<-mean(unlist(OPICGLMCV)[seq(1,length(unlist(OPICGLMCV)),3)])
+MSEcv[3]<-mean(unlist(MSECVtree)[seq(1,length(unlist(MSECVtree)),3)])
+MSEcv[4]<-mean(unlist(NBCV)[seq(1,length(unlist(NBCV)),3)])
+MSEcv[5]<-mean(unlist(RFCV)[seq(1,length(unlist(RFCV)),3)])
+MSEcv[6]<-mean(unlist(GBMCV)[seq(1,length(unlist(GBMCV)),3)])
+MSEcv[7]<-mean(unlist(SVMCV)[seq(1,length(unlist(SVMCV)),3)])
+MSEcv[8]<-mean(unlist(LASSOCV)[seq(1,length(unlist(LASSOCV)),3)])
+
+
+AUCcv<-liczbamet
+names(AUCcv)<-METODY
+AUCcv[1]<-mean(unlist(GLMCV)[seq(2,length(unlist(GLMCV)),3)])
+AUCcv[2]<-mean(unlist(OPICGLMCV)[seq(2,length(unlist(OPICGLMCV)),3)])
+AUCcv[3]<-mean(unlist(MSECVtree)[seq(2,length(unlist(MSECVtree)),3)])
+AUCcv[4]<-mean(unlist(NBCV)[seq(2,length(unlist(NBCV)),3)])
+AUCcv[5]<-mean(unlist(RFCV)[seq(2,length(unlist(RFCV)),3)])
+AUCcv[6]<-mean(unlist(GBMCV)[seq(2,length(unlist(GBMCV)),3)])
+AUCcv[7]<-mean(unlist(SVMCV)[seq(2,length(unlist(SVMCV)),3)])
+AUCcv[8]<-mean(unlist(LASSOCV)[seq(2,length(unlist(LASSOCV)),3)])
+
+
+AUC.POSORTOWANE<-METODY[order(AUCcv,decreasing=T)]
+MSE.POSORTOWANE<-as.vector(as.factor(METODY[order(MSEcv,decreasing=T)]))
+
+
+glmbic_CV <- data.frame(rep("glmBIC", length(OPICGLMCV)), unlist(OPICGLMCV)[seq(1,length(unlist(OPICGLMCV)),3)])
+colnames(glmbic_CV) <- c("metoda", "blad")
+glm_CV <- data.frame(rep("GLM", length(GLMCV)),unlist(GLMCV)[seq(1,length(unlist(GLMCV)),3)])
+colnames(glm_CV) <- c("metoda", "blad")
+DRZEWO_CV <- data.frame(rep("DRZEWO", length(MSECVtree)), unlist(MSECVtree)[seq(1,length(unlist(MSECVtree)),3)])
+colnames(DRZEWO_CV) <- c("metoda", "blad")
+NB_CV <- data.frame(rep("NB", length(NBCV)), unlist(NBCV)[seq(1,length(unlist(NBCV)),3)])
+colnames(NB_CV) <- c("metoda", "blad")
+RF_CV <- data.frame(rep("RF", length(RFCV)), unlist(RFCV)[seq(1,length(unlist(RFCV)),3)])
+colnames(RF_CV) <- c("metoda", "blad")
+GBM_CV <- data.frame(rep("GBM", length(GBMCV)), unlist(GBMCV)[seq(1,length(unlist(GBMCV)),3)])
+colnames(GBM_CV) <- c("metoda", "blad")
+SVM_CV <- data.frame(rep("svm",length(SVMCV)),unlist(SVMCV)[seq(1,length(unlist(SVMCV)),3)])
+colnames(SVM_CV) <- c("metoda", "blad")
+LASSO_CV <- data.frame(rep("LASSO", length(LASSOCV)), unlist(LASSOCV)[seq(1,length(unlist(LASSOCV)),3)])
+colnames(LASSO_CV) <- c("metoda", "blad")
+
+bledycv <- rbind(DRZEWO_CV,glmbic_CV,GBM_CV,glm_CV,RF_CV,SVM_CV,LASSO_CV,NB_CV)
+
+ggplot(bledycv, aes(x = metoda, y = blad, fill = metoda)) + geom_violin() + guides(fill = FALSE) +
+  ggtitle("rozk³ad MSE cv dla ró¿nych modeli") + stat_summary(fun.y = "mean", geom = "point", size = 4) 
+
+glmbic_CV <- data.frame(rep("glmBIC", length(OPICGLMCV)), unlist(OPICGLMCV)[seq(2,length(unlist(OPICGLMCV)),3)])
+colnames(glmbic_CV) <- c("metoda", "AUC")
+glm_CV <- data.frame(rep("GLM", length(GLMCV)),unlist(GLMCV)[seq(2,length(unlist(GLMCV)),3)])
+colnames(glm_CV) <- c("metoda", "AUC")
+DRZEWO_CV <- data.frame(rep("DRZEWO", length(MSECVtree)), unlist(MSECVtree)[seq(2,length(unlist(MSECVtree)),3)])
+colnames(DRZEWO_CV) <- c("metoda", "AUC")
+NB_CV <- data.frame(rep("NB", length(NBCV)), unlist(NBCV)[seq(2,length(unlist(NBCV)),3)])
+colnames(NB_CV) <- c("metoda", "AUC")
+RF_CV <- data.frame(rep("RF", length(RFCV)), unlist(RFCV)[seq(2,length(unlist(RFCV)),3)])
+colnames(RF_CV) <- c("metoda", "AUC")
+GBM_CV <- data.frame(rep("GBM", length(GBMCV)), unlist(GBMCV)[seq(2,length(unlist(GBMCV)),3)])
+colnames(GBM_CV) <- c("metoda", "AUC")
+SVM_CV <- data.frame(rep("svm",length(SVMCV)),unlist(SVMCV)[seq(2,length(unlist(SVMCV)),3)])
+colnames(SVM_CV) <- c("metoda", "AUC")
+LASSO_CV <- data.frame(rep("LASSO", length(LASSOCV)), unlist(LASSOCV)[seq(2,length(unlist(LASSOCV)),3)])
+colnames(LASSO_CV) <- c("metoda", "AUC")
+
+bledycv <- rbind(RF_CV,LASSO_CV,NB_CV,glm_CV,DRZEWO_CV ,SVM_CV,glmbic_CV,GBM_CV)
+
+ggplot(bledycv, aes(x = metoda, y = AUC, fill = metoda)) + geom_violin() + guides(fill = FALSE) +
+  ggtitle("rozk³ad AUC cv dla ró¿nych modeli") + stat_summary(fun.y = "mean", geom = "point", size = 4) 
+```
+
+#Model stacking
+```{r,warning=FALSE,message=FALSE, results="hide",eval=FALSE}
+#Stacking na final
+dane<-geny
+for(i in 5:(ncol(dane)-1)){
+      dane[which(is.na(dane[,i])),i] <- mean(dane[,i], na.rm = TRUE)
+}
+ist<-istotne(dane[,-ncol(dane)],25)
+dane<-dane[,c("age","death1y",ist,"smierc")]
+
+dataset<-dane[,-ncol(dane)]
+control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions=T, classProbs=TRUE)
+seed<-8
+metric<-"Accuracy"
+set.seed(8)
+models <- caretList(as.factor(death1y)~., 
+                    data=dataset, 
+                    trControl=control,
+                    tuneList = list(gbm=caretModelSpec(method='gbm', distribution="adaboost"), 
+                                    glm=caretModelSpec(method='glm', family="binomial"),
+                                    glmStepAIC=caretModelSpec(method='glmStepAIC', family="binomial", trace=FALSE, 
+                                                              k=log(nrow(dataset))),
+                                    glmnet=caretModelSpec(method='glmnet', family="binomial", preProcess=c("center","scale")
+                                    ),
+                                     rpart=caretModelSpec(method='rpart') ,
+                                    rf=caretModelSpec(method='rf', ntree=25),
+                                    nb=caretModelSpec(method='nb'),
+                                    svmRadial=caretModelSpec(method='svmRadial',preProcess=c("center","scale")))) 
+results <- resamples(models)
+
+```
+
+Poni¿ej znajduje siê podsumowanie skutecznoœci naszych modeli oraz wspó³czynnika **Kappa**, który mo¿emy interpretowaæ jako czêstoœæ trafnoœci klasyfikacji naszego modelu o któr¹ przewy¿sza on trafnoœæ klasyfikacji modelu losowego, 0 oznacza model losowy, a 1 model idealny.
+
+```{r, warning=FALSE,message=FALSE,}
+load("C:/Users/Wioleta/Downloads/resultdoprojektu.rda")
+summary(results)[3]$statistics$Accuracy
+dotplot(results)
+```
+
+Widzimy, ¿e model Random Forest tworzy najskuteczniejszy model z accuracy do **75.37%**. Glmnet,Naive Bayes oraz GBM posiadaj¹ podobny wynik, jednak dla nich wspó³czynnik Kappa jest gorszy ni¿ dla Random Forest. Reasumuj¹c modelami, które na postawie powy¿szej analizy okazuj¹ siê byæ najlepsze, s¹: **RF,GLMNET (lasso),NB**. Aby wybraæ modele, które chcemy ze sob¹ po³¹czyæ obliczmy macierz korelacji predykcji tych modeli. Gdy ³¹czymy predykcje ró¿nych modeli chcemy aby prognozy przedstawione przez te modele mia³y niska korelacje, poniewa¿ oznacza to, ¿e modele s¹ równie skuteczne ale na ró¿ne sposoby. Zatem dziêki temu nasz klasyfikator uczy siê jak uzyskaæ najlepsze predykcje w celu udoskonalenia koñcowego modelu.
+
+
+```{r, warning=FALSE,message=FALSE,echo=FALSE,eval=FALSE,results="hide"}
+set.seed(8)
+models1 <- caretList(as.factor(death1y)~., 
+                    data=dataset, 
+                    trControl=control,
+                    tuneList = list(glmnet=caretModelSpec(method='glmnet', 
+                                          family="binomial",preProcess=c("center","scale")),
+                                    rf=caretModelSpec(method='rf', ntree=25),
+                                    nb=caretModelSpec(method='nb')))
+                                     
+results1 <- resamples(models1)
+
+```
+
+```{r, warning=FALSE,message=FALSE}
+load("C:/Users/Wioleta/Downloads/results1.rda")
+modelCor(results1)
+splom(results1)
+```
+
+Generalnie wszystkie pary predykcji s¹ dosyæ s³abo skorelowane. Zatem ostateczny model stacking budujemy na postawie tych trzech modeli. Widzimy, ¿e nasz nowy model stacking utworzony metod¹ rf posiada skutecznoœæ a¿ do **82%**, co jest niema³ym ulepszeniem modelu Radom Forest.
+
+```{r, warning=FALSE,message=FALSE,eval=FALSE}
+stackControl <- trainControl(method="repeatedcv", number=10, repeats=10, classProbs=TRUE)
+set.seed(8)
+stack.rf <- caretStack(models1, method="rf", metric=metric, trControl=stackControl)
+
+
+
+set.seed(8)
+stack.glm <- caretStack(models1, method="glm", metric=metric, trControl=stackControl)
+
+
+```
+
+```{r, warning=FALSE,message=FALSE}
+load("C:/Users/Wioleta/Downloads/stack.glm.rda")
+load("C:/Users/Wioleta/Downloads/stack.rf.rda")
+print(stack.rf)
+print(stack.glm)
+```
+#Predykcja na zbiorze final
+```{r,message=FALSE,warning=FALSE,eval = FALSE}
+final<-read.table("C:/Users/Key/Documents/final.csv",sep=",", dec=".", header=TRUE)
+final1<-as.data.frame(final)
+final1<-final1[,c("age",ist)]
+
+for(i in 2:ncol(final1)){
+      final1[which(is.na(final1[,i])),i] <- mean(final1[,i], na.rm=TRUE)
+}
+
+pred<-predict(stack.rf,newdata = final1)
+pred<-ifelse(pred1=="alive",1,0)	
+    
+results<-as.data.frame(as.factor(pred2))   
+results<-cbind(c(1:250),results)    
+rownames(results) <- NULL
+names(results)[1]<-paste("rowid")
+names(results)[2]<-paste("Expected")
+
+write.table(results, file="resultsstacking.csv", 
+            sep = ",", dec = ".", row.names = FALSE)
+```
+#Podsumowanie
+W raporcie przedstawione zosta³y modele predykcyjne dla zachorowañ na nowotwory mózgu. B³¹d œredniokwadratowy modeli wypad³ bardzo podobnie. Z wykresu mo¿na odczytaæ, ¿e najlepiej wypad³ NB, LASSO, SVM i RF. Modelelami o najwiêkszej wartoœci AUC okaza³y siê byæ Lasso, RF i NB. Dok³adniejsza analiza modeli pod wzglêdem wartoœci Accuracy, Kappy i F1 pozwala wyci¹gn¹æ wniosek, ¿e najbardziej skuteczne modele to **Radom Forest, Naive Bayes** oraz **Lasso**. Ostatecznie stworzyliœmy **model Stacking** opieraj¹c siê na trzech wy¿ej wymienionych modelach, którego wspó³czynnik Kappa i Accuracy jest wy¿szy od ka¿dego modelu sk³adaj¹cego siê na ostateczny klasyfikator. 

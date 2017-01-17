@@ -1,0 +1,89 @@
+---
+title: "Lab 12"
+author: "Przemyslaw Biecek"
+date: "17 styczeń 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Rozgrzewka
+
+Wygeneruj dwa zbiory danych, będą później wykorzystywane w analizie grup.
+
+1. Użyj funkcji `rmvnorm{mvtnorm}` aby wylosować
+- 120 obserwacji z dwuwymiarowego rozkładu normlanego *N(c(3,0), diag(1,2))*.
+-  80 obserwacji z dwuwymiarowego rozkładu normlanego *N(c(0,3), diag(1,2))*.
+Następnie skorzystaj z funkcji `rbind` aby połączyć obie macierze w jedną ramkę o 200 wierszach i 2 kolumnach.
+Użyj pakietu `ggplot2` aby narysować oba skupiska.
+
+Aby dowiedzieć się więcej o technikach losowania danych przeczytaj https://pbiecek.gitbooks.io/przewodnik/content/Programowanie/generatory_3.html.
+
+
+2. Użyj funkcji `kmeans{stats}` i `pam{cluster}` aby zidentyfikować 2 skupiska w danych wygenerowanych w kroku 1.
+
+
+# Symulacje
+
+Czas przeprowadzić eksperymenty z liczbą grup.
+
+1. Wylosuj dane z kilku skupisk (np. 5) o mniej więcej zbliżonych wielkościach (np. 60, 80, 100, 120, 140). 
+
+Organoleptycznie sprawdź co się stanie, jeżeli wykorzystasz te dane do identyfikacji 3, 5, lub 7 skupisk.
+Wywołaj algorytm k-średnich kilkukrotnie. Zobacz czy wyniki są stabilne czy nie.
+
+2. Użyj funkcji `silhouette()` do policzenia średnich sylwetek. Narysuj wykresy sylwetek.
+
+3. Przygotuj wykres, który bada jak zmienia się średnia sylwetka w zależności od liczby grup.
+
+
+# Dane rzeczywiste
+
+Ponownie popracujemy nad danymi o głosowaniach.
+Wczytaj dane o głosowaniach z VII kadencji Sejmu. 
+
+```
+votings <- archivist::aread("pbiecek/Przewodnik/arepo/9175ec8b23098c4364495afde9a2cc17")
+votings[is.na(votings)] <- "Not present"
+```
+
+Wykorzystaj funkcję `daisy()` aby wyznaczyć macierz podobieństwa pomiędzy posłami. 
+Znajdź dla tych danych 'dobrą' liczbę grup (używając gap-statistics lub średniej sylwetki).
+Porównaj znalezione grupy z informacją o klubach, do których należą posłowie.
+
+Czy dla tych danych można wykorzystać funkcję pam? A k-średnich? Dlaczego?
+
+
+
+
+
+
+## Podpowiedzi
+
+Używaj tylko w ostateczności
+
+```{r}
+library(mvtnorm)
+s1 <- rmvnorm(120, c(3,0), diag(1, 2))
+s2 <- rmvnorm(80, c(0,3), diag(1, 2))
+ss <- as.data.frame(rbind(s1, s2))
+
+library(ggplot2)
+ggplot(ss, aes(V1, V2)) +
+geom_point()
+
+g1 <- kmeans(ss, 2)
+library(cluster)
+g2 <- pam(ss, 2)
+
+ss$g1 <- g1$cluster
+ss$g2 <- g2$clustering
+
+ggplot(ss, aes(V1, V2, color=g1)) +
+geom_point()
+ggplot(ss, aes(V1, V2, color=g2)) +
+geom_point()
+```
+
