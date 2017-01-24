@@ -1,0 +1,787 @@
+---
+title: "Projekt 2"
+author: "Patrycja Faszczewska, Krystian Igras"
+date: "17 grudnia 2016"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 2
+    toc_float: true
+
+---
+Prezentowana analiza dotyczy danych z projektu PISA 2015 opisujących wyniki badania kompetencji wśród 15-latków (ponad 0,5 mln osób) z zakresu czytania, matematyki i nauk przyrodniczych. Badani mieli 120 minut na rozwiązanie testu składającego się z 4 części.Analizowane przez nas dane ograniczają się do informacji odnośnie części matematycznej i czytania. Rozwiązywanie zadań odbywało się w kolejności ich prezentowania bez możliwości powrotu i poprawy zatwierdzonej odpowiedzi.  Na bazie tych wiadomości postaramy się znaleźć i opisać strategie obierane przez uczniów w trakcie rozwiązywania testu. 
+
+# Ogólne informacje o danych
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+load("onlyTimingsLong.rda")
+data<-onlyTimingsLong
+str(onlyTimingsLong)
+names(data)
+library("dplyr")
+zadania<-table(data$Zadanie)
+zadania<-as.data.frame(unlist(labels(zadania)))
+colnames(zadania)<-"Zadanie"
+zad<-left_join(zadania,data[,c("Zadanie","Zestaw")])
+zad<-unique(zad)
+rm(onlyTimingsLong)
+```
+<br></br>
+Mamy do dyspozcji 8.5 mln obserwacji opisanych przez 8 wypisanych wyżej wartości.Dane zawierają informacje opisujące czas wykonywania zadań przez uczniów z 58 krajów.Po sprawdzeniu wiemy, że każdy ze studentów pisał co najwyżej dwie części (1 i 2 lub 3 i 4) - czytanie i matematykę.
+```{r,echo=TRUE,warning=FALSE,message=FALSE,cache=TRUE}
+cat("Ogólne informacje:\n",
+    length(unique(data$Zestaw)),"  Liczba różnych zestawów\n",
+    length(unique(data$Zadanie)),"  Liczba zadań\n",
+    length(unique(data$Kraj)),"  Liczba krajów\n",
+    length(unique(data$Student)),"  Liczba studentów\n",
+    length(unique(data$Szkola)),"  Liczba szkół " )
+
+```
+<br></br> Średnio każdy z uczniów rozwiązał ok. 23 zadania, jednak wśród badanych znajdują się również osoby, które rozwiązały od 1 do 30 zadań.
+
+```{r,echo=TRUE,results=FALSE,message=FALSE,cache=FALSE}
+library("dplyr")
+dane<-data %>% group_by(Student) %>% dplyr::summarise(Ile = n())
+#summary(dane)
+```
+
+
+# Porządkowanie danych
+Analizując statyki opisowe czasu rozwiązywania poszczegółnych zadań (w minutach) prezentowane poniżej widzimy, że konieczne jest uporządkowanie danych i pozbycie się obserwacji mogących zawierać błędne bądź przypadkowe informacje.
+```{r}
+summary((data$Czas)/1000/60)
+
+```
+Gdy wyrazimy czas w minutach widać, że na niektóre z zadań przeznaczono dużo więcej niż regulaminowe 2-godziny niezbędne na wykonanie testu (Max>120). Musimy pozbyć się takich danych.
+```{r,message=FALSE,warning=FALSE,echo=TRUE,cache=TRUE}
+library("dplyr")
+stat<-data %>% dplyr::group_by(Student) %>%
+  dplyr::summarize(sum(Czas))
+sum(stat$'sum(Czas)'>120*60*1000)
+
+Studenci<-stat$Student[which(stat$`sum(Czas)`>120*60*1000)]
+Studenci1<-data$Student[which(data$Pozycja==-1)]
+data<-data[! data$Student %in% Studenci,]
+data<-data[! data$Student %in% Studenci1,]
+#saveRDS(data,"data.rds")
+
+rm(Studenci)
+rm(Studenci1)
+```
+
+<br></br>Ponad 227 z ok.356 tys. uczniów przeznaczyło więcej niż 2 godziny na wykonywanie testu zgodnie z przedstawionymi danymi. Ze względu na dużą ilość danych pozbędziemy się "nieprzepisowych". Usuwamy również obserwacje, dla których Pozycja przyjmuje wartość -1, gdyż świadczy to o błędnym wprowadzeniu danych. Upewniliśmy się również czy w zbiorze obserwacji nie występują luki w danych - tzn. "NA", gdyż konieczne byłoby ich zastąpienie. 
+<br></br> Jak widzimy wyżej czasy wykonywania niektórych zadań są na tyle małe, że mogą wiązać się z przypadkowym pominięciem przez ucznia (nie jest w stanie zapoznać się z zadaniem w 0.15 s). W związku z tym zadania te nie są częścią strategii przyjętej przez ucznia a błędem, który zaburza analizę. Wydaje nam się, że rozsądne ograniczenie dolne czasu przeznaczonego na zadanie wynosi 1s, gdyż student po szybkiej ocenie zakresu zadania może świadomie podejmować decyzję o jego pominięciu, co stanowi część badanej strategii.
+<br></br> Część z obserwacji zaburza analizę ze względu na duże czasy rozwiązywania zadania (np. 85 minut poświęcone na jedno zadanie). Może to wiązać się z wyjściem ucznia z klasy i przerwaniem wykonywania testu, co zapewne nie jest częścią przyjętej przez niego strategii. W związku z tym pozbędziemy się obserwacji, których czas przekracza górną granicę 15 minut.
+```{r,echo=TRUE,cache=TRUE,warning=FALSE,message=FALSE}
+library("highcharter")
+d<-(data$Czas)[which(data$Czas<60000*15)]
+hchart(d/1000)%>% hc_xAxis(plotLines = list(
+             list(label = list(text = "1 sekunda"),
+                  color = "#FF0000",
+                  width = 2,
+                  value = 1))) %>% hc_title(text = "Histogram czasu wykonywania zadania")
+data<-data[which(data$Czas>1000),]
+data<-data[which(data$Czas<15*60000),]
+```
+
+<br></br>
+Korzystając z funkcji boxplot.stats udało nam się zlokalizować ok 400 tys. obserwacji odstających. Dane bez odstających obserwacji oznaczamy przez data2. Uwzględnimy je w dalszej analizie , jednak nie chcemy ich na razie usuwać gdyż mogą być istotne przy porównywaniu krajów.
+
+```{r,echo=TRUE,message=FALSE, warning=FALSE,cache=FALSE,cache=TRUE}
+library("tidyr")
+dataM<-data[which(data$Obszar=="M"),]
+dataR<-data[which(data$Obszar=="R"),]
+
+#obserwacje odstające
+odstajace<-boxplot.stats(data$Czas)$out
+
+
+
+data2<-data[! data$Czas %in% odstajace,]
+
+
+statM<-dataM %>% dplyr::group_by(Kraj) %>%
+  dplyr::summarize(mean(Czas)/(1000*60))
+
+statR<-dataR %>% dplyr::group_by(Kraj) %>%
+  dplyr::summarize(mean(Czas)/(1000*60))
+
+
+statMR<-merge(statR,statM,by="Kraj")
+colnames(statMR)<-c("Kraj","CzasR","CzasM")
+
+```
+
+# Porównanie obszarów
+<br></br>Jak widzimy na wykresie poniżej zadania z części matematycznej i czytania są wykazane w podobnej wielkości obserwacji.
+```{r,echo=TRUE,warning=FALSE,message=FALSE,cache=TRUE}
+
+dane<-data
+
+
+#remove.packages("highcharter")
+#install.packages('highcharter', dependencies = TRUE)
+library('highcharter')
+dan<-dane %>% group_by(Obszar) %>% dplyr::summarise(Ile = n())
+
+hc<-highchart() %>% hc_chart(type="pie") %>% 
+  hc_title(text = "Udział M/R") %>%
+  hc_add_series_labels_values(labels = dan$Obszar, values=dan$Ile) %>%
+  hc_tooltip(pointFormat = "{point.y}")
+
+hc
+```
+<br></br>Statystyki opisowe czasu (w minutach) wykonywania zadań z matematyki:
+```{r}
+summary((dataM$Czas)/60000)
+```
+<br></br>Statystyki opisowe czasu (w minutach) wykonywania zadań z czytania:
+```{r}
+summary((dataR$Czas)/60000)
+```
+<br></br> Powyżej prezentujemy podstawowe statystyki czasu przeznaczonego na zadanie w każdym z obszarów. Już na pierwszy rzut oka widać, że zadania z matematyki są wykonywane dłużej aniżeli zadania z czytania. Minimum i maximum w obu prezentowanych statystykach są sobie równe ze wględu na narzucenie wcześniej dolnych i górnych ograniczeń na czas wykonywania zadania.
+<br></br> Dodatkowo porównajmy histogramy czasów rozwiązywania zadania z matematyki oraz czytania, które prezentujemy poniżej.
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+data1.1<-data[which(data$Pozycja==1),]
+data1.2<-data[which(data$Pozycja==2),]
+data1.3<-data[which(data$Pozycja==3),]
+data1.4<-data[which(data$Pozycja==4),]
+library("ggplot2")
+#saveRDS(data1.4,"data1.4.rds")
+stat1<-data1.1 %>% dplyr::group_by(Szkola,Student) %>%
+  dplyr::summarize(Czas=sum(Czas)/(1000*60))
+stat2<-data1.2 %>% dplyr::group_by(Szkola,Student) %>%
+  dplyr::summarize(Czas=sum(Czas)/(1000*60))
+stat3<-data1.3 %>% dplyr::group_by(Szkola,Student) %>%
+  dplyr::summarize(Czas=sum(Czas)/(1000*60))
+stat4<-data1.4 %>% dplyr::group_by(Szkola,Student) %>%
+  dplyr::summarize(Czas=sum(Czas)/(1000*60))
+
+
+ggplot(data2, aes(x=Czas, fill=Obszar)) +
+               geom_histogram(position="identity", alpha=0.5)
+
+```
+<br></br> Gdy porównamy histogramy czasów wykonywania zadań z obu obszarów, widzimy, że zadania z matematyki były rozwiązywane dłużej co potwierdza wcześniej przedstawioną hipotezę.
+
+# Porównanie części testów (opisanych przez zmienną Pozycja)
+<br></br>Jak widzimy na wykresie poniżej zadania z wszystkich części testu są wykazane w podobnej wielkości obserwacji.
+```{r,echo=TRUE,cache=TRUE,warning=FALSE,message=FALSE,cache=TRUE}
+library('highcharter')
+dan<-dane %>% group_by(Pozycja) %>% dplyr::summarise(Ile = n())
+
+hc<-highchart() %>% hc_chart(type="pie") %>% 
+  hc_title(text = "Udział Pozycje") %>%
+  hc_add_series_labels_values(labels = paste("Pozycja",dan$Pozycja), values=dan$Ile) %>%
+  hc_tooltip(pointFormat = "{point.y}")
+
+hc
+```
+<br></br>Podstawowe statystyki czasu (w minutach) wykonywania zadań w każdej części testu prezentują się następująco:
+```{r,echo=TRUE,cache=TRUE}
+cat("Pozycja 1 :\n")
+summary((data1.1$Czas)/60000)
+cat("Pozycja 2: \n") 
+summary((data1.2$Czas)/60000)
+cat("Pozycja 3: \n")
+summary((data1.3$Czas)/60000)
+cat("Pozycja 4: \n" )
+summary((data1.4$Czas)/60000)
+```
+<br></br>Wnioskując jak wcześniej, widzimy, że średni czas przeznaczony na zadanie z części pierwszej jest najdłuższy natomiast na zadania z ostatniej części testu przeznaczono najmniej czasu.
+<br></br>Rozkład łącznego czasu przeznaczonego na każdą z części pokazują poniższe boxploty.
+
+```{r,echo=TRUE,cache=TRUE}
+par(mfrow=c(1,4))
+col<-rainbow(4,start=.8)
+boxplot(stat1$Czas, main="Pozycja 1", col=col[1],ylim=c(0,120))
+boxplot(stat2$Czas, main="Pozycja 2", col=col[2],ylim=c(0,120))
+boxplot(stat3$Czas, main="Pozycja 3", col=col[3],ylim=c(0,120))
+boxplot(stat4$Czas, main="Pozycja 4", col=col[4],ylim=c(0,120))
+
+
+
+
+```
+
+<br></br> Boxploty przedstawiają rozkład czasu przeznaczonego na każdą z części testu (wyrażony w minutach). Analizując powyższy wykres dochodzimy do wniosku, że najwięcej czasu przeznaczano na wykonanie częsci pierwszej, druga część wykonywana była znacznie krócej. Jednak ten malejący trend nieznacznie odwraca się w przypadku części trzeciej, na którą poświęcano więcej czasu niż na część drugą ale mniej niż na część pierwszą. Natomiast część czwarta była zdecydowanie najszybciej wykonywaną z części. Może to wynikać z presji czasu, którą odczuwali uczniowie badź też z kolejności umieszczania obszarów w poszczególnych częściach testu. Prezentowany poniżej wykres kołowy pozwoli nam ocenić przyczyny takich zależności.
+```{r,echo=TRUE,cache=TRUE,warning=FALSE,message=FALSE}
+
+library('highcharter')
+dan<-data %>% group_by(Pozycja) %>% dplyr::summarise(Ile = n())
+dan1<-data %>% group_by(Pozycja,Obszar) %>% dplyr::summarise(Ile = n())
+
+hc<-highchart() %>% hc_title(text = "Udział obszarów w poszczególnych częsciach testu") %>%hc_add_series_labels_values(labels = paste(dan$Pozycja), values=dan$Ile, type="pie",size="60%") %>%hc_add_series_labels_values(labels = paste(dan1$Obszar), values=dan1$Ile, type="pie",size="100%",innerSize="60%") %>% hc_tooltip(pointFormat = "{point.y}")
+
+hc
+
+```
+
+<br></br> W każdej z części testu zadania z matematyki i czytania wykazane są w podobnych wielkościach tak więc zapewne nie mają one znaczącego wpływu na czas poświęcony na wykonanie kolejnych części testu. Zatem możemy przypuszczać, że opisana zależność wynika z presji czasu jakiej poddani są uczniowie.
+
+# Porównanie krajów
+
+<br></br> Badane kraje wykazane są w następujących częściach obserwacji:
+```{r,echo=TRUE,cache=TRUE}
+library('highcharter')
+dan<-dane %>% group_by(Kraj) %>% dplyr::summarise(Ile = n())
+
+hc<-highchart() %>% hc_chart(type="pie") %>% 
+  hc_title(text = "Udział krajów") %>%
+  hc_add_series_labels_values(labels = paste(dan$Kraj), values=dan$Ile) %>%
+  hc_tooltip(pointFormat = "{point.y}")
+
+hc
+
+```
+<br></br> Jak widzimy liczba obserwacji przypadających na każdy z krajów jest podobna, dzięki czemu analiza porównawcza ma większy sens i nie będzie zaburzana różnicami w wielkości dostępnych danych.
+<br></br> Poniżej prezentujemy średnie czasy rozwiązywania zadań z czytania i matematyki dla każdego z krajów.
+```{r, fig.height=7,fig.width=15,message=FALSE,warning=FALSE,echo=TRUE,cache=TRUE}
+pc1 <- ggplot(statMR, aes(x = CzasR , y = CzasM , color = Kraj))
+pc2 <- pc1 + geom_point()
+
+library("ggrepel")
+pc4 <- pc2 +
+   geom_text_repel(aes(label = Kraj),
+                   color = "gray20",
+                   data = statMR,
+                   force = 10)+ 
+                    geom_point(shape = 1, size = 5) +
+                    theme(text = element_text(color = "gray20"),
+                    legend.position = "none",
+                    legend.justification = 0.5, 
+                    legend.text = element_text(size = 15, color = "gray10"))
+library(plotly)
+  ggplotly(pc4, width=800)
+
+```
+<br></br>Wykres przedstawiony wyżej prezentuje średni czas poświęcony na zadanie z części matematycznej oraz czytania w każdym z badanych krajów. Najszybciej zadania z obu częci wykonywane są przez studentów  z Korei natomiast najdłuższy średni czas poświęcony jest na zadania w Peru.Jak widzimy większość punktów na wykresie odpowiadających poszczególnym krajom jest skupiona blisko siebie i wzdłuż przekątnej wykresu co świadczy o tym, że większość krajów wykazuje podobne średnie czasy rozwiązywania zadań z obu części oraz czasy rozwiązywania problemów z obu obszarów są ze sobą powiązane (szybsze rozwiązywanie zadań z matematyki w danym kraju w porównaniu z innymi najczęściej wiąże się również z szybszym rozwiązywaniem zadań z czytania).
+
+<br></br> Następny wykres pokazuje średnie czasy wykonywania zadań w każdej z kolejnych części testów w rozróżnieniu na kraje.
+```{r,echo=TRUE,cache=TRUE,warning=FALSE,message=FALSE}
+
+dane<- data %>% group_by(Kraj,Pozycja) %>% dplyr::summarise(Czas_razem=mean(Czas)/60000)
+
+dane2<-dane
+
+dane2$Kraj<-unlist(lapply(1:(nrow(dane2)/4),function(x){c(x,x,x,x)}))
+ds <- list.parse2(dane2)
+
+hc <- highchart() %>% 
+  hc_chart(type = "heatmap", layout='horizontal') %>% 
+  hc_title(text = "Czas rozwiązywania zadań dla poszczególnych pozycji") %>% 
+  hc_xAxis(categories = c("",as.character(unique(dane$Kraj))),
+           labels=list(style=list(fontSize = '10px'))) %>% 
+  hc_yAxis(categories = c("",unique(dane$Pozycja))) %>% 
+  hc_add_series(name = "Czas rozwiązywania", data = ds) %>%
+  #hc_tooltip(pointFormat = "Pozycja: {point.y} <br> Państwo: {series.xAxis.categories} <br> Wartość: {point.value}")
+  hc_tooltip(formatter = JS("function(){
+                      return ('Pozycja: ' + this.y + ' <br> Państwo: ' + this.series.xAxis.categories[this.point.x] + '<br> Wartość:' + this.point.value)
+                }"))
+hc_colorAxis(hc, minColor = "#f2eff5", maxColor = "#990041")
+
+
+```
+Tu również możemy dostrzec opisaną wcześniej zależność, mianowicie zachowanie średniego czasu rozwiązywania zadań w rozróżnieniu na części testu, które jest wyraźne w przypadku np. Brazyli, Tunezji czy Peru. Jednak w części z krajów zależność ta jest znikoma. Przykład mogą stanowić chociażby Korea czy Holandia, gdzie różnice między częściami testu  są niezauważalne. Może to świadczyć o tym, że w tej części krajów studenci są znacznie mniej podatni na presje czasu i lepiej przygotowani do testu. 
+<br></br>Największe zróżnicowanie między czasami wykonywania zadań pomiędzy krajami widoczne jest w części pierwszej testu natomiast najmniejsze w części czwartej.
+<br></br> Podobne wnioski możemy osiągnąć z wykresu zaprezentowanego poniżej, który jest analogiczny do wcześniejszego jednak pozwala nam przeprowadzić analizę w rozróżnieniu na obszary testu.
+<div style="padding-left: 0cm">
+```{r,echo=TRUE,cache=TRUE,warning=FALSE,message=FALSE}
+library('highcharter')
+library("dplyr")
+dane<- data %>% group_by(Kraj,Obszar) %>% summarise(Czas_razem=mean(Czas)/60000)
+
+dane2<-dane
+
+dane2$Kraj<-unlist(lapply(1:(nrow(dane2)/2),function(x){c(x,x)}))
+dane2$Obszar<-ifelse(dane2$Obszar=="M",1,2)
+ds <- list.parse2(dane2)
+
+hc <- highchart() %>% 
+  hc_chart(type = "heatmap", layout='vertical') %>% 
+  hc_title(text = "Czas rozwiązywania zadań dla poszczególnych obszarów") %>% 
+  hc_xAxis(categories = c("",as.character(unique(dane$Kraj))),
+           labels=list(style=list(fontSize = '10px'))) %>% 
+  hc_yAxis(categories = c("",unique(dane$Obszar))) %>% 
+  hc_add_series(name = "Czas rozwiązywania", data = ds) %>%
+  #hc_tooltip(pointFormat = "Pozycja: {point.y} <br> Państwo: {series.xAxis.categories} <br> Wartość: {point.value}")
+  hc_tooltip(formatter = JS("function(){
+                      return ('Obszar: ' + this.y + ' <br> Państwo: ' + this.series.xAxis.categories[this.point.x] + '<br> Wartość:' + this.point.value)
+                }"))
+hc_colorAxis(hc, minColor = "#f2eff5", maxColor = "#990041")
+
+
+```
+
+</div> 
+<br></br> 
+Opisany wyżej trend (zadania z czytania są rozwiązywane szybciej niż z matematyki) możemy dostrzec również tutaj. Jednak w części z krajów różnice pomiędzy obszarami są bardziej widoczne, jak chociażby w Estonii czy Meksyku w innych natomiast są znikome (np. Hong Kong, Tunezja)
+<br></br>
+Poniżej prezentujemy średni rozkład czasów dla krajów, który pomoże nam określić części testu które charakteryzują się dużym zróżnicowaniem wśród badanych krajów.
+```{r,echo=TRUE,cache=TRUE,warning=FALSE,message=FALSE}
+library(ggplot2)
+dane<- data %>% group_by(Kraj,Pozycja, Obszar) %>% dplyr::summarise(Sredni_Czas=mean(Czas)/60000)
+dane$Pozycja<-as.factor(dane$Pozycja)
+ggplot(dane,aes(x = Pozycja,y= Sredni_Czas,fill=Obszar)) + geom_violin() + ggtitle("Rozkład średnich czasów dla krajów")
+
+```
+<br></br>Jak widzimy największe zróżnicowanie wśród krajów występuje na pozycji pierwszej. Świadczy to o tym, że to właśnie tutaj możemy dopatrywać się największych różnic między krajami. Również czas przenaczony na część matematyczną w każdym z krajów jest znacznie bardziej zróżnicowany aniżeli na czytanie. 
+
+# Analiza grup 
+
+##Wybór grup
+<br></br> Na kolejnym etapie analizy danych postaramy się wskazać i opisać typowe wzorce zachowań jeżeli chodzi o czas realizacji zadań w teście. Aby to zrobić obliczymy średnie czasy wykonywania poszczególnych zadań w szkołach, których mamy ponad 15 000. Agregowanie danych do poziomu szkół pozwoli nam ograniczyć dane na tyle, aby analiza była możliwa jednocześnie pozostawiając dużą część informacji. Poniżej prezentujemy fragment tabeli, która będzie podstawą dalszej analizy. Jeśli zadanie nie było rozwiązywane w badanej szkole to przypisujemy mu średni czas rozwiązywania tego zadania w szkołach, w których było rozwiązywane.
+```{r,echo=TRUE,warning=FALSE,message=FALSE}
+load("dane_klastry_etap3.rda")
+dane_klastry[1:5,1:10]
+```
+
+<br></br> Odległości między szkołami obliczymy przy pomocu metryki "manhattan", którą ustalamy jako jeden z parametrów funkcji dist. Wybieramy metodę łączenia grup Warda, która pozwoli nam minimalizować wewnątrzgrupową wariancję.
+```{r,echo=TRUE,message=FALSE,warning=FALSE}
+
+library("dplyr")
+library("tidyr")
+library("zoo")
+#dane_klastry<-data %>% group_by(Szkola,Zadanie) %>% dplyr::summarise(srednie_zadania=mean(Czas)) %>% spread(Zadanie,srednie_zadania)
+#dane_klastry<-na.aggregate(dane_klastry)
+#save(dane_klastry,file='dane_klastry_etap3.rda')
+load('dane_klastry_etap3.rda')
+  
+#odleglosci<-dist(dane_klastry[,-1], method="manhattan")
+#save(odleglosci,file='odleglosci_etap3.rda')
+#load('odleglosci_etap3.rda')
+
+
+library('cluster')
+
+#hc_szkoly<-hclust(odleglosci,method="ward.D")
+#save(hc_szkoly,file="hc_szkoly_etap3.rda")
+load("hc_szkoly_etap3.rda")
+
+
+
+```
+<br></br> Po wykonaniu powyższych działań kluczowe jest znalezienie optymalnej liczby grup, na które będziemy dzielić opisywane strategie. W tym celu wykorzystamy statystykę: gap-statistic, której wyniki prezentujemy poniżej.
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+
+#mycluster <- function(x, k) list(cluster=cutree(hc_szkoly,k=k))
+#library("cluster")
+#myclusGap <- clusGap(dane_klastry,
+#                                   FUN = mycluster, 
+#                                   K.max = 10, 
+#                                   B = 10)
+#save(myclusGap,file="myclusGap_dzien5.rda")
+load("myclusGap_dzien5.rda")
+
+library("factoextra")
+fviz_gap_stat(myclusGap)
+
+
+
+```
+<br></br>Zatem optymalny jest podział na 8 grup. W takim przypadku liczba szkół przynależnych do poszczególnych grup przedstawia się następująco:
+```{r,echo=TRUE,message=FALSE,warning=FALSE}
+hc_szkoly_cut<-cutree(hc_szkoly,k=8)
+table(hc_szkoly_cut)
+```
+
+<br></br>
+
+##Analiza stworzonych grup
+
+<br></br>
+
+###Porównanie średnich i odchyleń czasu wykonywania zadań w grupach
+
+<br></br> Skoro stworzyliśmy już grupy musimy je teraz scharakteryzować. W tym celu najpierw porównamy średnie czasy rozwiązywania zadań oraz odchylenia standardowe.  Pierwszy z prezentowanych wykresów przedstawia poszczególne grupy na układzie współrzędnych opisanym przez odchylenie standardowe oraz średnie czasy rozwiązywania zadań.
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+library("ggplot2")
+library("dplyr")
+library("tidyr")
+
+dane_klastry_agr<-data %>% group_by(Szkola) %>% 
+  dplyr::summarise(srednie_zadania=mean(Czas),odchylenie_zadania=sd(Czas))
+
+dane_klastry_agr$grupy<-hc_szkoly_cut
+
+ggplot(dane_klastry_agr,aes(srednie_zadania,odchylenie_zadania)) + geom_point(aes(color=as.factor(grupy)))+theme_bw()
+
+
+
+
+
+```
+<br></br> Widzimy, że grupa 4 charakteryzuje się niskimi średnimi i odchyleniami w porównaniu z pozostałymi. Oznacza to, że uczniowie w tej grupie przeznaczali podobną ilość czasu na każde z zadań i rozwiązywali je stosunkowo szybko. Natomiast grupa 6 wykazuje sie dużymi różnicami między czasami rozwiązywania poszczególnych zadań, które rozwiązywali stosunkowo długo. Jednak głębsza analiza na podstawie tego wykresu nie jest możliwa. W związku z tym bardziej szczegółowe informacje mogą być widoczne z boxplotów powyższych statystyk dla poszczególnych grup, które prezentujemy poniżej.
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+library("ggplot2")
+ggplot(dane_klastry_agr, aes(factor(grupy), srednie_zadania)) + geom_boxplot(aes(fill=factor(grupy)))+ggtitle("Rozkład średnich czasów wykonywania zadania dla każdej z grup")
+
+ggplot(dane_klastry_agr, aes(factor(grupy), odchylenie_zadania)) +geom_boxplot(aes(fill=factor(grupy)))+ggtitle("Rozkład odchyleń standardowych czasów wykonywania zadania w grupach")
+
+```
+<br></br> Z boxplotów widzimy, że największe różnice w czasach rozwiązywania zadań charakteryzują grupę 6. Natomiast grupa 4 na każde z zadań przeznaczała podobną ilość czasu. Dodatkowo grupa 1 ma stosunkowe niskie średnie czasy rozwiązywania zadań i podobnie jak grupa 4 małe różnice w czasach wykonywania poszczególnych zadań.
+
+<br></br>
+
+###Porównanie statystyk dla obszarów między grupami
+
+<br></br> Podobne wykresy możemy skonstruować w podziale na obszary wykonywania testu. Pozwoli nam to dookreślić strategie reprezentowane przez opisywane grupy. Spójrzmy zatem na boxploty dla odchyleń czasów rozwiązywania zadań z matematyki i czytania.
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+dane_klastry_obsz_odchylenia<-data %>% group_by(Szkola, Obszar) %>% 
+  dplyr::summarise(odchylenie_zadania=sd(Czas)) %>% spread(Obszar,odchylenie_zadania)
+
+dane_klastry_obsz_odchylenia$grupy<-hc_szkoly_cut
+
+dane_klastry_obsz_srednie<-data %>% group_by(Szkola, Obszar) %>% 
+  dplyr::summarise(srednie_zadania=mean(Czas)) %>% spread(Obszar,srednie_zadania)
+
+dane_klastry_obsz_srednie$grupy<-hc_szkoly_cut
+
+dane_klastry_obsz_sre_odch<-dane_klastry_obsz_srednie
+colnames(dane_klastry_obsz_sre_odch)[2:3]<-c("M_srednie","R_srednie")
+dane_klastry_obsz_sre_odch$M_odchylenia<-dane_klastry_obsz_odchylenia$M
+dane_klastry_obsz_sre_odch$R_odchylenia<-dane_klastry_obsz_odchylenia$R
+ 
+ 
+
+
+
+
+
+```
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+
+#ggplot(dane_klastry_obsz_srednie, aes(factor(grupy), M)) + geom_boxplot(aes(fill=factor(grupy)))+ggtitle("Rozkład średnich czasów rozwiązywania zadań z matematyki w grupach")
+#ggplot(dane_klastry_obsz_srednie, aes(factor(grupy), R)) + geom_boxplot(aes(fill=factor(grupy)))+ggtitle("Rozkład średnich czasów rozwiązywania zadań z czytania w grupach")
+
+
+```
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+
+
+
+ggplot(dane_klastry_obsz_odchylenia, aes(factor(grupy), M)) + geom_boxplot(aes(fill=factor(grupy)))+ggtitle("Rozkład odchyleń czasów rozwiązywania zadań z matematyki w grupach")
+ggplot(dane_klastry_obsz_odchylenia, aes(factor(grupy), R)) + geom_boxplot(aes(fill=factor(grupy)))+ggtitle("Rozkład odchyleń czasów rozwiązywania zadań z czytania w grupach")
+```
+<br></br> Z porównania powyższych wykresów możemy wywnioskować, że w przypadku grupy 8 różnice w czasie rozwiązywania zadań z matematyki są dużo większe aniżeli w przypadku zadań z czytania.
+<br></br>
+
+###Porównywanie różnic między poszczególnymi pozycjami w grupach
+
+<br></br> Aby opisać strategie kluczowe może być również porównanie łącznego czasu przeznaczonego na każdą z pozycji testu. 
+Na wykresie poniżej prezentujemy wspomniane porównanie.
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+
+
+
+dane_klastry_poz_srednie1<-stat1 %>% group_by(Szkola) %>% 
+  dplyr::summarise(Pozycja1=mean(Czas))
+dane_klastry_poz_srednie2<-stat2%>% group_by(Szkola) %>% 
+  dplyr::summarise(Pozycja2=mean(Czas))
+dane_klastry_poz_srednie3<-stat3%>% group_by(Szkola) %>% 
+  dplyr::summarise(Pozycja3=mean(Czas))
+dane_klastry_poz_srednie4<-stat4%>% group_by(Szkola) %>% 
+  dplyr::summarise(Pozycja4=mean(Czas))
+dane_klastry_poz_srednie<-merge(dane_klastry_poz_srednie1,dane_klastry_poz_srednie2,by="Szkola")
+dane_klastry_poz_srednie<-merge(dane_klastry_poz_srednie,dane_klastry_poz_srednie3,by="Szkola")
+dane_klastry_poz_srednie<-merge(dane_klastry_poz_srednie,dane_klastry_poz_srednie4,by="Szkola")
+dane_klastry_poz_srednie<-merge(dane_klastry_poz_srednie,dane_klastry_agr[,c("Szkola","grupy")],by="Szkola")
+
+
+dane_klastry_poz<-as.data.frame(rep(1:8,each=4))
+colnames(dane_klastry_poz)<-"grupy"
+for (i in 0:7){
+  dane_klastry_poz[1+4*i,"Czas"]<-mean(dane_klastry_poz_srednie[which(dane_klastry_poz_srednie$grupy==i+1),"Pozycja1"])
+  dane_klastry_poz[1+4*i,"Pozycja"]<-1
+}
+for (i in 0:7){
+  dane_klastry_poz[2+4*i,"Czas"]<-mean(dane_klastry_poz_srednie[which(dane_klastry_poz_srednie$grupy==i+1),"Pozycja2"])
+  dane_klastry_poz[2+4*i,"Pozycja"]<-2
+}
+for (i in 0:7){
+  dane_klastry_poz[3+4*i,"Czas"]<-mean(dane_klastry_poz_srednie[which(dane_klastry_poz_srednie$grupy==i+1),"Pozycja3"])
+  dane_klastry_poz[3+4*i,"Pozycja"]<-3
+}
+for (i in 0:7){
+  dane_klastry_poz[4+4*i,"Czas"]<-mean(dane_klastry_poz_srednie[which(dane_klastry_poz_srednie$grupy==i+1),"Pozycja4"])
+  dane_klastry_poz[4+4*i,"Pozycja"]<-4
+}
+
+procent<-dane_klastry_poz %>% group_by(grupy) %>% summarise(czas_laczny=sum(Czas))
+dane_klastry_poz$procent<-0
+for (i in 1:8){
+dane_klastry_poz[dane_klastry_poz$grupy==i,"procent"]<-procent[procent$grupy==i,"czas_laczny"]
+}
+dane_klastry_poz<-dane_klastry_poz %>% mutate(procent=paste0(round(Czas/procent*100,2),"%"))
+ 
+ 
+p <- ggplot(dane_klastry_poz, aes(x=grupy, y=Czas, fill=factor(Pozycja))) +
+        geom_bar(stat="identity") +
+        ggtitle("Czas spędzony nad kolejnymi częsciami testu w każdej z grup")+
+    geom_text(aes(label = procent), size = 3, hjust = 0.5, vjust = 3, position =     "stack")
+p
+```
+<br></br> Obserwując powyższe wykresy zauważamy, że w przypadku grupy 7 na każdą z pozycji przeznaczono podobną ilość czasu. Grupa 6 pisała część 2 i 4 testu najkrócej spośród wszystkich prezentowanych oraz poświecała znacznie większą część czasu na pierwszą część testu w porównaniu z pozostałymi grupami.
+
+<br></br>
+
+###Porównanie liczby rozwiązanych zadań między grupami
+
+<br></br>Dodatkowo sprawdźmy ile średnio zadań rozwiązywano w każdej z grup. Prezentujemy to na wykresie poniżej.
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+
+
+dane_klastry_zadania<-data %>% group_by(Szkola,Student) %>% 
+  dplyr::summarise(liczba_zadan=n())
+dane_klastry_zadania<-dane_klastry_zadania %>% group_by(Szkola) %>% dplyr::summarise(liczba_zadan=floor(mean(liczba_zadan)))
+
+dane_klastry_zadania$grupy<-hc_szkoly_cut
+
+
+ggplot(dane_klastry_zadania, aes(factor(grupy), liczba_zadan)) + geom_boxplot(aes(fill=factor(grupy)))+ggtitle("Rozkład średniej liczby zadań rozwiązywanych w teście dla każdej z grup")
+
+```
+<br></br> Z wykresu możemy wywnioskować, że w przypadku grupy 5 rozwiązywano  najwięcej zadań. Natomiast w grupie 6 rozwiązywano ich najmniej.
+Widzimy, że w pozostałych grupach ilości rozwiązywanych zadań są podobne.
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+#dane_klastry_zadM<-dataM%>%group_by(Szkola,Student)%>%dplyr::summarise(ile=n())
+#dane_klastry_zadM<-dane_klastry_zadM%>%group_by(Szkola)%>%dplyr::summarise(ilosc=floor(mean(ile)))
+#dane_klastry_zadR<-dataR%>%group_by(Szkola,Student)%>%dplyr::summarise(ile=n())
+#dane_klastry_zadR<-dane_klastry_zadR%>%group_by(Szkola)%>%dplyr::summarise(ilosc=floor(mean(ile)))
+#dane_klastry_zadM<-merge(dane_klastry_zadM,dane_klastry_agr[,c("Szkola","grupy")],by="Szkola")
+#dane_klastry_zadR<-merge(dane_klastry_zadR,dane_klastry_agr[,c("Szkola","grupy")],by="Szkola")
+#dane_klastry_zadM<-dane_klastry_zadM%>%group_by(grupy)%>%dplyr::summarise(M=floor(mean(ilosc)))
+#dane_klastry_zadR<-dane_klastry_zadR%>%group_by(grupy)%>%dplyr::summarise(R=floor(mean(ilosc)))
+#dane_klastry_zad<-merge(dane_klastry_zadM,dane_klastry_zadR,by="grupy")
+
+#dane_klastry_zad<-gather(dane_klastry_zad,"Obszar","Ilosc",2:3)
+
+#p <- ggplot(dane_klastry_zad, aes(x=grupy, y=Ilosc, fill=factor(Obszar))) +geom_bar(stat="identity",position="fill") +ggtitle("Ilość rozwiązanych zadań w każdym z obszarów")+coord_polar(theta="y")
+#print(p)
+
+```
+
+
+# Końcowe wyodrębnienie strategii
+
+
+<br></br> Ze względu na małe różnice między grupami i wynikające z tego powodu problemy z charakteryzacjami strategii zdecydowaliśmy się poprawic prezentowane podziały. Z powyższych opisów możemy zauważyć podobieństwa między parami prezentowanych grup. W oparciu o tą analizę zdecydowaliśmy się połączyć grupy następująco :
+<br></br> Grupa A - powstaje z połączenia grup 1 i 4
+<br></br> Grupa B - powstaje z połączenia grup 2, 5, 7 i 8
+<br></br> Grupa C - powstaje z połączenia grup 3 i 6
+<br></br> Z prezentowanego poniżej wykresu możemy wyciągnać następujące wnioski:
+<br></br> Grupa A - rozwiązuje zadania najszybciej
+<br></br> Grupa B - poświeca na zadanie mniej czasu niż grupa C, ale więcej niż grupa A
+<br></br> Gruba C - rozwiązuje zadania najwolniej, można również zaobserwować duże różnice w czasach rozwiązywania poszczególnych zadań.
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+hc_szkoly_cut<-replace(hc_szkoly_cut,which(hc_szkoly_cut==1),"A")
+hc_szkoly_cut<-replace(hc_szkoly_cut,which(hc_szkoly_cut==4),"A")
+hc_szkoly_cut<-replace(hc_szkoly_cut,which(hc_szkoly_cut==2),"B")
+hc_szkoly_cut<-replace(hc_szkoly_cut,which(hc_szkoly_cut==5),"B")
+hc_szkoly_cut<-replace(hc_szkoly_cut,which(hc_szkoly_cut==3),"C")
+hc_szkoly_cut<-replace(hc_szkoly_cut,which(hc_szkoly_cut==6),"C")
+hc_szkoly_cut<-replace(hc_szkoly_cut,which(hc_szkoly_cut==7),"B")
+hc_szkoly_cut<-replace(hc_szkoly_cut,which(hc_szkoly_cut==8),"B")
+
+dane_klastry_agr<-data %>% group_by(Szkola) %>% 
+  dplyr::summarise(srednie_zadania=mean(Czas),odchylenie_zadania=sd(Czas))
+
+dane_klastry_agr$grupy<-hc_szkoly_cut
+
+ggplot(dane_klastry_agr,aes(srednie_zadania,odchylenie_zadania)) + geom_point(aes(color=as.factor(grupy)))+theme_bw()
+
+
+```
+<br></br> Porównajmy również rozkłady czasu poświeconego na rozwiązanie zadania z poszczególnych obszarów. 
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+dane_klastry_obsz_odchylenia<-data %>% group_by(Szkola, Obszar) %>% 
+  dplyr::summarise(odchylenie_zadania=sd(Czas)) %>% spread(Obszar,odchylenie_zadania)
+
+dane_klastry_obsz_odchylenia$grupy<-hc_szkoly_cut
+
+dane_klastry_obsz_srednie<-data %>% group_by(Szkola, Obszar) %>% 
+  dplyr::summarise(srednie_zadania=mean(Czas)) %>% spread(Obszar,srednie_zadania)
+
+dane_klastry_obsz_srednie$grupy<-hc_szkoly_cut
+
+
+
+
+
+dane_klastry_obsz_srednie<-gather(dane_klastry_obsz_srednie,"Obszar","Średnie",2:3)
+ggplot(dane_klastry_obsz_srednie,aes(x = Obszar,y= Średnie)) + geom_violin(aes(fill=factor(Obszar))) + ggtitle("Rozkład średnich czasów dla prezentowanych grup")+facet_grid(~grupy)
+```
+<br></br> Wszystkie grupy piszą zadania z matematyki dłużej aniżeli z czytania, jednak ta różnica jest mniej widoczna w grupie A.
+<br></br> Gdy porównamy jaką część czasu każda z grup przeznacza na wykonanie poszczególnych pozycji testu zauważymy, że Grupa C przeznacza o dużo więcej czasu na rozwiązywanie pozycji 1,3 i co się z tym wiąże mniej na wykonanie pozycji 2,4. Wnioski te wyciągneliśmy z wykresu:
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+dane_klastry_poz_srednie<-merge(dane_klastry_poz_srednie[,-6],dane_klastry_agr[,c("Szkola","grupy")],by="Szkola")
+
+dane_klastry_poz_srednie1<-dane_klastry_poz_srednie%>%group_by(grupy)%>%dplyr::summarise(Pozycja1=mean(Pozycja1))
+dane_klastry_poz_srednie2<-dane_klastry_poz_srednie%>%group_by(grupy)%>%dplyr::summarise(Pozycja2=mean(Pozycja2))
+dane_klastry_poz_srednie3<-dane_klastry_poz_srednie%>%group_by(grupy)%>%dplyr::summarise(Pozycja3=mean(Pozycja3))
+dane_klastry_poz_srednie4<-dane_klastry_poz_srednie%>%group_by(grupy)%>%dplyr::summarise(Pozycja4=mean(Pozycja4))
+
+dane_klastry_poz<-merge(dane_klastry_poz_srednie1,dane_klastry_poz_srednie2,by="grupy")
+dane_klastry_poz<-merge(dane_klastry_poz,dane_klastry_poz_srednie3,by="grupy")
+dane_klastry_poz<-merge(dane_klastry_poz,dane_klastry_poz_srednie4,by="grupy")
+
+dane_klastry_poz<-gather(dane_klastry_poz,"Pozycja","Czas",2:5)
+
+procent<-dane_klastry_poz %>% group_by(grupy) %>% summarise(czas_laczny=sum(Czas))
+dane_klastry_poz$procent<-0
+dane_klastry_poz[dane_klastry_poz$grupy=="A","procent"]<-procent[procent$grupy=="A","czas_laczny"]
+dane_klastry_poz[dane_klastry_poz$grupy=="B","procent"]<-procent[procent$grupy=="B","czas_laczny"]
+dane_klastry_poz[dane_klastry_poz$grupy=="C","procent"]<-procent[procent$grupy=="C","czas_laczny"]
+ 
+dane_klastry_poz<-dane_klastry_poz %>% mutate(procent=paste0(round(Czas/procent*100,2),"%"))
+ 
+p <- ggplot(dane_klastry_poz, aes(x=grupy, y=Czas, fill=factor(Pozycja))) +
+        geom_bar(stat="identity") +
+        ggtitle("Czas spędzony nad kolejnymi częsciami testu w każdej z grup")+
+  geom_text(aes(label = procent), size = 3, hjust = 0.5, vjust = 3, position =     "stack")
+p
+```
+<br></br> Dodatowo porównajmy ilości rozwiązywanych zadań w każdej z grup.
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+dane_klastry_zadania<-data %>% group_by(Szkola,Student) %>% 
+  dplyr::summarise(liczba_zadan=n())
+dane_klastry_zadania<-dane_klastry_zadania %>% group_by(Szkola) %>% dplyr::summarise(liczba_zadan=floor(mean(liczba_zadan)))
+
+dane_klastry_zadania$grupy<-hc_szkoly_cut
+
+
+ggplot(dane_klastry_zadania, aes(factor(grupy), liczba_zadan)) + geom_boxplot(aes(fill=factor(grupy)))+ggtitle("Rozkład średniej liczby zadań rozwiązywanych w teście dla każdej z grup")
+
+
+
+
+
+
+```
+<br></br> Jak widzimy ilości rozwiązywanych zadań w każdej z grup są podobne, aczkolwiek grupa C odbiega od pozostałych, gdyż rozwiązuje najmniej zadań.
+<br></br>
+
+##Podsumowanie
+
+<br></br>
+Grupa A - rozwiązuje zadania najszybciej, na zadania z matematyki i czytania przeznacza podobną ilość czasu. Najdłuższą część czasu poświeca na pozyję 1 kosztem pozycji 4. Na cały test przeznacza średnio ok. 60 min., rozwiązując około 24 zadań.
+<br></br>
+<br></br> 
+Grupa B - rozwiązuje zadania w średnim czasie, poświęcając na zadania z matematyki więcej czasu aniżeli na zadania z czytania. Na każdą z pozycji przeznacza podobną ilość czasu. Średnio rozwiązuje 24 zadania w ok. 75 minut.
+<br></br> 
+<br></br> 
+Grupa C - rozwiązuje zadania najwolniej. Znacznie wolniej rozwiązuje zadania z matematyki w porównaniu z zadaniami z czytania. Dodatkowo  większą część czasu przeznacza na pozycje 1 i 3 kosztem pozycji 2 i 4, którym poświęca łącznie zaledwie 40 % całego czasu. Średnio rozwiązuje 23 zadania w ok. 82 minuty.
+<br></br>
+
+#Występowanie strategii w badanych krajach
+
+<br></br> Po wyodrębnieniu kluczowych strategii zbadamy ich występowanie w poszczególnych krajach. W związku z tym prezentujemy wykres pokazujący procentowe występowanie poszczególnych strategii w badanych krajach.
+```{r,echo=TRUE}
+data$Kraj<-as.character(data$Kraj)
+data$Kraj[grepl("USA",data$Kraj) | grepl("States",data$Kraj)]<-"USA"
+data$Kraj[grepl("Spain",data$Kraj)]<-"Spain"
+data$Kraj[grepl("China",data$Kraj)]<-"China"
+data$Kraj[grepl("Russia",data$Kraj)]<-"Russia"
+data$Kraj[grepl("Chin",data$Kraj)| grepl("Hong",data$Kraj)| grepl("Macao",data$Kraj)]<-"China"
+data$Kraj[grepl("Korea",data$Kraj)]<-"South Korea"
+data$Kraj[grepl("Slovak",data$Kraj)]<-"Slovakia"
+data$Kraj[grepl("United Kingdom",data$Kraj)]<-"UK"
+data$Kraj<-as.factor(data$Kraj)
+
+statMR$Kraj<-as.character(statMR$Kraj)
+statMR$Kraj[grepl("USA",statMR$Kraj) | grepl("States",statMR$Kraj)]<-"USA"
+statMR$Kraj[grepl("Spain",statMR$Kraj)]<-"Spain"
+statMR$Kraj[grepl("China",statMR$Kraj)]<-"China"
+statMR$Kraj[grepl("Russia",statMR$Kraj)]<-"Russia"
+statMR$Kraj[grepl("Chin",statMR$Kraj)| grepl("Hong",statMR$Kraj)| grepl("Macao",statMR$Kraj)]<-"China"
+statMR$Kraj[grepl("Korea",statMR$Kraj)]<-"South Korea"
+statMR$Kraj[grepl("Slovak",statMR$Kraj)]<-"Slovakia"
+statMR$Kraj[grepl("United Kingdom",statMR$Kraj)]<-"UK"
+statMR$Kraj<-as.factor(statMR$Kraj)
+```
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE,fig.height=7}
+
+
+udzial<-data %>% group_by(Szkola,Kraj) %>% summarise(sredni_czas=mean(Czas), odchylenie_czas=sd(Czas))
+udzial$grupa<-hc_szkoly_cut
+#udzial<-left_join(udzial,unique(data[,c("Szkola","Kraj")]), by="Szkola")
+do_wykresu<-udzial[,c("grupa","Kraj")] %>% group_by(Kraj,grupa) %>% summarise(ile_szkol=n())
+ 
+ 
+sumy<-do_wykresu %>% group_by(Kraj) %>% summarise(Szkol_razem=sum(ile_szkol))
+polaczone<-left_join(do_wykresu,sumy,by="Kraj")
+polaczone$procentowo<-polaczone$ile_szkol/polaczone$Szkol_razem
+do_wykresu<-polaczone
+ 
+rm(polaczone,sumy)
+ 
+do_wykresu<-do_wykresu[order(do_wykresu$grupa,-do_wykresu$procentowo),]
+do_wykresu$Kraj<-factor(do_wykresu$Kraj,unique(do_wykresu$Kraj))
+ 
+library("ggplot2")
+ 
+p2<-ggplot(data=do_wykresu, aes(x=Kraj,y=ile_szkol,fill=grupa))+geom_bar(position ="fill",stat = "identity")+coord_flip()+ggtitle("Procentowy udział stretegii w każdym z krajów")
+p2
+```
+<br></br> Po przeanalizowaniu wykresu możemy zauważyć, że w państwach takich jak Tunezja, Peru czy Brazylia dominuje strategia C, świadczaca o długim rozwiązywaniu małej ilości zadań. W USA, Hong Kongu najczęściej występuje strategia B. Natomiast w krajach szybko rozwiązujących zadania np. Korei i Holandii dominuje strategia A.
+
+<br></br> Kolejny wykres prezentuje rozmieszczenie krajów na płaszczyźnie opisanej przez średni czas poświęcony na wykonanie zadania z matematyki i średni czas rozwiązywania zadania z czytania. Dodatkowo kolor danego kraju zależy od dominującej w tym kraju strategii. 
+
+
+```{r, fig.height=6,fig.width=15,message=FALSE,warning=FALSE,echo=TRUE}
+library("ggplot2")
+do_tabeli<-do_wykresu[,-c(3,4)] %>% spread(grupa,procentowo, fill=0)
+wygrana<-do_tabeli[,2:4] %>% max.col('first')
+do_tabeli$wygrana <- colnames(do_tabeli[,2:4])[wygrana]
+rm(wygrana)
+statMR<-merge(do_tabeli[,c(1,5)],statMR,by="Kraj")
+
+pc1 <- ggplot(statMR, aes(x = CzasR , y = CzasM , color = wygrana,fill = Kraj))
+pc2 <- pc1 + geom_point()
+
+
+library("ggrepel")
+pc4 <- pc2 +
+   geom_text_repel(aes(label = Kraj),
+                   color = "gray20",
+                   data = statMR,
+                   force = 10)+ 
+                    geom_point(shape = 1, size = 5) +
+                    theme(text = element_text(color = "gray20"),
+                    legend.position = "none",
+                    legend.justification = 0.5, 
+                    legend.text = element_text(size = 15, color = "gray10"))
+library(plotly)
+  ggplotly(pc4, width=800)
+
+```
+
+
+<br></br> W większości przypadków, niski czas uzyskany z obu części pociąga za sobą dominację strategii A , podobnie w przypadku najdłuższego czasu i strategii C. Dodatkowo możemy zauważyć, że zaledwie w 4 krajach dominuje strategia A, natomiast w 9 strategia C. 
+
+<br></br> W celu podsumowania osiągniętych wyników przedstawiamy mapę prezentującą kraje biorące udział w badaniu wraz z dominującymi w nich strategiami. Jak widzimy w Ameryce Połnocnej i Australii dominuje strategia B, podczas gdy w Ameryce Środkowej i Południowej większość szkół rozwiązuje zadania zgodnie ze strategią C. Kraje europejskie wypadają najkorzystniej gdyż przeważa tu zarówno strategia B jak i A. Natomiast Azja jest najbardziej zróżnicowanym kontynentem.
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,fig.width=10,fig.height=7}
+library("ggmap")
+library("ggplot2")
+
+
+world <- map_data("world")
+colnames(world)[5]<-"Kraj"
+world_main<-left_join(world,do_tabeli[,c(1,5)], by="Kraj")
+worldmap <- ggplot(world_main, aes(x=long, y=lat, group=group)) +
+  geom_path() +  geom_polygon(aes(fill = wygrana))+
+  scale_y_continuous(breaks=(-2:2) * 30) +
+  scale_x_continuous(breaks=(-4:4) * 45)
+worldmap+geom_path()
+```
+
