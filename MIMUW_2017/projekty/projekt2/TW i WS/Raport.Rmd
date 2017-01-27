@@ -1,0 +1,832 @@
+
+---
+title: "Projekt2"
+author: "Wojciech Szymañski, Tomasz W¹s"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache=TRUE, warning=FALSE, message = FALSE)
+knitr::opts_chunk$set(fig.width = 10, fig.height =7, fig.align='center')
+```
+
+# Eksploaracja - opis projektu
+
+Drugi projekt dotyczy analizy struktury danych. Dane, na których bêdziemy pracowaæ pochodz¹ z projektu PISA 2015. To dane dla 58 krajów, w których przeprowadzono wœród 15 latków badanie kompetencji w matematyce, czytaniu ze zrozumieniem i naukach przyrodniczych. Celem projektu jest znalezienie strategii rozwi¹zywania testu na podstawie zbadanych wzorców zachowañ wystêpuj¹cych w ró¿nych krajach.
+
+### Wczytanie danych
+
+Wczytujemy i zapisujemy dane w tabeli `Dane`. Nastêpnie wyœwietlamy kilka wierszy aby zapoznaæ siê ze struktur¹ danych.   
+
+```{r data_loading}
+
+load("~/R/Projects/PISA/onlyTimingsLong.rda")
+Dane <- onlyTimingsLong
+head(Dane)
+rm(onlyTimingsLong)
+```
+
+Ka¿dy wiersz opisuje czas rozwi¹zywania jednego zadania. Rozwa¿amy tylko zadania z matematyki i czytania. Kolejne kolumny to:
+ 
+  - Kraj z którego pochodzi uczeñ
+ 
+  - Szko³a do której chodzi uczeñ
+ 
+  - Student, czyli ID ucznia w danej szkole w danym kraju
+ 
+  - Zestaw – numer zestawu zadañ, które student rozwi¹zywa³
+ 
+  - Czas – w tysiêcznych sekundy
+ 
+  - Zadanie – identyfikator zadania, które jest rozwi¹zywane
+ 
+  - Pozycja – informacja w której czêœci ca³ego testu wyst¹pi³o to zadanie. Ca³y dwugodzinny test jest podzielony na 4 mniej wiêcej równe czêœci, a ta kolumna opisuje kod okreœlonej czêœci
+ 
+  - Obszar – okreœla czy zadanie dotyczy czytania czy matematyki.
+
+
+### Czyszczenie danych
+
+Przedstawiamy podstawowe wyniki dotycz¹ce czasów rozwi¹zywania zadañ w ró¿nych krajach. Najpierw potrzebna jest jednak obróbka danych.
+
+Porz¹dkujemy dane, tzn. kolumnê `Czas` dzielimy przez 1000 aby wyraziæ czas rozwi¹zywania zadañ w sekundach. Usuwamy te wiersze, w których pozycja wynios³a -1 .Nastêpnie odrzucamy te wiersze, w których czas by³ wiêkszy ni¿ 900 sekund (zak³adamy, ¿e maksymalny czas rozwi¹zywania pojedynczego zadania to 15 minut) oraz mniejszy od 0,5 sekundy (uczniowie, którzy rozwi¹zywali zadanie poni¿ej pó³ sekundy mogli pomy³kowo omin¹æ zadanie, st¹d odrzucamy wiersze z czasem poni¿ej 0,5 sekundy).
+
+```{r data_cleaning}
+Dane$Czas <- Dane$Czas/1000
+Dane <- Dane[-which(Dane$Pozycja==-1),]
+Dane <- Dane[-which(Dane$Czas>900),]
+Dane <- Dane[-which(Dane$Czas<0.5),]
+```
+
+
+## Wstêpna analiza
+
+Maj¹c oczyszczone dane przystêpujemy do analizy.
+Sprawdzamy jak wygl¹da histogram czasów oraz wykres gêstoœci rozk³adu logarytmów czasu.
+
+```{r time_distribution}
+hist(Dane$Czas, breaks = "FD", main="Histogram czasów rozwi¹zywania zadañ")
+plot(density(log(Dane$Czas)), main="Gêstoœæ rozk³adu logarytmów czasu")
+
+```
+
+Sprawdzamy testem `lillie` z pakietu `nortest`,  czy logarytm kolumny `Czas` ma rozk³ad normalny.
+
+```{r nor_test, echo=TRUE}
+library("nortest")
+lillie.test(log(Dane$Czas))
+```
+
+Widzimy, ¿e p-value powy¿szego testu jest bardzo ma³a. Kolumna `Czas` nie ma rozk³adu log-normalnego, ale ma rozk³ad do niego podobny.
+
+Tworzymy tabelê `Stat1`, w której znajd¹ siê statystyki ogólne dla poszczególnych krajów (œredni czas rozwi¹zywania zadania dla czytania i pisania, œredni czas tylko dla czytania, œredni czas tylko dla matematyki, œredni czas tylko dla pozycji1, œredni czas tylko dla pozycji2, œredni czas tylko dla pozycji3, œredni czas tylko dla pozycji4, kwantyle oraz liczba obserwacji dla kraju). 
+
+```{r summary_by_country}
+library("dplyr")
+Stat1 <- data.frame(1:58)
+
+Stat1$Kraj <- as.data.frame(Dane%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.25)))[,1]
+
+Stat1$RM_q1 <- as.data.frame(Dane%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.25)))[,2]
+Stat1$RM_q2 <- as.data.frame(Dane%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.5)))[,2]
+Stat1$RM_q3 <- as.data.frame(Dane%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.75)))[,2]
+Stat1$RM_mean <- as.data.frame(Dane%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+
+Stat1[,1]<-NULL
+
+Stat1$R_q1 <- as.data.frame(Dane[which(Dane$Obszar=="R"),]%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.25)))[,2]
+Stat1$R_q2 <- as.data.frame(Dane[which(Dane$Obszar=="R"),]%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.5)))[,2]
+Stat1$R_q3 <- as.data.frame(Dane[which(Dane$Obszar=="R"),]%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.75)))[,2]
+Stat1$R_mean <- as.data.frame(Dane[which(Dane$Obszar=="R"),]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+
+Stat1$M_q1 <- as.data.frame(Dane[which(Dane$Obszar=="M"),]%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.25)))[,2]
+Stat1$M_q2 <- as.data.frame(Dane[which(Dane$Obszar=="M"),]%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.5)))[,2]
+Stat1$M_q3 <- as.data.frame(Dane[which(Dane$Obszar=="M"),]%>%group_by(Kraj)%>%dplyr::summarise(quantile(Czas,0.75)))[,2]
+Stat1$M_mean <- as.data.frame(Dane[which(Dane$Obszar=="M"),]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+
+Stat1$p1_mean <- as.data.frame(Dane[which(Dane$Pozycja==1),]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+
+Stat1$p2_mean <- as.data.frame(Dane[which(Dane$Pozycja==2),]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+
+Stat1$p3_mean <- as.data.frame(Dane[which(Dane$Pozycja==3),]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+
+Stat1$p4_mean <- as.data.frame(Dane[which(Dane$Pozycja==4),]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+
+Stat1$Liczba <- as.data.frame(Dane%>%group_by(Kraj)%>%dplyr::summarise(length(Czas)))[,2]
+
+```
+
+### Wykresy i tabele
+
+Na pocz¹tku przedstawiamy wykres liczby obserwacji w poszczególnych krajach.
+
+```{r data_quantity_map, results="hide"}
+
+library("rworldmap")
+Kraje<-Stat1$Kraj
+k_liczba<-Stat1$Liczba
+mean_RM<-Stat1$RM_mean
+
+
+mean_RM[16]<-(mean_RM[16]*k_liczba[16]+mean_RM[45]*k_liczba[45])/(k_liczba[16]+k_liczba[45])
+mean_RM[58]<-(mean_RM[58]*k_liczba[58]+mean_RM[46]*k_liczba[46]+mean_RM[47]*k_liczba[47])/(k_liczba[58]+k_liczba[46]+k_liczba[47])
+mean_RM[45]<-NA
+mean_RM[46]<-NA
+mean_RM[47]<-NA
+
+
+k_liczba[16]<-k_liczba[16]+k_liczba[45]
+k_liczba[58]<-k_liczba[58]+k_liczba[46]+k_liczba[47]
+k_liczba[45]<-NA
+k_liczba[46]<-NA
+k_liczba[47]<-NA
+
+
+Kraje[44]<-"China"
+Kraje[45]<-NA
+Kraje[46]<-NA
+Kraje[47]<-NA
+
+
+Liczba_mapa<-joinCountryData2Map(data.frame("k"=Kraje,"l"=k_liczba),"NAME","k")
+```
+
+```{r mapa_i_tabela}
+mapCountryData(Liczba_mapa,"l",mapTitle = "Iloœæ danych z poszczególnych krajów")
+
+
+Stat1 <- arrange(Stat1,Liczba)
+as.data.frame(cbind(
+Kraj=as.character(Stat1$Kraj[sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))]), 
+Liczba_obser=Stat1$Liczba[sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))]), row.names=as.integer(sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))))
+```
+
+Widzimy, ¿e najwiêksz¹ liczbê obserwacji odnotowaliœmy w regionach Hiszpanii (ponad 60 tys. obserwacji). Najmniej obserwacji odnotowano w stanie Massachusettes (30057). W Polsce przeprowadzono 113954 obserwacji.
+
+Poni¿ej prezentujemy wykres œredniego czasu rozwi¹zywania zadania w poszczególnych krajach w zale¿noœci od obszaru.
+
+```{r R_and_M_plots}
+library("ggplot2")
+library("ggthemes")
+
+
+  Stat1 <- arrange(Stat1,RM_mean)
+  Stat1$Kraj<- as.character(Stat1$Kraj)
+  Stat1$Kraj<- factor(Stat1$Kraj, levels=Stat1$Kraj)
+
+my_colors<-c('#DD5555','#55DD55','#5555DD')
+ggplot(data=Stat1) + 
+  geom_point(data=Stat1, aes(x=RM_mean, y=Kraj, color="R+M"),size=2) + 
+  geom_point(data=Stat1, aes(x=R_mean, y=Kraj, color="Reading"),size=2) + 
+  geom_point(data=Stat1,aes(x=M_mean, y=Kraj, color="Maths"),size=2)+
+  ggtitle("Œredni czas rozwi¹zywania zadania w krajach")+
+  theme_fivethirtyeight() + scale_colour_manual(values=my_colors) +
+  theme(axis.text.y = element_text(size=8))
+```
+
+Widzimy, ¿e czêœæ matematyczna we wszystkich krajach zajê³a uczniom wiêcej czasu ni¿ czytanie.
+
+Przedstawmy teraz wykresy kwantyli dla poszczególnych obszarów. 
+
+```{r kwantyle}  
+my_colors<-c('#66BB66','#55DD55','#66BB66')
+ggplot(data=Stat1) + 
+  geom_point(data=Stat1, aes(x=RM_q1, y=Kraj, color="25%"),size=2) + 
+  geom_point(data=Stat1, aes(x=RM_q2, y=Kraj, color="50%"),size=2) + 
+  geom_point(data=Stat1,aes(x=RM_q3, y=Kraj, color="75%"),size=2)+
+  ggtitle("Kwantyle czasu rozwi¹zywania zadania w krajach (R+M)")+
+  theme_fivethirtyeight() + scale_colour_manual(values=my_colors) +
+  theme(axis.text.y = element_text(size=8))
+  
+my_colors<-c('#BB6666','#DD5555','#BB6666')
+ggplot(data=Stat1) + 
+  geom_point(data=Stat1, aes(x=M_q1, y=Kraj, color="25%"),size=2) + 
+  geom_point(data=Stat1, aes(x=M_q2, y=Kraj, color="50%"),size=2) + 
+  geom_point(data=Stat1,aes(x=M_q3, y=Kraj, color="75%"),size=2)+
+  ggtitle("Kwantyle czasu rozwi¹zywania zadania w krajach (M)")+
+  theme_fivethirtyeight() + scale_colour_manual(values=my_colors) +
+  theme(axis.text.y = element_text(size=8))
+  
+my_colors<-c('#6666BB','#5555DD','#6666BB')
+ggplot(data=Stat1) + 
+  geom_point(data=Stat1, aes(x=R_q1, y=Kraj, color="25%"),size=2) + 
+  geom_point(data=Stat1, aes(x=R_q2, y=Kraj, color="50%"),size=2) + 
+  geom_point(data=Stat1,aes(x=R_q3, y=Kraj, color="75%"),size=2)+
+  ggtitle("Kwantyle czasu rozwi¹zywania zadania w krajach (R)")+
+  theme_fivethirtyeight() + scale_colour_manual(values=my_colors) +
+  theme(axis.text.y = element_text(size=8))
+
+```
+
+Zobaczmy jak wygl¹daj¹ tabele z ogólnymi statystykami dla wybranych krajów. 
+
+```{r tabele krajów}
+Stat1 <- arrange(Stat1, RM_mean, Liczba)
+as.data.frame(cbind(
+Kraj=as.character(Stat1$Kraj[sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))]), 
+Srednia=round(Stat1$RM_mean[sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))],digits = 3)),
+row.names=as.integer(sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))))
+```
+
+Pod wzglêdem œredniego czasu rozwi¹zywania zadania najlepiej wypad³a Korea (65,17 sek.). Polska zajê³a 29 miejsce (85,231 sek.). Na ostatinim miejscu znalaz³o siê Peru (115,332 sek.).
+
+```{r R_table}
+Stat1 <- arrange(Stat1, R_mean, Liczba)
+as.data.frame(cbind(
+Kraj=as.character(Stat1$Kraj[sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))]),                 
+Czytanie=round(Stat1$R_mean[sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))],digits = 3)),
+row.names=as.integer(sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))))
+```
+
+W czytaniu równie¿ najlepiej wypad³a Korea (57,727 sek.). Polska zajê³a 19 miejsce (74,276 sek.). Najs³abiej na tle innych pañstw wypad³o Peru (104,393 sek.). 
+
+```{r M_table}
+Stat1 <- arrange(Stat1, M_mean, Liczba)
+as.data.frame(cbind(
+Kraj=as.character(Stat1$Kraj[sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))]), 
+Matematyka=round(Stat1$M_mean[sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))],digits=3)),
+row.names=as.integer(sort(c(1,2,10,20,which(Stat1$Kraj=="Poland"),30,40,50,57,58))))
+```
+
+W czêœci matematycznej poraz kolejny najlepiej wypad³a Korea (74,239 sek.). Polska wypad³a s³abiej ni¿ w czytaniu, zajajê³a 36 miejsce (98,43 sek.). Najs³abiej na tle innych pañstw znowu wypad³o Peru (127,936 sek.). 
+
+SprawdŸmy jak wygl¹da œredni czas rozwi¹zywania zadania w poszczególnych krajach w zale¿noœci od pozycji. 
+
+```{r Position_Plots}
+ggplot(data=Stat1,aes(y=Kraj,x=Sekundy, size=Kraj)) + 
+  geom_point(data=Stat1, aes(x=p1_mean,y=Kraj,color="Pozycja1"),size=2) + 
+  geom_point(data=Stat1, aes(x=p2_mean,y=Kraj,color="Pozycja2"),size=2) + 
+  geom_point(data=Stat1, aes(x=p3_mean,y=Kraj,color="Pozycja3"),size=2) + 
+  geom_point(data=Stat1, aes(x=p4_mean,y=Kraj,color="Pozycja4"),size=2) +
+  ggtitle("Œredni czas rozwi¹zywania zadania w krajach") +
+  theme_calc() + scale_color_calc("")
+```
+
+Widzimy, ¿e pozycja1 we wszystkich krajach zajê³a uczniom najwiêcej czasu natomiast pozycja4 najmniej. 
+
+Po przeprowadzeniu wstepnej analizy danych przechodzimy do g³ównej czêœci projektu.
+
+```{r czyszczenie pamiêci}
+rm(Stat1)
+rm(k_liczba)
+rm(Kraje)
+rm(Liczba_mapa)
+rm(mean_RM)
+rm(my_colors)
+```
+
+
+```{r setup_2, include=FALSE}
+knitr::opts_chunk$set(fig.width = 10, fig.height =7, fig.align='center')
+```
+
+## Analiza
+
+
+
+#### Wybór próbki uczniów
+
+Aby móc porównywaæ ze sob¹ strategie rozwi¹zywania testów poszczególnych uczniów, nale¿y rozpatrywaæ tych, którzy stanêli przed podobnym zadaniem.
+Zatem wybraliœmy tych, którzy:
+
+- Rozwi¹zywali test zarówno z Czytania jak i Matematyki
+
+- Obie te czêœci rozwi¹zywali przed czêœciami 3 i 4 (z przyrody).
+
+
+```{r data_choose, echo=TRUE}
+stud_R <- Dane$Student[which(Dane$Obszar=="R")]
+stud_M <- Dane$Student[which(Dane$Obszar=="M")]
+stud_1 <- Dane$Student[which(Dane$Pozycja==1)]
+k <- intersect(stud_R,stud_M)
+j <- intersect(k,stud_1)
+Dane1 <- Dane[which(Dane$Student %in% j),]
+```
+
+```{r ³adowanie danych}
+library("dplyr")
+library("ggplot2")
+library("ggthemes")
+library("MASS")
+library("stats")
+library("cluster")
+e <- data.frame("Number"=sort(unique(Dane1$Student)))
+e$RM_mean <- as.data.frame( Dane1%>%group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+e$RM_sd <- as.data.frame( Dane1%>%group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+e$R_mean <- as.data.frame( Dane1[which(Dane1$Obszar=="R"),]%>%group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+e$R_sd <- as.data.frame( Dane1[which(Dane1$Obszar=="R"),]%>%group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+e$M_mean <- as.data.frame( Dane1[which(Dane1$Obszar=="M"),]%>%group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+e$M_sd <- as.data.frame( Dane1[which(Dane1$Obszar=="M"),]%>%group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+
+Dane1<-arrange(Dane1,Student)
+Dane1$Zadanie <- as.factor(Dane1$Zadanie)
+
+
+
+
+
+```
+
+
+### Przekrój danych po selekcji (œrednie w krajach)
+
+
+Zobaczmy jak wygl¹daj¹ wykresy skrzypcowe dla uczniów.
+
+```{r pressure}
+a<-numeric(length(e$Number))
+line<-as.factor(c(a+1,a+2,a+3,a+4,a+5,a+6))
+levels(line)<-c("Œrednia","Œrednia Cz","Œrednia Mat", "Od. St.", "Od. St. Cz", "Od. St. Mat")
+line_data<-c(e$RM_mean,e$R_mean,e$M_mean,e$RM_sd,e$R_sd,e$M_sd)
+plot_df<-data.frame("X"=line,"Y"=line_data)
+ggplot(plot_df, aes(x=X, y=Y, color=X, fill=X) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+```
+
+
+Poni¿sza tabela prezentuje jak zmieni³a siê liczba obserwacji dla wybranych krajów po obróbce danych.
+
+```{r kraje liczebnoœæ}
+
+Stat2 <- data.frame(1:58)
+
+Stat2$Kraj <- as.data.frame(Dane1%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,1]
+Stat2$Liczba <- as.data.frame(Dane1%>%group_by(Kraj)%>%dplyr::summarise(length(Czas)))[,2]
+Stat2[,1]<-NULL
+Stat2 <- arrange(Stat2,Liczba)
+Stat1 <- as.data.frame(Dane%>%group_by(Kraj)%>%dplyr::summarise(Liczba=length(Czas)))
+Stat1 <- arrange(Stat1,Liczba)
+
+as.data.frame(cbind(                            
+Kraj=as.character(Stat2$Kraj[sort(c(1,2,10,20,which(Stat2$Kraj=="Poland"),30,40,50,57,58))]), 
+Liczba_obser_zm=Stat2$Liczba[sort(c(1,2,10,20,which(Stat2$Kraj=="Poland"),30,40,50,57,58))],
+Liczba_obser_przed=Stat1$Liczba[sort(c(which(Stat1$Kraj==Stat2$Kraj[1]),which(Stat1$Kraj==Stat2$Kraj[2]),which(Stat1$Kraj==Stat2$Kraj[10]),which(Stat1$Kraj==Stat2$Kraj[20]),which(Stat1$Kraj=="Poland"),which(Stat1$Kraj==Stat2$Kraj[30]),which(Stat1$Kraj==Stat2$Kraj[40]),which(Stat1$Kraj==Stat2$Kraj[50]),which(Stat1$Kraj==Stat2$Kraj[57]),which(Stat1$Kraj==Stat2$Kraj[58])))] 
+), 
+row.names = as.character(sort(c(1,2,10,20,which(Stat2$Kraj=="Poland"),30,40,50,57,58)))
+)
+```
+
+
+
+Zajmiemy siê teraz podzia³em uczniów na grupy. Potraktowaliœmy ka¿dego ucznia jako punkt oœmiowymiarowej przestrzeni. Przestrzeñ ta powsta³a poprzez osobne potraktowanie: 
+
+- Œredniej i odchylenia standardowego
+
+- Matematyki i Czytania
+
+- Trudnych i £atwych zadañ
+
+
+
+
+
+
+### Podzia³ zadañ 
+
+Podzieliliœmy zadania na 4 kategorie:
+
+- mt oznacza trudne zadania z matematyki
+
+- ml oznacza ³atwe zadania z matematyki
+
+- rt oznacza trudne zadania z czytania
+
+- rl oznacza ³atwe zadania z czytania
+
+
+
+
+Podzia³u zadañ na ³atwe i trudne dokonaliœmy na podstawie danych po selekcji. Ka¿demu zadaniu przypisaliœmy czasy rozwi¹zywania zadañ przez uczniów. Oczywiœcie wektory zadañ maj¹ ró¿ne d³ugoœci. Dla wszystkich zadañ skonstruowaliœmy dystrybuanty empiryczne i na ich podstawie ustaliliœmy odleg³oœæ miêdzy nimi za pomoc¹ normy L2.
+
+$$d(f_1,f_2)=\left( \int_{-\infty}^{\infty} (f_1 - f_2)^2 dx \right)^{\frac{1}{2}}$$ 
+
+```{r Liczenie normy L2}
+#Funkcje do liczenia normy L2:
+
+vec_merg<-function(x,y){ #funkcja pomocnicza ³¹cz¹ca wektory
+  l_x <- length(x)
+  l_y <- length(y)
+  i_x <- 1
+  i_y <- 1
+  norm<-0
+  points<-c()
+  value_x<-0
+  value_y<-0
+  x<-c(x,99999)
+  y<-c(y,99999)
+  while(i_x < l_x + 1 || i_y < l_y + 1){
+    if(x[i_x] <= y[i_y]){
+      points<-c(points,x[i_x])
+      i_x<-i_x+1
+      value_x<-c(value_x,value_x[length(value_x)]+1)
+      value_y<-c(value_y,value_y[length(value_y)])     
+    }
+    else{
+      points<-c(points,y[i_y])
+      i_y<-i_y+1
+      value_x<-c(value_x,value_x[length(value_x)])
+      value_y<-c(value_y,value_y[length(value_y)]+1) 
+    }
+  }
+  return(data.frame("points"=points,"x"=value_x[-1]/value_x[length(value_x)],"y"=value_y[-1]/value_y[length(value_y)]))
+}
+L2_norm <- function(x,y){ #funkcja g³ówna
+  norm<-0
+  merged<-vec_merg(x,y)
+  for (i in 1:(length(merged$points)-1)){
+    norm<-norm +(merged$points[i+1]-merged$points[i])*(merged$x[i]-merged$y[i])^2
+  }
+  return(sqrt(norm))
+}
+
+#wyliczenie macierzy odleg³oœci zadañ (wykomentowane, bo liczy si¹ ko³o 30 minut, a jest ju¿ policzone)
+
+##przygotowanie wektotów
+#Dane1$Zadanie<-as.factor(Dane1$Zadanie)
+#Zadania<-list()
+#for(i in 37:182){
+#  lvl<-levels(Dane1$Zadanie)[i]
+#  Zadania[[i]]<-sort(Dane1$Czas[Dane1$Zadanie==lvl])
+#}
+#faktyczne liczenie (górny trójk¹t)
+#dist_q<-matrix(nrow=182,ncol=182)
+#for (i in 1:181){
+#  for (j in (i+1):182){
+#    dist_q[i,j]<-L2_norm(Zadania[[i]],Zadania[[j]])
+#  }
+#}
+#kopiowanie wyników
+#for (i in 1:182) dist_q[i,i]=0
+#for (j in 1:181){
+#  for (i in (1+j):182){
+#    dist_q[i,j]<-dist_q[j,i]
+#  }
+#}
+#write.csv(dist_q,"~/R/Projects/PISA/dist_q.csv")
+
+dist_q<-as.matrix(read.csv("~/R/Projects/PISA/Zadania.csv"))[,-1]
+```
+
+
+Rzutujemy macierz odleg³oœci zadañ na przestrzeñ dwuwymiarow¹ metod¹ isoMDS w celu graficznego zobrazowania odleg³oœci. Czerwone kropki oznaczaj¹ zadania z matematyki, a niebieskie z czytania.
+
+```{r rzutowanie}
+Obszar <- function(string) 
+          if (substr(string,1,1)=="R") return(0) else 
+          if (substr(string,1,1)=="M") return(1) else 
+          return(NA)
+Zadania_o <-vapply(levels(Dane1$Zadanie),Obszar,c(0))
+
+DIST_Q<-as.dist(dist_q)
+newcoord <- isoMDS(DIST_Q)
+ndf <- data.frame(newcoord$points, class = as.factor(1-Zadania_o))
+
+ggplot(ndf, aes(X1, X2, color=class)) + geom_point()
+```
+
+Po obliczniu macierzy odleg³oœci dokonaliœmy podzia³u zadañ metod¹ `complete`. 
+Zobaczmy jak wygl¹da drzewo zadañ.
+
+
+
+```{r dendrogram}
+#Tworzenie klasyfikacji zadañ
+
+hc_q <- hclust(DIST_Q, method="complete")
+
+
+
+#rysowanie drzewa
+mycol <- c("blue","red")
+drzewo <- as.dendrogram(hc_q)
+Zadania_o_tree<-Zadania_o[order.dendrogram(drzewo)]
+leafcolor <- function(node) {
+  if (is.leaf(node)) {
+    i <<- i + 1
+    attr(node, "nodePar") <- list(pch=20, cex=1.9, col=mycol[Zadania_o_tree[i]+1] )
+  }
+  return(node)
+}
+i<-0
+drzewo <- dendrapply(drzewo, leafcolor)
+plot(drzewo, leaflab = "none", main="Classification tree")
+legend("topright", c("Czytanie","Matematyka"), pch=19, col=mycol)
+```
+
+Podzieliliœmy drzewo na 5 grup, poniewa¿ grupa bêd¹ca na powy¿szym wykresie najbardziej na lewo sk³ada siê tylko z dwóch obserwacji, p³¹czyliœmy j¹ z grup¹ bêd¹c¹ obok otrzymuj¹c cztery grupy. Poni¿ej przedstawiamy histogramy czasów rozwi¹zywania zadañ dla ka¿dej z tych grup.
+
+
+```{r gêstoœci zadañ}
+cat_q <- cutree(hc_q,k=5) # pi¹Ä‡ pocz¹tkowych kategorii
+
+par(mfrow=c(2,2))
+hist(Dane1$Czas[cat_q[as.numeric(Dane1$Zadanie)]==2],breaks=200, main="Grupa 1", xlab="")
+hist(Dane1$Czas[cat_q[as.numeric(Dane1$Zadanie)]==3],breaks=200, main="Grupa 2", xlab="")
+hist(Dane1$Czas[cat_q[as.numeric(Dane1$Zadanie)]==1],breaks=200, main="Grupa 3", xlab="")
+hist(Dane1$Czas[cat_q[as.numeric(Dane1$Zadanie)]%in%c(4,5)],breaks=200, main="Grupa 4", xlab="")
+par(mfrow=c(1,1))
+
+```
+
+Przy dodatkowym podziale zadañ wzglêdem obszaru, cztery grupy trudnoœci, mog³yby spowodowaæ zbyt ma³y udzia³ zadañ w grupie, zatem kolejnym krokiem by³ podzia³ zadañ na dwie grupy: "³atwe" i "trudne".
+
+Na poni¿szym wykresie, który obrazuje rzutowanie odleg³oæi zadañ na p³aszczyznê, widzimy wyraŸny ich podzia³.
+
+```{r kategorie zadañ}
+cat2_q <- numeric(182) #dwie koñcowe kategorie 1 - ³atwe, 2 - trudne
+cat2_q[cat_q==2] <- 1
+cat2_q[cat_q==3] <- 1
+cat2_q[cat_q==1] <- 2
+cat2_q[cat_q==4] <- 2
+cat2_q[cat_q==5] <- 2
+
+
+my_colors_2<-c('#55DDDD','#DD55DD')
+ndf_1 <- data.frame(newcoord$points, class = as.factor(cat2_q))
+ggplot(ndf_1, aes(X1, X2, color=class)) +
+  geom_point() + scale_colour_manual(values=my_colors_2)
+
+
+#wgranie kategorii do danych
+Dane1$Kategoria <- cat2_q[as.numeric(Dane1$Zadanie)]
+
+#Pomocnicza wektory logiczne
+wsk_t <- Dane1$Kategoria==2
+wsk_m <- Dane1$Obszar=="M"
+
+#liczenie ilu studentów zrobi³o ile zadañ
+d <- data.frame("Number"=sort(unique(Dane1$Student)))
+d$mt_count <- numeric(length(d$Number))
+d$rt_count <- numeric(length(d$Number))
+d$ml_count <- numeric(length(d$Number))
+d$rl_count <- numeric(length(d$Number))
+for (i in 1:length(Dane1$Student)){ 
+  if (wsk_m[i]){
+    if (wsk_t[i]) 
+      d$mt_count[which(d$Number==Dane1$Student[i])] <- d$mt_count[which(d$Number==Dane1$Student[i])]+1
+    else d$ml_count[which(d$Number==Dane1$Student[i])]<-d$ml_count[which(d$Number==Dane1$Student[i])]+1
+ }
+  else {
+    if (wsk_t[i])
+      d$rt_count[which(d$Number==Dane1$Student[i])]<-d$rt_count[which(d$Number==Dane1$Student[i])]+1
+    else d$rl_count[which(d$Number==Dane1$Student[i])]<-d$rl_count[which(d$Number==Dane1$Student[i])]+1
+  }
+}
+
+#usuwanie studentów, robi¹cych mniej ni¿ dwa zadania z grupy
+to_delete <- d$Number[(d$mt_count<2)]
+to_delete <- c(to_delete,d$Number[(d$rt_count<2)])
+to_delete <- c(to_delete,d$Number[(d$ml_count<2)])
+to_delete <- c(to_delete,d$Number[(d$rl_count<2)])
+d <- d[!(d$Number %in% to_delete),]
+```
+
+```{r tworzenie wymiarów}
+#kolejny pomocniczy wektor logiczny
+s <- !(Dane1$Student %in% to_delete)
+
+#wgranie wymiarów
+d$mt_mean<-as.data.frame(Dane1[which(wsk_t & wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$mt_sd <- as.data.frame(Dane1[which(wsk_t & wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+d$rt_mean<-as.data.frame(Dane1[which(wsk_t & !wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$rt_sd <- as.data.frame(Dane1[which(wsk_t & !wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+d$ml_mean<-as.data.frame(Dane1[which(!wsk_t & wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$ml_sd <- as.data.frame(Dane1[which(!wsk_t & wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+d$rl_mean<-as.data.frame(Dane1[which(!wsk_t & !wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$rl_sd <- as.data.frame(Dane1[which(!wsk_t & !wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+d$m_mean <-as.data.frame(Dane1[which(wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$r_mean <-as.data.frame(Dane1[which(!wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+
+```
+
+
+
+Zadania trudne s¹ oznaczone przez 2, natomiast ³atwe przez 1.
+
+Nastêpnie przeciêliœmy te dwie grupy z zadaniami z matematyki oraz czytania uzyskuj¹c ostatecznie podzia³ zadañ na cztery grupy. 
+
+Poni¿sza tabela prezentuje strukturê zadañ po podziale dla danych po selekcji
+
+```{r tabela_zadan}
+as.data.frame(cbind(
+Matematyka=c(length(unique(Dane1[which(!wsk_t & wsk_m & s),6])),length(unique(Dane1[which(wsk_t & wsk_m & s),6]))),
+Czytanie=c(length(unique(Dane1[which(!wsk_t & !wsk_m & s),6])),length(unique(Dane1[which(wsk_t & !wsk_m & s),6])))),
+row.names=c("³atwe","trudne")
+)
+```
+
+###Podzia³ uczniów na grupy
+
+Maj¹c podzia³ zadañ na cztery kategorie przyst¹piliœmy do analizy podzia³u uczniów.
+Ka¿demu uczniowi przypisaliœmy œredni czas oraz odchylenie standardowe dla ka¿dej kategorii zadañ. Nie wszyscy uczniowie rozwi¹zywali zadania ze wszystkich grup, niektórzy uczniowie zrobili tylko jedno zadnie dla okreœlonego obszaru. Dane o tych uczniach zosta³y usuniête.  
+
+```{r grupowanie studentów}
+km<-kmeans(scale(d[,6:13]),3)
+                          
+d$km[km$cluster==1] <- 2
+d$km[km$cluster==2] <- 3
+d$km[km$cluster==3] <- 1
+                          
+d$km<-as.factor(d$km)
+
+#Metoda Ward
+#dist<-dist(scale(d[,6:13])
+#hc<-hclust(dist,method="ward")
+#cut<-cutree(hc,k=3)
+#plot(d[,6:13], pch=18, col=as.factor(cut))
+#d$ward[cut==1] <- 2
+#d$ward[cut==2] <- 1
+#d$ward[cut==3] <- 3
+#summary(d$ward)
+
+#Metoda PAM
+#pam<-pam(scale(d[,6:13]),3)
+#plot(d[,6:13], pch=18, col=as.factor(pam$clustering))
+#d$pam[pam$clustering==1] <- 2
+#d$pam[pam$clustering==2] <- 3
+#d$pam[pam$clustering==3] <- 1
+#summary(d$pam)
+
+#Porównania metod:
+#ggplot(d, aes(x=rt_mean,y=mt_mean, color=km)) + geom_point()
+
+#ggplot(d, aes(x=km, y=mt_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=ward, y=mt_mean, color=ward, fill=ward) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=pam, y=mt_mean, color=pam, fill=pam) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+
+#ggplot(d, aes(x=km, y=rt_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=ward, y=rt_mean, color=ward, fill=ward) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=pam, y=rt_mean, color=pam, fill=pam) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+
+#ggplot(d, aes(x=km, y=ml_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=ward, y=ml_mean, color=ward, fill=ward) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=pam, y=ml_mean, color=pam, fill=pam) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+
+#ggplot(d, aes(x=km, y=rl_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=ward, y=rl_mean, color=ward, fill=ward) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=pam, y=rl_mean, color=pam, fill=pam) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+
+
+```
+
+```{r statystki dla grup}
+Stat <- data.frame(1:58)
+Stat$Kraj <- as.data.frame(Dane1[s,]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,1]
+Stat$RM_mean <- as.data.frame(Dane1[s,]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+Stat$R_mean <- as.data.frame(Dane1[!wsk_m & s,]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+Stat$M_mean <- as.data.frame(Dane1[wsk_m & s,]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+
+d$kraj <- "abc"
+for (i in 1:length(d$kraj)) d$kraj[i] <- levels(Dane1$Kraj)[Dane1$Kraj[which(d$Number[i]==Dane1$Student)[1]]]
+d$kraj <- factor(d$kraj, levels=levels(Dane1$Kraj))
+
+Stat$cat1 <- as.data.frame(d[d$km==1,]%>%group_by(kraj)%>%dplyr::summarise(length(km)))[,2]
+Stat$cat2 <- as.data.frame(d[d$km==2,]%>%group_by(kraj)%>%dplyr::summarise(length(km)))[,2]
+Stat$cat3 <- as.data.frame(d[d$km==3,]%>%group_by(kraj)%>%dplyr::summarise(length(km)))[,2]
+
+  Stat <- arrange(Stat,RM_mean)
+  Stat$Kraj<- as.character(Stat$Kraj)
+  Stat$Kraj<- factor(Stat$Kraj, levels=Stat$Kraj)
+
+Stat$Stud <- Stat$cat1 + Stat$cat2 + Stat$cat3
+Stat$cat1 <- Stat$cat1/Stat$Stud
+Stat$cat2 <- Stat$cat2/Stat$Stud
+Stat$cat3 <- Stat$cat3/Stat$Stud
+```
+
+####K_means
+
+Aby podzieliæ uczniów na grupy wed³ug ich strategii rozwi¹zywania testów zastosowaliœmy metodê K-œrednich na przeskalowanych danych. Sprawdziliœmy najpierw za pomoc¹ wykresu Silhouette na ile grup podzieliæ uczniów. 
+
+```{r silhouette}
+dist<-dist(scale(d[,6:13]))
+av.sil<-numeric(20)
+for (i in 2:20){
+  kms<-kmeans(scale(d[,6:13]),i)
+  sil<-silhouette(kms$cluster, dist)
+  av.sil[i]<-summary(sil)$avg.width
+}
+sil_data <- data.frame("No.centers"=2:20, "Avg.width"=av.sil[-1])
+
+ggplot(sil_data, aes(x=No.centers,y=Avg.width)) + geom_point()
+```
+
+Na podstawie powy¿szego wykresu zdecydowaliœmy siê podzieliæ studentów na 3 grupy.
+
+Zobaczmy zatem jak wygl¹daj¹ nasze grupy na wykresie œredniego czasu rozwi¹zywania zadañ z matematyki i czytania, gdzie punktami s¹ uczniowie.
+
+```{r}
+ggplot(d, aes(x=r_mean,y=m_mean, color=km)) + geom_point() + xlab("Czytanie") + ylab("Matematyka")  
+```
+
+Mo¿emy opisaæ powy¿sze trzy grupy:
+
+- "Najszybsi" maj¹ œrednio najkrótszy czas rozwi¹zywania zadañ zarówno z czytania jak i matematyki 
+
+- "Matematycy" potrzebuj¹ œrednio mniej czasu na rozwi¹zywanie zadañ z matematyki, ale wiêcej czasu poœwiêcaj¹ na czytanie
+
+- "Humaniœci" potrzebuj¹ œrednio mniej czasu na rozwi¹zywanie zadañ z czytania, ale wiêcej czasu poœwiêcaj¹ na matematykê
+
+Oczywiœcie uczniów podzieliliœmy na podstawie oœmiu wymiarów, st¹d prezentj¹c wykresy œredniego czasu rozwi¹zywania zadañ dla matematyki i czytania widzimy, ¿e  grupy tych uczniów nie s¹ od siebie odseparowane. 
+
+
+
+
+#### Wykresy skrzypcowe z tabel¹
+
+Za pomoc¹ wykresów skrzypcowych i tabeli z ogólnymi statystykami prezentujemy ró¿nice miêdzy grupami.
+
+```{r}
+library(devtools)
+library(easyGgplot2)
+p1<-ggplot(d, aes(x=km, y=mt_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+p2<-ggplot(d, aes(x=km, y=rt_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+p3<-ggplot(d, aes(x=km, y=ml_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+p4<-ggplot(d, aes(x=km, y=rl_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+ggplot2.multiplot(p1,p2,p3,p4, cols=2)
+```
+
+```{r tabele ze statystykami}
+e <- e[!(e$Number %in% to_delete),]
+e$klasa <- d$km
+e[,1] <- NULL
+Wynik <- as.data.frame(cbind(
+Humaniœci=c(mean(e[which(e$klasa==1),1]),mean(e[which(e$klasa==1),3]),mean(e[which(e$klasa==1),5]),mean(e[which(e$klasa==1),2]),mean(e[which(e$klasa==1),4]),mean(e[which(e$klasa==1),6]),length(which(e$klasa==1))),
+Matematycy=c(mean(e[which(e$klasa==2),1]),mean(e[which(e$klasa==2),3]),mean(e[which(e$klasa==2),5]),mean(e[which(e$klasa==2),2]),mean(e[which(e$klasa==2),4]),mean(e[which(e$klasa==2),6]),length(which(e$klasa==2))),
+Najszybsi=c(mean(e[which(e$klasa==3),1]),mean(e[which(e$klasa==3),3]),mean(e[which(e$klasa==3),5]),mean(e[which(e$klasa==3),2]),mean(e[which(e$klasa==3),4]),mean(e[which(e$klasa==3),6]),length(which(e$klasa==3)))
+),
+row.names=c("Œrednia","Œrednia_Cz","Œrednia_Mat","Odch.stand.","Odch.stand.Cz","Odch.stand.Mat","Liczebnoœæ")
+)
+t(Wynik)
+```
+
+
+### Udzia³ grup w poszczególnych krajach
+
+Zobaczmy jak wystêpuj¹ nasze wzorce zachowañ dla poszczególnych krajów.
+
+```{r udzia³ grup w krajach}
+my_colors_1<-c('#DD5555','#55DD55','#5555DD')
+ggplot(data=Stat) + 
+  geom_point(data=Stat, aes(x=cat1, y=Kraj, color="Matematycy"),size=2) + 
+  geom_point(data=Stat, aes(x=cat2, y=Kraj, color="Humaniœci"),size=2) + 
+  geom_point(data=Stat,aes(x=cat3, y=Kraj, color="Najszybsi"),size=2)+
+  theme_fivethirtyeight() + scale_colour_manual(values=my_colors_1) +
+  theme(axis.text.y = element_text(size=8))
+```
+
+Porównajmy go z wykresem œredniej szybkoœci rozwi¹zywania zadañ w tych samych pañstwach (w tej samej kolejnoœci)
+
+```{r przekrój po selekci}
+my_colors<-c('#DDDD55','#55DDDD','#DD55DD')
+ggplot(data=Stat) + 
+  geom_point(data=Stat, aes(x=RM_mean, y=Kraj, color="Cz+M"),size=2) + 
+  geom_point(data=Stat, aes(x=R_mean, y=Kraj, color="Czytanie"),size=2) + 
+  geom_point(data=Stat,aes(x=M_mean, y=Kraj, color="Matematyka"),size=2)+
+  theme_fivethirtyeight() + scale_colour_manual(values=my_colors) +
+  theme(axis.text.y = element_text(size=8))
+```
+
+Na podstawie powy¿szych wykresów mo¿emy stwierdziæ, ¿e poszczególne kraje ró¿ni¹ siê miêdzy sob¹ udzia³em poszczególnych grup. W Korei, gdzie œrednia czasu rozwi¹zywania zadañ by³a najmniejsza, grupa "Najszybszych" ma najwiêkszy udzia³(ponad 80%). W krajach, które wypad³y najs³abiej pod wzglêdem œredniego czasu rozwi¹zywania zadania "Najszybsi" stanowi¹ najmniej liczn¹ grupê (np. w Tunezji i Peru poni¿ej 10%, gdzie œredni czas by³ najwiêkszy). W pozosta³ych krajach "Najszybsi" byli grup¹ dominuj¹c¹. Co ciekawe "Humaniœci" stanowi¹ najmniej liczn¹ gupê w Korei, a najwiêksz¹ grupê stanowi¹ w Peru i Tunezji.
+
+
+####Wykresy dla wybranych pañstw
+
+```{r wybrane kraje}
+my_colors_3<-c('#DD5555','#55DD55','#5555DD')
+Hiszpania <- d[which(d$kraj=="Spain (Regions)"),]
+k1<-ggplot(Hiszpania, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Hiszpania")+ theme(legend.position="none")
+
+Korea <- d[which(d$kraj=="Korea"),]
+k2<-ggplot(Korea, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Korea")+ theme(legend.position="none")
+
+Peru <- d[which(d$kraj=="Peru"),]
+k3<-ggplot(Peru, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Peru")+ theme(legend.position="none")
+
+Polska <- d[which(d$kraj=="Poland"),]
+k4<-ggplot(Polska, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Polska")+ theme(legend.position="none")
+
+Brazylia <- d[which(d$kraj=="Brazil"),]
+k5<-ggplot(Brazylia, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Brazylia")+ theme(legend.position="none")
+
+Japonia <- d[which(d$kraj=="Japan"),]
+k6<-ggplot(Japonia, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Japonia")+ theme(legend.position="none")
+
+Australia <- d[which(d$kraj=="Australia"),]
+k7<-ggplot(Australia, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Australia")+ theme(legend.position="none")
+
+Qatar <- d[which(d$kraj=="Qatar"),]
+k8<-ggplot(Qatar, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Katar")+ theme(legend.position="none")
+
+Chiny <- d[which(d$kraj=="B-S-J-G (China)"),]
+k9<-ggplot(Chiny, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Chiny")+ theme(legend.position="none")
+
+ggplot2.multiplot(k1, k2, k3, k4, k5, k6, k7, k8, k9, cols=3)
+```
+
+
+
+
+
+
+

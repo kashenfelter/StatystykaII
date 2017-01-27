@@ -1,0 +1,397 @@
+---
+title: "Projekt 2"
+author: "Tomasz W¹s, Wojciech Szymañski"
+date: "24 stycznia 2017"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message = FALSE, cache=TRUE)
+knitr::opts_chunk$set(fig.width = 10, fig.height =7, fig.align='center')
+```
+
+```{r kategorie zadañ, include=FALSE}
+load("~/R/Projects/PISA/Dane1.rda")
+library("dplyr")
+library("ggplot2")
+library("ggthemes")
+library("MASS")
+library("stats")
+library("cluster")
+Dane1<-arrange(Dane1,Student)
+Dane1$Zadanie <- as.factor(Dane1$Zadanie)
+
+#Funkcje do liczenia normy L2:
+
+vec_merg<-function(x,y){ #funkcja pomocnicza ³¹cz¹ca wektory
+  l_x <- length(x)
+  l_y <- length(y)
+  i_x <- 1
+  i_y <- 1
+  norm<-0
+  points<-c()
+  value_x<-0
+  value_y<-0
+  x<-c(x,99999)
+  y<-c(y,99999)
+  while(i_x < l_x + 1 || i_y < l_y + 1){
+    if(x[i_x] <= y[i_y]){
+      points<-c(points,x[i_x])
+      i_x<-i_x+1
+      value_x<-c(value_x,value_x[length(value_x)]+1)
+      value_y<-c(value_y,value_y[length(value_y)])     
+    }
+    else{
+      points<-c(points,y[i_y])
+      i_y<-i_y+1
+      value_x<-c(value_x,value_x[length(value_x)])
+      value_y<-c(value_y,value_y[length(value_y)]+1) 
+    }
+  }
+  return(data.frame("points"=points,"x"=value_x[-1]/value_x[length(value_x)],"y"=value_y[-1]/value_y[length(value_y)]))
+}
+L2_norm <- function(x,y){ #funkcja g³ówna
+  norm<-0
+  merged<-vec_merg(x,y)
+  for (i in 1:(length(merged$points)-1)){
+    norm<-norm +(merged$points[i+1]-merged$points[i])*(merged$x[i]-merged$y[i])^2
+  }
+  return(sqrt(norm))
+}
+
+#wyliczenie macierzy odleg³oœci zadañ (wykomentowane, bo liczy si¹ ko³o 30 minut, a jest ju¿ policzone)
+
+##przygotowanie wektotów
+#Dane1$Zadanie<-as.factor(Dane1$Zadanie)
+#Zadania<-list()
+#for(i in 37:182){
+#  lvl<-levels(Dane1$Zadanie)[i]
+#  Zadania[[i]]<-sort(Dane1$Czas[Dane1$Zadanie==lvl])
+#}
+#faktyczne liczenie (górny trójk¹t)
+#dist_q<-matrix(nrow=182,ncol=182)
+#for (i in 1:181){
+#  for (j in (i+1):182){
+#    dist_q[i,j]<-L2_norm(Zadania[[i]],Zadania[[j]])
+#  }
+#}
+#kopiowanie wyników
+#for (i in 1:182) dist_q[i,i]=0
+#for (j in 1:181){
+#  for (i in (1+j):182){
+#    dist_q[i,j]<-dist_q[j,i]
+#  }
+#}
+#write.csv(dist_q,"~/R/Projects/PISA/dist_q.csv")
+dist_q<-as.matrix(read.csv("~/R/Projects/PISA/Zadania.csv"))[,-1]
+
+#Tworzenie klasyfikacji zadañ
+DIST_Q<-as.dist(dist_q)
+hc_q <- hclust(DIST_Q, method="complete")
+cat_q <- cutree(hc_q,k=5) # pi¹Ä‡ pocz¹tkowych kategorii
+cat2_q <- numeric(182) #dwie koñcowe kategorie 1 - ³atwe, 2 - trudne
+cat2_q[cat_q==2] <- 1
+cat2_q[cat_q==3] <- 1
+cat2_q[cat_q==1] <- 2
+cat2_q[cat_q==4] <- 2
+cat2_q[cat_q==5] <- 2
+
+#wgranie kategorii do danych
+Dane1$Kategoria <- cat2_q[as.numeric(Dane1$Zadanie)]
+```
+
+```{r tworzenie wymiarów, include=FALSE}
+
+#Pomocnicza wektory logiczne
+wsk_t <- Dane1$Kategoria==2
+wsk_m <- Dane1$Obszar=="M"
+
+#liczenie ilu studentów zrobi³o ile zadañ
+d <- data.frame("Number"=sort(unique(Dane1$Student)))
+d$mt_count <- numeric(length(d$Number))
+d$rt_count <- numeric(length(d$Number))
+d$ml_count <- numeric(length(d$Number))
+d$rl_count <- numeric(length(d$Number))
+for (i in 1:length(Dane1$Student)){ 
+  if (wsk_m[i]){
+    if (wsk_t[i]) 
+      d$mt_count[which(d$Number==Dane1$Student[i])] <- d$mt_count[which(d$Number==Dane1$Student[i])]+1
+    else d$ml_count[which(d$Number==Dane1$Student[i])]<-d$ml_count[which(d$Number==Dane1$Student[i])]+1
+ }
+  else {
+    if (wsk_t[i])
+      d$rt_count[which(d$Number==Dane1$Student[i])]<-d$rt_count[which(d$Number==Dane1$Student[i])]+1
+    else d$rl_count[which(d$Number==Dane1$Student[i])]<-d$rl_count[which(d$Number==Dane1$Student[i])]+1
+  }
+}
+
+#usuwanie studentów, robi¹cych mniej ni¿ dwa zadania z grupy
+to_delete <- d$Number[(d$mt_count<2)]
+to_delete <- c(to_delete,d$Number[(d$rt_count<2)])
+to_delete <- c(to_delete,d$Number[(d$ml_count<2)])
+to_delete <- c(to_delete,d$Number[(d$rl_count<2)])
+d <- d[!(d$Number %in% to_delete),]
+
+#kolejny pomocniczy wektor logiczny
+s <- !(Dane1$Student %in% to_delete)
+
+#wgranie wymiarów
+d$mt_mean<-as.data.frame(Dane1[which(wsk_t & wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$mt_sd <- as.data.frame(Dane1[which(wsk_t & wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+d$rt_mean<-as.data.frame(Dane1[which(wsk_t & !wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$rt_sd <- as.data.frame(Dane1[which(wsk_t & !wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+d$ml_mean<-as.data.frame(Dane1[which(!wsk_t & wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$ml_sd <- as.data.frame(Dane1[which(!wsk_t & wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+d$rl_mean<-as.data.frame(Dane1[which(!wsk_t & !wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$rl_sd <- as.data.frame(Dane1[which(!wsk_t & !wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(sd(Czas)) )[,2]
+d$m_mean <-as.data.frame(Dane1[which(wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+d$r_mean <-as.data.frame(Dane1[which(!wsk_m & s),] %>% group_by(Student)%>%dplyr::summarise(mean(Czas)) )[,2]
+```
+
+```{r kategorie studentów, include=FALSE}
+#metoda K-means
+km<-kmeans(scale(d[,6:13]),3)
+plot(d[,6:13], pch=18, col=c("red","green","blue")[as.factor(km$cluster)])
+d$km[km$cluster==1] <- 2
+d$km[km$cluster==2] <- 3
+d$km[km$cluster==3] <- 1
+summary(d$km)
+d$km<-as.factor(d$km)
+
+#Metoda Ward
+#dist<-dist(scale(d[,6:13])
+#hc<-hclust(dist,method="ward")
+#cut<-cutree(hc,k=3)
+#plot(d[,6:13], pch=18, col=as.factor(cut))
+#d$ward[cut==1] <- 2
+#d$ward[cut==2] <- 1
+#d$ward[cut==3] <- 3
+#summary(d$ward)
+
+#Metoda PAM
+#pam<-pam(scale(d[,6:13]),3)
+#plot(d[,6:13], pch=18, col=as.factor(pam$clustering))
+#d$pam[pam$clustering==1] <- 2
+#d$pam[pam$clustering==2] <- 3
+#d$pam[pam$clustering==3] <- 1
+#summary(d$pam)
+
+#Porównania metod:
+#ggplot(d, aes(x=rt_mean,y=mt_mean, color=km)) + geom_point()
+
+#ggplot(d, aes(x=km, y=mt_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=ward, y=mt_mean, color=ward, fill=ward) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=pam, y=mt_mean, color=pam, fill=pam) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+
+#ggplot(d, aes(x=km, y=rt_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=ward, y=rt_mean, color=ward, fill=ward) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=pam, y=rt_mean, color=pam, fill=pam) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+
+#ggplot(d, aes(x=km, y=ml_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=ward, y=ml_mean, color=ward, fill=ward) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=pam, y=ml_mean, color=pam, fill=pam) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+
+#ggplot(d, aes(x=km, y=rl_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=ward, y=rl_mean, color=ward, fill=ward) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+#ggplot(d, aes(x=pam, y=rl_mean, color=pam, fill=pam) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+```
+
+##Trzy Kategorie
+
+- <span style="color:red">1. Humaniœci</span> - poœwi¹caj¹ du¿o czasu na zadania z matematyki (23.98%)
+
+- <span style="color:green">2. Matematycy</span> - poœwi¹caj¹ du¿o czasu na zadania z czytania (25.38%)
+
+- <span style="color:blue">3. Najszybsi</span> - poœwi¹caj¹ ma³o czasu na zadania z obu obszarów (50.63%)
+
+```{r udzia³, include=FALSE}
+summary(d$km)/sum(summary(d$km))
+```
+
+##Œrednie czasy rozwi¹zywania zadañ
+``` {r mean_m i mean_r}
+ggplot(d, aes(x=r_mean,y=m_mean, color=km)) + geom_point() + xlab("Czytanie") + ylab("Matematyka")
+```
+
+##Porównanie krajów (œrednie czasy)
+
+```{r Statystyki krajów}
+Stat <- data.frame(1:58)
+Stat$Kraj <- as.data.frame(Dane1[s,]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,1]
+Stat$RM_mean <- as.data.frame(Dane1[s,]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+Stat$R_mean <- as.data.frame(Dane1[!wsk_m & s,]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+Stat$M_mean <- as.data.frame(Dane1[wsk_m & s,]%>%group_by(Kraj)%>%dplyr::summarise(mean(Czas)))[,2]
+
+d$kraj <- "abc"
+for (i in 1:length(d$kraj)) d$kraj[i] <- levels(Dane1$Kraj)[Dane1$Kraj[which(d$Number[i]==Dane1$Student)[1]]]
+d$kraj <- factor(d$kraj, levels=levels(Dane1$Kraj))
+
+Stat$cat1 <- as.data.frame(d[d$km==1,]%>%group_by(kraj)%>%dplyr::summarise(length(km)))[,2]
+Stat$cat2 <- as.data.frame(d[d$km==2,]%>%group_by(kraj)%>%dplyr::summarise(length(km)))[,2]
+Stat$cat3 <- as.data.frame(d[d$km==3,]%>%group_by(kraj)%>%dplyr::summarise(length(km)))[,2]
+
+  Stat <- arrange(Stat,RM_mean)
+  Stat$Kraj<- as.character(Stat$Kraj)
+  Stat$Kraj<- factor(Stat$Kraj, levels=Stat$Kraj)
+  
+my_colors<-c('#DDDD55','#55DDDD','#DD55DD')
+ggplot(data=Stat) + 
+  geom_point(data=Stat, aes(x=RM_mean, y=Kraj, color="Cz+M"),size=2) + 
+  geom_point(data=Stat, aes(x=R_mean, y=Kraj, color="Czytanie"),size=2) + 
+  geom_point(data=Stat,aes(x=M_mean, y=Kraj, color="Matematyka"),size=2)+
+  theme_fivethirtyeight() + scale_colour_manual(values=my_colors) +
+  theme(axis.text.y = element_text(size=8))
+```
+
+##Udzia³ grup w krajach
+
+```{r Udzia³ grup w krajach}
+Stat$Stud <- Stat$cat1 + Stat$cat2 + Stat$cat3
+Stat$cat1 <- Stat$cat1/Stat$Stud
+Stat$cat2 <- Stat$cat2/Stat$Stud
+Stat$cat3 <- Stat$cat3/Stat$Stud
+
+my_colors<-c('#DD5555','#55DD55','#5555DD')
+ggplot(data=Stat) + 
+  geom_point(data=Stat, aes(x=cat1, y=Kraj, color="1"),size=2) + 
+  geom_point(data=Stat, aes(x=cat2, y=Kraj, color="2"),size=2) + 
+  geom_point(data=Stat,aes(x=cat3, y=Kraj, color="3"),size=2)+
+  theme_fivethirtyeight() + scale_colour_manual(values=my_colors) +
+  theme(axis.text.y = element_text(size=8))
+```
+
+## Wykresy grup dla wybranych krajów
+
+```{r wykresy}
+my_colors<-c('#DD5555','#55DD55','#5555DD')
+Hiszpania <- d[which(d$kraj=="Spain (Regions)"),]
+k1<-ggplot(Hiszpania, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Hiszpania")+ theme(legend.position="none")
+
+Korea <- d[which(d$kraj=="Korea"),]
+k2<-ggplot(Korea, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Korea")+ theme(legend.position="none")
+
+Peru <- d[which(d$kraj=="Peru"),]
+k3<-ggplot(Peru, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Peru")+ theme(legend.position="none")
+
+Polska <- d[which(d$kraj=="Poland"),]
+k4<-ggplot(Polska, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Polska")+ theme(legend.position="none")
+
+Brazylia <- d[which(d$kraj=="Brazil"),]
+k5<-ggplot(Brazylia, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Brazylia")+ theme(legend.position="none")
+
+Japonia <- d[which(d$kraj=="Japan"),]
+k6<-ggplot(Japonia, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Japonia")+ theme(legend.position="none")
+
+Australia <- d[which(d$kraj=="Australia"),]
+k7<-ggplot(Australia, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Australia")+ theme(legend.position="none")
+
+Qatar <- d[which(d$kraj=="Qatar"),]
+k8<-ggplot(Qatar, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Katar")+ theme(legend.position="none")
+
+Chiny <- d[which(d$kraj=="B-S-J-G (China)"),]
+k9<-ggplot(Chiny, aes(x=mt_mean,y=rt_mean,col=km)) + geom_point() + ggtitle("Chiny")+ theme(legend.position="none")
+
+ggplot2.multiplot(k1, k2, k3, k4, k5, k6, k7, k8, k9, cols=3)
+```
+
+##Jak wybraliœmy grupy?
+
+Potraktowaliœmy studentów jako punkty 8-wymiarowej przestrzeni.
+
+- Œrednia i odchylenie standardowe
+
+- Matematyka i Czytanie osobno
+
+- Trudne i £atwe zadania osobno
+
+Dla tej przestrzeni zastosowaliœmy metodê k-œrednich
+
+##Silhouette
+
+```{r silhouette}
+dist<-dist(scale(d[,6:13]))
+av.sil<-numeric(20)
+for (i in 2:20){
+  km<-kmeans(scale(d[,6:13]),i)
+  sil<-silhouette(km$cluster, dist)
+  av.sil[i]<-summary(sil)$avg.width
+}
+sil_data <- data.frame("No.centers"=2:20, "Avg.width"=av.sil[-1])
+ggplot(sil_data, aes(x=No.centers,y=Avg.width)) + geom_point()
+
+```
+
+##Œrednie czasy rozwi¹zywania zadañ
+
+```{r}
+#install.packages("devtools")
+library(devtools)
+#install_github("easyGgplot2", "kassambara")
+library(easyGgplot2)
+p1<-ggplot(d, aes(x=km, y=mt_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+p2<-ggplot(d, aes(x=km, y=rt_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+p3<-ggplot(d, aes(x=km, y=ml_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+p4<-ggplot(d, aes(x=km, y=rl_mean, color=km, fill=km) ) + geom_violin()+ geom_boxplot(color="black", alpha=0.2)
+ggplot2.multiplot(p1,p2,p3,p4, cols=2)
+```
+
+##Jak podzieliliœmy zadania?
+
+Dla wszystkich zadañ skonstruowaliœmy dystrybuanty empiryczne i na ich podstawie ustaliliœmy odleg³oœæ miêdzy nimi za pomoc¹ normy L2.
+
+$$d(f_1,f_2)=\left( \int_{-\infty}^{\infty} (f_1 - f_2)^2 dx \right)^{\frac{1}{2}}$$
+
+##Po zrzutowaniu na p³aszczyznê (isoMDS)
+
+```{r p³aszczyzna z zadaniami (M i R)}
+Obszar <- function(string) 
+          if (substr(string,1,1)=="R") return(0) else 
+          if (substr(string,1,1)=="M") return(1) else 
+          return(NA)
+Zadania_o <-vapply(levels(Dane1$Zadanie),Obszar,c(0))
+newcoord <- isoMDS(DIST_Q)
+ndf <- data.frame(newcoord$points, class = as.factor(1-Zadania_o))
+ggplot(ndf, aes(X1, X2, color=class)) + geom_point()
+```
+
+##Klasyfikacja drzewem (hcclust - metoda complete)
+
+```{r rysowanie_drzewa_zadañ}
+#rysowanie drzewa
+
+mycol <- c("blue","red")
+drzewo <- as.dendrogram(hc_q)
+Zadania_o_tree<-Zadania_o[order.dendrogram(drzewo)]
+leafcolor <- function(node) {
+  if (is.leaf(node)) {
+    i <<- i + 1
+    attr(node, "nodePar") <- list(pch=20, cex=1.9, col=mycol[Zadania_o_tree[i]+1] )
+  }
+  return(node)
+}
+i<-0
+drzewo <- dendrapply(drzewo, leafcolor)
+plot(drzewo, leaflab = "none", main="Classification tree")
+legend("topright", c("Czytanie","Matematyka"), pch=19, col=mycol)
+```
+
+##Cztery grupy zadañ (gêstoœci)
+
+```{r gêstoœci}
+par(mfrow=c(2,2))
+hist(Dane1$Czas[cat_q[as.numeric(Dane1$Zadanie)]==2],breaks=200, main="Grupa 1", xlab="")
+hist(Dane1$Czas[cat_q[as.numeric(Dane1$Zadanie)]==3],breaks=200, main="Grupa 2", xlab="")
+hist(Dane1$Czas[cat_q[as.numeric(Dane1$Zadanie)]==1],breaks=200, main="Grupa 3", xlab="")
+hist(Dane1$Czas[cat_q[as.numeric(Dane1$Zadanie)]==4],breaks=200, main="Grupa 4", xlab="")
+par(mfrow=c(1,1))
+```
+
+##Zadania po klasyfikacji (na 2 grupy)
+
+```{r p³aszczyzna z zadaniami (Kategorie)}
+my_colors<-c('#55DDDD','#DD55DD')
+ndf <- data.frame(newcoord$points, class = as.factor(cat2_q))
+ggplot(ndf, aes(X1, X2, color=class)) +
+  geom_point() + scale_colour_manual(values=my_colors)
+```
+

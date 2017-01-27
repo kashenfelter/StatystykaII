@@ -1,0 +1,610 @@
+---
+title: "Strategie rozwi¹zywania zadañ - PISA2015"
+author: "Wioleta Stojak, Szymon Majewski"
+date: "8 stycznia 2017"
+output:
+    html_document:
+         toc: true
+         toc_float:
+          collapsed: false
+          smooth_scroll: false
+---
+#Wstêp
+
+OECD (Organizacja Wspó³pracy Gospodarczej i Rozwoju) od 2000 roku bada poziom œwiatowego szkolnictwa, oceniaj¹c nie stan wiedzy uczniów, ale umiejêtnoœci pos³ugiwania siê ni¹ - na tym w³aœnie opiera siê badania PISA (Programme for International Student Assesment). To ono sprawdza 15-latków z ca³ego œwiata pod k¹tem ich zdolnoœci do rozwi¹zywania problemów, analizowania, argumentowania i interpretowania. Bada umiejêtnoœæ myœlenia i przygotowanie do doros³ego ¿ycia. I tak np. gdy w ramach badania PISA oceniane jest “czytanie”, uczniowie dostaj¹ teksty, z którymi mog¹ spotkaæ siê w codziennym ¿yciu np. fragmenty instrukcji obs³ugi, czy artyku³ów prasowych. Celem projektu jest znalezienie strategii, któr¹ mogli obraæ uczniowie w trakcie rozwi¹zywania testu. Niektórzy uczniowie mog¹ poœwiêciæ wiêcej czasu na pocz¹tku testu, inni pod jego koniec.
+
+#Dane
+Ka¿dy wiersz dostêpnych danych opisuje czas rozwi¹zywania jednego zadania.
+<ul>
+<li>Kraj z którego pochodzi uczeñ</li>
+<li>Szko³a do której chodzi uczeñ</li>
+<li>Student, czyli ID ucznia w danej szkole w danym kraju</li>
+<li>Zestaw – numer zestawu zadañ, które student rozwi¹zywa³</li>
+<li>Czas – w tysiêcznych sekundy</li>
+<li>Zadanie – identyfikator zadania, które jest rozwi¹zywane</li>
+<li>Pozycja – informacja w której czêœci ca³ego testu wyst¹pi³o to zadanie. Ca³y dwugodzinny test jest podzielony na 4 mniej wiêcej równe czêœci, a ta kolumna opisuje kod okreœlonej czêœci</li>
+<li>Obszar – okreœla czy zadanie dotyczy czytania czy matematyki.</li>
+</ul>
+
+
+```{r}
+load("C:/Users/Wioleta/Downloads/onlyTimingsLong.rda")
+head(onlyTimingsLong)
+```
+
+Wykorzystane pakiety:
+
+```{r,message=FALSE, warning=FALSE}
+library(MASS)
+library(cluster)
+library(ggplot2)
+library(factoextra)
+library(ggfortify)
+library(dendextend)
+library(stats)
+library(scales)
+library(plotly)
+library(flexclust)
+library(gridExtra)
+library(reshape2)
+```
+
+##Obróbka danych
+Aby zacz¹æ prace z naszymi danymi musieliœmy je wstêpnie przetworzyæ. Czas, który by³ podany w tysiêcznych sekundy zosta³ przeliczony na minuty. Ponadto zosta³y wyrzucone rekordy z pozycj¹ oznaczon¹ jako -1. Nastêpnie odrzuciliœmy wiersze w których czas rozwi¹zywania zadania by³ wiêkszy od 15 minut oraz mniejszy ni¿  1 sekunda. Wi¹¿e siê to najpewniej z nag³ym opuszczeniem sali i pozostawieniem przez ucznia stanowiska na d³u¿szy czas, b¹dŸ z b³êdem systemu. Jak widaæ zdarza³o siê, ¿e uczeñ rozwi¹zywa³ pojedyncze zadanie d³u¿ej ni¿ 2 godziny. Z kolei odrzucenie czasów mniejszych ni¿ 1 sekunda jest spowodowane tym, ¿e uczeñ najprawdopodobniej nie zd¹¿y³ zapoznaæ siê z treœci¹ zadania w tym czasie, wybieraj¹c niezamierzenie jedn¹ z odpowiedzi.
+
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=FALSE}
+
+onlyTimingsLong$Czas<- onlyTimingsLong$Czas*0.001/60
+pozycjaujemny<-which(onlyTimingsLong$Pozycja==-1)
+dane<- onlyTimingsLong[-pozycjaujemny,]
+
+
+n<-15
+m<-1/60
+nierealne<-(dane$Czas>n)|(dane$Czas<m)
+dane<-dane[!nierealne,]
+```
+
+
+#Statystyki dla szkól
+
+Dla ka¿dej ze szko³y stworzyliœmy nastêpuj¹ce statystyki:
+
+<ul>
+<li> œrednia czasu rozwiazywania zadania przez studentów z ka¿dej pozycji testu, z podzia³em na matematykê i czytanie, oraz z podzia³em na obszar i pozycje, które zosta³y podzielone przez odpowiednia sumê œrednich z poszczególnych czêœci tak aby obrazowaæ proporcje  </li>
+
+<li> œrednie odchylenie standardowe czasu rozwi¹zywania zadania przez studenta z podzia³em na matematykê i czytanie </li>
+
+<li> œredni maksymalny czas rozwi¹zywania zadania przez studenta z podzia³em na matematykê i czytanie </li>
+
+<li> œrednie odchylenia czasu rozwi¹zywania zadañ przez studenta dla ka¿dej pozycji </li>
+
+<li> œredni ³aczny czas rozwi¹zywania zadañ z podzia³em na matematykê i czytanie </li>
+
+<li> œrednie kwantyle rzêdu  0.25 i 0.75 czasu rozwi¹zywania zadania przez studenta z podzia³em na matematykê i czytanie  </li>
+
+<li> œrednia skoœnoœæ czasu rozwi¹zywania zadañ przez studenta  </li>
+
+</ul>
+
+Ponadto postanowiliœmy odrzuciæ szko³y, które mia³y mniej ni¿ 25 studentów, a z pozosta³ych szkó³ wybraliœmy te pochodz¹ce z nastêpuj¹cych Pañstw:
+Polska, Korea, Peru, Singapur, Irlandia, Brazylia, Katar, Japonia, Hiszpania, Kanada, Chinese Taipei.
+Pojawiaj¹ce siê  wartoœci **NA** w statystykach zosta³y usuniête przez wyrzucenie danego rekordu (³¹cznie jeden wiersz).
+
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=FALSE}
+
+statystykisr<-tapply(dane$Czas,list(factor(dane$Szkola),factor(dane$Obszar),factor(dane$Pozycja)),mean)
+statystyki_sr_obszar <- tapply(dane$Czas, list(factor(dane$Szkola), factor(dane$Obszar)), mean)
+statystyki_sr_poz <- tapply(dane$Czas, list(factor(dane$Szkola), factor(dane$Pozycja)), mean)
+
+statystykisr<-data.frame(statystykisr)
+
+colnames(statystykisr)<-c("M1sr","R1sr","M2sr","R2sr","M3sr","R3sr","M4sr","R4sr")
+colnames(statystyki_sr_obszar) <- c("Msr", "Rsr")
+colnames(statystyki_sr_poz) <- c("P1sr", "P2sr", "P3sr", "P4sr")
+
+g<-cbind(statystykisr, statystyki_sr_obszar, statystyki_sr_poz)
+
+daneSzkol <- split(dane, dane$Szkola)
+
+resSzkoly <- as.data.frame(matrix(, nrow=0, ncol=22))
+colnames(resSzkoly) <- c("Panstwo","Nstud","Meantest_P1","Meantest_P2","Meantest_P3","Meantest_P4","MeanSD_P1","MeanSD_P2","MeanSD_P3","MeanSD_P4","MeanStudtest_M","MeanStudtest_R","MeanStudSD_M", "MeanStudSD_R", "MeanStudMax_M", "MeanStudMax_R","MeanStudQ1_M", "MeanStudQ1_R", "StudMax3kw_M", "StudMax3kw_R","MeanStudSkew_M", "MeanStudSkew_R")
+
+GaltonSkewness <- function(x){
+    q1 <- quantile(x, 0.75, na.rm=TRUE)
+    q2 <- quantile(x, 0.5, na.rm = TRUE)
+    q3 <- quantile(x, 0.25, na.rm=TRUE)
+    return((q3 +q1 - 2*q2)/(q3 - q1))
+  }
+for (i in 1:length(daneSzkol)) {
+  daneSzkoly <- daneSzkol[[i]];
+  aggrSD <- tapply(daneSzkoly$Czas, list(daneSzkoly$Student, daneSzkoly$Obszar), sd)
+  aggrSD_means <- colMeans(aggrSD, na.rm=TRUE)
+  aggrMax <- tapply(daneSzkoly$Czas, list(daneSzkoly$Student, daneSzkoly$Obszar), max)
+  aggrMax_means <- colMeans(aggrMax, na.rm = TRUE)
+  aggrMax_3kw <- sapply(as.data.frame(aggrMax), function(x) quantile(x, 0.75, na.rm = TRUE)) 
+  aggrStudQ1 <- tapply(daneSzkoly$Czas, list(daneSzkoly$Student, daneSzkoly$Obszar), 
+                       function(x) quantile(x, 0.25, na.rm=TRUE))
+  meanStudQ1 <- colMeans(aggrStudQ1, na.rm=TRUE)
+  sredniczastestu_m_r<-tapply(daneSzkoly$Czas,list(factor(daneSzkoly$Student),factor(daneSzkoly$Obszar)),sum)
+  aggrMeantimetest_m_r<-colMeans(sredniczastestu_m_r,na.rm=T)
+  studGaltSkew <- tapply(daneSzkoly$Czas, 
+                         list(factor(daneSzkoly$Student), factor(daneSzkoly$Obszar)), function(x) GaltonSkewness(x))
+  meanSkew <- colMeans(studGaltSkew, na.rm=TRUE)
+  czasy<-tapply(daneSzkoly$Czas,list(factor(daneSzkoly$Student),factor(daneSzkoly$Pozycja)),sum)
+  meantime_poz<-colMeans(czasy,na.rm=T)
+  sredniczastestu_m_r<-tapply(daneSzkoly$Czas,list(factor(daneSzkoly$Student),factor(daneSzkoly$Obszar)),sum)
+  aggrMeantimetest_m_r<-colMeans(sredniczastestu_m_r,na.rm=T)
+  meanSD_P<-tapply(daneSzkoly$Czas,list(factor(daneSzkoly$Student), factor(daneSzkoly$Pozycja)),sd)
+  aggrmeanSD_P<-colMeans(meanSD_P,na.rm=T)
+  new_row <- data.frame(row.names=daneSzkoly[1,"Szkola"],
+                        Panstwo = daneSzkoly[1,"Kraj"],
+                        Nstud= length(unique(daneSzkoly$Student)),
+                        Meantot_time_P1=meantime_poz["1"],
+                        Meantot_time_P2=meantime_poz["2"],
+                        Meantot_time_P3=meantime_poz["3"],
+                        Meantot_time_P4=meantime_poz["4"],
+                        MeanSD_P1=aggrmeanSD_P["1"],
+                        MeanSD_P2=aggrmeanSD_P["2"],
+                        MeanSD_P3=aggrmeanSD_P["3"],
+                        MeanSD_P4=aggrmeanSD_P["4"],
+                        MeanStudtest_M=aggrMeantimetest_m_r["M"],
+                        MeanStudtest_R=aggrMeantimetest_m_r["R"], 
+                        MeanStudSD_M = aggrSD_means["M"], 
+                        MeanStudSD_R = aggrSD_means["R"],
+                        MeanStudMax_M = aggrMax_means["M"],
+                        MeanStudMax_R = aggrMax_means["R"],
+                        MeanStudQ1_M= meanStudQ1["M"], 
+                        MeanStudQ1_R= meanStudQ1["R"],
+                        StudMax3kw_M = aggrMax_3kw["M.75%"],
+                        StudMax3kw_R = aggrMax_3kw["R.75%"],
+                        MeanStudSkew_M = meanSkew["M"],
+                        MeanStudSkew_R = meanSkew["R"])
+  
+  
+  resSzkoly <- rbind(resSzkoly, new_row) 
+}
+
+resSzkoly<-cbind(resSzkoly,g)
+#resSzkoly jest macierza statystyk pomocnicznych
+```
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=FALSE}
+liczbastudok<-resSzkoly[,2]>=25
+
+resSzkoly_25<-resSzkoly[liczbastudok,]
+
+resSzkoly_25_k<-resSzkoly_25[resSzkoly_25$Panstwo %in% c("Poland", "Korea","Peru","Singapore","Ireland","Brazil","Qatar","Finland","Japan","Spain","Canada","Chinese Taipei"),]
+
+resSzkoly_25_k<-na.omit(resSzkoly_25_k)
+
+M_poz_sr <- rowMeans(resSzkoly_25_k[,c("M1sr", "M2sr", "M3sr", "M4sr")])
+R_poz_sr <- rowMeans(resSzkoly_25_k[,c("R1sr", "R2sr", "R3sr", "R4sr")])
+MR_sr <- rowMeans(resSzkoly_25_k[,c("Msr", "Rsr")])
+Poz_sr <- rowMeans(resSzkoly_25_k[,c("P1sr", "P2sr", "P3sr", "P4sr")])
+
+
+P1_P2_rel <- resSzkoly_25_k["P1sr"] / (resSzkoly_25_k["P1sr"] + resSzkoly_25_k["P2sr"])
+P3_P4_rel <- resSzkoly_25_k["P3sr"] / (resSzkoly_25_k["P3sr"] + resSzkoly_25_k["P4sr"])
+P13_P24_rel <- (resSzkoly_25_k["P1sr"]  + resSzkoly_25_k["P3sr"]) / 
+  (resSzkoly_25_k["P1sr"] + resSzkoly_25_k["P2sr"] + resSzkoly_25_k["P3sr"] + resSzkoly_25_k["P4sr"])
+
+resSzkoly_25_k[, c("P1_P2_rel", "P3_P4_rel", "P13_P24_rel")] <- cbind(P1_P2_rel, P3_P4_rel, P13_P24_rel)
+
+resSzkoly_25_k[,c("R1sr", "R2sr", "R3sr", "R4sr")] <- resSzkoly_25_k[,c("R1sr", "R2sr", "R3sr", "R4sr")] / (4*R_poz_sr)
+resSzkoly_25_k[,c("M1sr", "M2sr", "M3sr", "M4sr")] <- resSzkoly_25_k[,c("M1sr", "M2sr", "M3sr", "M4sr")] / (4*M_poz_sr)
+resSzkoly_25_k[,c("Msr", "Rsr")] <- resSzkoly_25_k[,c("Msr", "Rsr")] / (2* MR_sr)
+resSzkoly_25_k[,c("P1sr", "P2sr", "P3sr", "P4sr")] <- resSzkoly_25_k[,c("P1sr", "P2sr", "P3sr", "P4sr")] / (4 * Poz_sr)
+
+#docelowa macierz statystyk
+nowe<-resSzkoly_25_k[,-c(3:6,38,37,36,35,34,33,32,31)]
+
+```
+
+#Wstêpna analiza danych
+
+Poni¿ej zamieszony jest wykres œredniego czasu rozwi¹zywania zadañ, oraz œredni czas z matematyki i czytania z ka¿dego wybranego kraju. Widzimy, ¿e Korea charakteryzuje siê najkrótszym œrednim czasem rozwiazywania zadañ, natomiast Peru wypada najgorzej na tle innych krajów. Mo¿emy zauwa¿yæ, ¿e dla ka¿dego kraju mamy nastêpuj¹c¹ zale¿noœæ: œredni czas z matematyki jest zawsze wiêkszy od ogólnej œredniej, a œredni czas rozwi¹zywania zadañ z czytania jest mniejszy od ogólnej œredniej.
+
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=FALSE}
+
+dane<-dane[dane$Kraj %in% c("Poland", "Korea","Peru","Singapore","Ireland","Brazil","Qatar","Finland","Japan","Spain","Canada","Chinese Taipei"),]
+
+mean.kraj<-round(tapply(dane$Czas,factor(dane$Kraj),mean),2)
+mean.kraj.obsz<-round(tapply(dane$Czas,list(factor(dane$Kraj),factor(dane$Obszar)),mean),2)
+mean.kraj.poz<-round(tapply(dane$Czas,list(factor(dane$Kraj),factor(dane$Pozycja)),mean),2)
+
+allmean<-cbind(mean.kraj.obsz,mean.kraj)
+
+allmean<-allmean[order(allmean[,3],decreasing = T),]
+mean.kraj.poz<-mean.kraj.poz[order(mean.kraj.poz[,1],decreasing = T),]
+
+ramka<-as.data.frame(cbind(c(rownames(mean.kraj.poz)),mean.kraj.poz))
+
+mean.kraj.poz.sort<-arrange(ramka, 
+        desc(ramka[,2]), desc(ramka[,3]),desc(ramka[,4]),desc(ramka[,5]))
+k1<-as.matrix(data.frame(mean.kraj.poz.sort[,-1]))
+a<-as.numeric(k1[,1])
+b<-as.numeric(k1[,2])
+c<-as.numeric(k1[,3])
+d<-as.numeric(k1[,4])
+mean.kraj.poz<-cbind(a,b,c,d)
+rownames(mean.kraj.poz)<-mean.kraj.poz.sort[,1]
+```
+
+```{r,,message=FALSE, warning=FALSE,echo=FALSE,fig.width=9, fig.height=8,fig.keep='high' }
+
+load("~/allmeanpr3.rda")
+dotplot(allmean,
+        pch = 19,
+        lwd=1,xlab=NULL,
+        col=c("#ff7f00","#984ea3","#e41a1c"),
+        main="Œredni czas rozwiazywania zadania w zale¿noœci od Kraju i Obszaru", 
+        key= list(text = list(labels =c("Œrednia M","Œrednia M+R","Œrednia R"),
+                              cex  = c(1,1,1) ), 
+                           title = "oznacznia", cex.title = 1, 
+                           points = list(pch = c(18,18,18), 
+                                
+                                     col = c("#ff7f00","#e41a1c","#984ea3")), 
+                         space = "right"))
+
+```
+
+Poni¿szy wykres obrazuje œrednie czasy rozwi¹zywania zadañ w poszczególnych czêœciach testu w zale¿noœci od kraju. Aby wykres by³ czytelniejszy wartoœci œrednich zosta³y uporz¹dkowane malej¹co w zale¿noœci od pozycji 1. 
+Analizuj¹c wynik mo¿emy przedstawiæ pewn¹ hipotezê na temat strategii rozwi¹zywania zadañ. Widzimy, ¿e pierwsza czêœæ testu charakteryzuje siê najwiêksz¹ œrednia czasu, natomiast patrz¹c na 4 zosta³a ona rozwi¹zana najszybciej. Zatem czy oznacza to, ¿e studenci na pocz¹tku testu bêd¹c skupieni na zadaniu i chc¹c rozwi¹zaæ je najlepiej poœwiêcali na nie œrednio wiêcej czasu, a na koniec pod presja czasu wybierali losowo odpowiedzi? Niekoniecznie, poniewa¿ patrz¹c na wczeœniejszy wynik mog³o zdarzyæ siê tak, ¿e pierwszymi zadaniami by³y zadania z matematyki, które charakteryzuj¹ siê d³u¿szym czasem rozwiazywania, dlatego by³y po prostu dla uczniów trudniejsze. 
+Zauwa¿my równie¿ ze kraje takie jak Chinise Taipei, Irlandia czy Korea charakteryzuj¹ siê wzglêdnie ma³¹ ró¿nic¹ œrednich czasów w czterech pozycjach, natomiast Katar wyró¿nia siê a tle innych pañstw najni¿sza œrednia z ostatniej czêœci oraz relatywnie du¿a z pierwszej. Mo¿e to wskazywaæ na istnienie grup charakteryzuj¹cych siê równomiernym gospodarowaniem czasu na ka¿da z czêœci oraz takich którzy spêdzaj¹ najmniej czasu na ostatni¹ czêœæ poniewa¿ poœwiêcaj¹ swoja uwagê pierwszym zadaniom.
+
+
+
+```{r,,message=FALSE, warning=FALSE,echo=FALSE,fig.width=9, fig.height=8,fig.keep='high'}
+load("~/mean.kraj.pozpr3.rda")
+dotplot(mean.kraj.poz,
+        pch = 19,xlab=NULL,
+        lwd=1,
+        col=c("#e41a1c","#984ea3","#4daf4a","#ff7f00"),
+        main="Œredni czas rozwiazywania zadania w zale¿noœci od Kraju i Pozycji", 
+        key= list(text = list(labels =c("1","2","3","4"),
+                              cex  = c(1,1,1,1) ), 
+                           title = "oznaczenia", cex.title = 1, 
+                           points = list(pch = c(18,18,18,18), 
+                                         col = c("#e41a1c","#984ea3","#4daf4a","#ff7f00")), 
+                            space = "right"))
+        
+
+```
+
+#Wybór liczby klastrów
+
+Aby podzieliæ nasz zbiór na odpowiednie klastry pos³u¿yliœmy siê analiz¹ hierarchiczn¹ i k-means. Natomiast by znaleŸæ ich optymaln¹ liczbê skorzystaliœmy z **gap statistic**.
+
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=F}
+scaled_resSzkoly <- scale(nowe[,3:ncol(nowe)])
+
+#eclust + gap
+grupy_eclust <- eclust(scaled_resSzkoly, "hclust",k.max=7, graph = FALSE,nboot=50)
+
+dorysgap<-grupy_eclust$gap_stat
+save(dorysgap,file="dorysgappr3.rda")
+#kmean+gap
+grupy_eclust_mean <- eclust(scaled_resSzkoly, FUNcluster = "kmeans", 
+                    k.max = 7, nboot = 50,graph = FALSE) 
+dorysgap_mean<-grupy_eclust_mean$gap_stat
+save(dorysgap_mean,file="dorysgap_meanpr3.rda")
+```
+
+Na poni¿szym wykresie widaæ, ¿e "optymalna" liczba klastrów dla **analizy hierarchicznej** to 3.
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE}
+load("~/dorysgappr3.rda")
+fviz_gap_stat(dorysgap)
+```
+
+Dla **kmeans** "optymalna" liczba klastrów to 3.
+```{r,message=FALSE, warning=FALSE,echo=FALSE}
+load("~/dorysgap_meanpr3.rda")
+fviz_gap_stat(dorysgap_mean)
+```
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=F}
+grupykmeans<-kmeans(scaled_resSzkoly,centers =3)
+nowe$klastrymean<-grupykmeans$cluster
+
+grupy_eclust5 <- eclust(scaled_resSzkoly, "hclust", k = 3,nboot=50)
+nowe$klastry<-grupy_eclust5$cluster
+save(nowe,file="nowepr3.rda")
+tab<-table(nowe$klastry,nowe$klastrymean)
+save(tab,file="tabpr3.rda")
+```
+
+Czy te klastry s¹ podobne?  Aby to sprawdziæ obliczyliœmy miare podobieñstwa Randomized Index, która mówi jakie jest prawdopodobieñstwo, ¿e dwie losowo wybrane szko³y bêd¹ w tym samym klastrze w obu grupowaniach, lub w ró¿nych klastrach w obu grupowaniach.
+
+```{r,,message=FALSE, warning=FALSE,echo=FALSE}
+load("~/tabpr3.rda")
+randIndex(tab,correct=F)
+```
+
+#Redukcja wymiaru - PCA
+
+Poni¿szy rysunki  przedstawiaj¹ procent wyjaœnionej zmiennoœci, podsumowanie PCA oraz autplot, na którym umieszczone s¹ dwa wykresy. Jeden przedstawia indeksy obserwacji przedstawione na uk³adzie wspó³rzêdnych okreœlonych przez dwie pierwsze sk³adowe g³ówne (w tym przypadku dwie wspó³rzêdne wyjaœniaj¹ oko³o 55% ca³ej zmiennoœci). Drugi rysunek przedstawia kierunki w których dzia³aj¹ oryginalne zmienne, innymi s³owy przedstawiaj¹ jak wartoœæ danej zmiennej wp³ywa na wartoœci dwóch pierwszych sk³adowych g³ównych.
+Je¿eli wektory maj¹ przeciwne zwroty to dane zmienne s¹ ujemnie skorelowane (nie mo¿na jednak oceniæ wartoœci korelacji), je¿eli zwroty s¹ prostopad³e to zmienne s¹ nieskorelowane, a je¿eli zwroty s¹ bliskie to zmienne s¹ dodatnio skorelowane. Ponadto kolorami zosta³ oznaczony na nim podzia³ na klastry metoda kmeans. Z wykresu mo¿emy wyczytaæ, ¿e statystykami które dobrze odró¿niaj¹ grupy s¹ na przyk³ad P13_24_rel, MeanSD_P2, MeanSD_P4, M2_sr, R2_sr, MeanStudMax_M.
+
+
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=F}
+# PCA na przeskalowanych danych
+model <- prcomp(scaled_resSzkoly)
+save(model,file="modelpr3.rda")
+```
+
+```{r,message=FALSE, warning=FALSE,,echo=FALSE}
+load("~/modelpr3.rda")
+load("~/nowepr3.rda")
+plot(model,main="Procent wyjaœnionej zmiennoœci")
+summary(model)
+autoplot(model,shape=F,label.size=2,loadings=T,loadings.label=T,loadings.label.size=4,colour=nowe$klastrymean)+theme_bw()
+
+```
+
+#Analiza wyznaczonych grup
+
+Zaprezentowane wy¿ej algorytmy pozwoli³y na okreœlenie nastêpuj¹cych grup:
+
+<ul>
+
+
+<li> **Klepsydra** Grupa postawi³a przed sob¹ jasny cel - nie marnowaæ swojego czasu na zadania, których nie potrafi¹ rozwi¹zaæ. Wynika to z najni¿szego œredniego odchylenia jakim charakteryzuj¹ siê cz³onkowie grupy.  </li> 
+
+<li> **Po Pó³**  Grupa kieruj¹ca siê zdrowym rozs¹dkiem, ich motto brzmi - "dla wszystkich po równo", co znajduje odzwierciedlenie w ich strategii, która polega na równomiernym roz³o¿eniu swojego czasu na ka¿d¹ z czêœci. Pozwala to na skupienie siê na zadaniach, które wymagaj¹ wiêcej uwagi. </li>
+
+<li> **YOLO** - Grupa charakteryzuj¹ca siê jedn¹ z najbardziej oczywistych strategii, czyli jej brakiem. Cz³onkowie grupy nie potrafi¹ zorganizowaæ czasu, którym dysponuj¹ aby rozwi¹zaæ test bezstresowo. W pierwszej pozycji testu oraz w trzeciej odznaczaj¹ siê na tle pozosta³ych grup  najd³u¿szym ³¹cznym czasem rozwi¹zywania danej czêœci, natomiast w drugiej i czwartej - najkrótszym. Ponadto ich œrednie maksymalne czasy, oraz odchylenia s¹ stosunkowo du¿e co wskazuje na brak skupienia i poœwiêcanie d³u¿szej chwili na zadanie, które mogliby pomin¹æ i skupiæ siê bardziej na swoich dobrych stronach. </li>
+</ul>
+
+
+##Uzadadnienie opisów grup
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=F}
+load("~/nowedopr3.rda")
+
+tabelka<-table(factor(nowe[,1]),nowe[,28])
+
+prop<-prop.table(tabelka,1)
+
+dat<-data.frame((prop[order(prop[,1],decreasing = T),]))
+rownames(dat)<-c("YOLO","Klepsydra","Po Pó³")        
+datm <- melt(cbind(dat, ind = rownames(dat)), id.vars = c('ind'))
+
+save(datm,file="datmpr3.rda")
+tabelkaczasowtot<-resSzkoly_25_k[,c(3:6)]
+tabelkaczasowtot$klastrymeans<-grupykmeans$cluster
+
+tottime_P1<-tapply(tabelkaczasowtot[,1],list(factor(tabelkaczasowtot$klastrymeans)),mean)
+tottime_P2<-tapply(tabelkaczasowtot[,2],list(factor(tabelkaczasowtot$klastrymeans)),mean)
+tottime_P3<-tapply(tabelkaczasowtot[,3],list(factor(tabelkaczasowtot$klastrymeans)),mean)
+tottime_P4<-tapply(tabelkaczasowtot[,4],list(factor(tabelkaczasowtot$klastrymeans)),mean)
+
+tot<-(rbind(tottime_P1,tottime_P2,tottime_P3,tottime_P4))
+
+proptottime<-data.frame(prop.table(tot,2))
+colnames(proptottime)<-c("YOLO","Klepsydra","Po Pó³")
+
+dattime <- melt(cbind(proptottime, ind = rownames(proptottime), id.vars = c('ind')))
+save(dattime,file="dattimepr3.rda")
+```
+
+Poni¿ej znajduje siê tabela przedstawiaj¹ca procentowy udzia³ œrednich ³¹cznych czasów rozwi¹zywania zadañ z ka¿dej pozycji w ka¿dej z grup. Widzimy ¿e grupa **YOLO** spêdzi³a najmniej czasu na czêœci 2 i 4 oraz najwiêcej na 1 i 3. Pamiêtaj¹c, ¿e miêdzy 2, a 3 pozycj¹ odby³a siê przerwa dla uczniów wskazuje to na skupienie siê na pierwszej czêœci kosztem nastêpnej. **Po Pó³** natomiast rozdzieli³o swój czas relatywnie równomiernie pomiêdzy pozycje. Trochê gorzej od Po Pó³ wypad³a **Klepsydra**, równie¿ staraj¹c siê zachowaæ jednolity podzia³ dysponowanym czasem.
+
+
+```{r}
+
+load("~/dattimepr3.rda")
+ggplot(dattime,aes(x = variable, y = value,fill = ind)) + 
+    geom_bar(position = "fill",stat = "identity") + 
+    scale_y_continuous(labels = percent_format())
+
+```
+
+Matematyka i Czytanie
+
+Widzimy na wykresach, ¿e grupa **Klepsydra** ma najni¿sze œrednie odchylenia przy najni¿szym œrednim maksymalnym czasie rozwiazywania zadania. Oznacza to, ¿e cz³onkowie grupy staraj¹ siê nie spêdziæ du¿o czasu nad ¿adnym zadaniem. Natomiast w  **YOLO** wystêpuj¹ najwiêksze odchylenia standardowe czasów rozwi¹zywania zadañ przy najwy¿szych œrednich maksymalnych czasach rozwi¹zywania zadañ. 
+
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE}
+load("~/nowepr3.rda")
+a<-data.frame(nowe[,c(9,11,28)])
+a[which(a[,3]=="1"),3]<-"YOLO"
+a[which(a[,3]=="2"),3]<-"Klepsydra"
+a[which(a[,3]=="3"),3]<-"Po pó³"
+Grupy<-factor(a[,3])
+# color by groups
+scatterPlot <- ggplot(a[,1:2],aes(MeanStudMax_M, MeanStudSD_M, color=Grupy)) + 
+  geom_point() + 
+  scale_color_manual(values = c('#377eb8','#e41a1c','#4daf4a','#984ea3','#ff7f00')) +
+  theme(legend.position=c(0,1), legend.justification=c(0,1))
+  
+
+xdensity <- ggplot(a[,1:2], aes(MeanStudMax_M, fill=Grupy)) + 
+  geom_density(alpha=.5) + 
+  scale_fill_manual(values = c('#377eb8','#e41a1c','#4daf4a','#984ea3','#ff7f00'))+
+  theme(legend.position = "none")
+
+ydensity <- ggplot(a[,1:2], aes(MeanStudSD_M, fill=Grupy)) + 
+  geom_density(alpha=.5)  + scale_fill_manual(values = c('#377eb8','#e41a1c','#4daf4a','#984ea3','#ff7f00'))+
+  theme(legend.position = "none")
+
+
+blankPlot <- ggplot()+geom_blank(aes(1,1))+
+  theme(plot.background = element_blank(), 
+   panel.grid.major = element_blank(),
+   panel.grid.minor = element_blank(), 
+   panel.border = element_blank(),
+   panel.background = element_blank(),
+   axis.title.x = element_blank(),
+   axis.title.y = element_blank(),
+   axis.text.x = element_blank(), 
+   axis.text.y = element_blank(),
+   axis.ticks = element_blank()
+     )
+
+grid.arrange(xdensity, blankPlot, scatterPlot, ydensity, 
+        ncol=2, nrow=2, widths=c(4, 1.6), heights=c(1.6, 4))
+```
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE}
+load("~/nowepr3.rda")
+a<-data.frame(nowe[,c(10,12,28)])
+a[which(a[,3]=="1"),3]<-"YOLO"
+a[which(a[,3]=="2"),3]<-"Klepsydra"
+a[which(a[,3]=="3"),3]<-"Po pó³"
+Grupy<-factor(a[,3])
+# color by groups
+scatterPlot <- ggplot(a[,1:2],aes(MeanStudMax_R, MeanStudSD_R, color=Grupy)) + 
+  geom_point() + 
+  scale_color_manual(values = c('#377eb8','#e41a1c','#4daf4a','#984ea3','#ff7f00')) +
+  theme(legend.position=c(0,1), legend.justification=c(0,1))
+  
+
+
+# Marginal density plot of x (top panel)
+xdensity <- ggplot(a[,1:2], aes(MeanStudMax_R, fill=Grupy)) + 
+  geom_density(alpha=.5) + 
+  scale_fill_manual(values = c('#377eb8','#e41a1c','#4daf4a','#984ea3','#ff7f00'))+
+  theme(legend.position = "none")
+
+ydensity <- ggplot(a[,1:2], aes(MeanStudSD_R, fill=Grupy)) + 
+  geom_density(alpha=.5)  + scale_fill_manual(values = c('#377eb8','#e41a1c','#4daf4a','#984ea3','#ff7f00'))+
+  theme(legend.position = "none")
+
+
+blankPlot <- ggplot()+geom_blank(aes(1,1))+
+  theme(plot.background = element_blank(), 
+   panel.grid.major = element_blank(),
+   panel.grid.minor = element_blank(), 
+   panel.border = element_blank(),
+   panel.background = element_blank(),
+   axis.title.x = element_blank(),
+   axis.title.y = element_blank(),
+   axis.text.x = element_blank(), 
+   axis.text.y = element_blank(),
+   axis.ticks = element_blank()
+     )
+
+grid.arrange(xdensity, blankPlot, scatterPlot, ydensity, 
+        ncol=2, nrow=2, widths=c(4, 1.6), heights=c(1.6, 4))
+
+```
+
+Poni¿szy wykres obrazuje rozk³ad proporcji sumy œrednich czasów z 1 i 3 czêœci w stosunku do sumy ze wszystkich pozycji dla poszczególnych grup. Dla **Po pó³** widaæ, ¿e ten stosunek jest niemal zawsze pomiêdzy 0.48-0.55, co obrazuje to, ¿e cz³onkowie grupy starali siê przeznaczaæ œrednio tyle samo czasu na ka¿d¹ czêœæ testu. Studenci którzy nie mieli strategii dysponowanie czasem (**YOLO**)mniej czasu poœwiêcali na czêœæ 3 i 4.
+
+```{r,message=FALSE, warning=FALSE,echo=FALSE}
+load("~/nowepr3.rda")
+a<-data.frame(nowe[,c(27,12,28)])
+a[which(a[,3]=="1"),3]<-"YOLO"
+a[which(a[,3]=="2"),3]<-"Klepsydra"
+a[which(a[,3]=="3"),3]<-"Po pó³"
+Grupy<-factor(a[,3])
+
+xdensity <- ggplot(a[,1:2], aes(P13_P24_rel, fill=Grupy)) + 
+  geom_density(alpha=.5) + 
+  scale_fill_manual(values = c('#377eb8','#e41a1c','#4daf4a','#984ea3','#ff7f00'))+
+  theme(legend.position = c(1,1),legend.justification=c(1,1))
+xdensity
+
+```
+
+#Wzorce zachowañ w krajach
+
+Na wykresie przedstawiamy udzia³ poszczególnych grup na tle wybranych Pañstw. Widzimy, ¿e zdecydowana wiêkszoœæ szkó³ w Korei stosowa³a strategie grupy **Klepsydra**, w Katarze by³o podobnie jednak oko³o 25% stanowi³y szko³y wybieraj¹ce strategie **Po Pó³**, a nieznaczna iloœæ **YOLO**. W Peru i Brazylii dominowa³y strategie **YOLO**. W Polsce Hiszpanii, Singapurze, Irlandii i Japonii - **Po Pó³**.
+
+
+```{r,,message=FALSE, warning=FALSE,echo=FALSE,fig.width=9, fig.height=8,fig.keep='high'}
+
+load("~/datmpr3.rda")
+ggplot(datm,aes(x = variable, y = value,fill = ind)) + 
+    geom_bar(position = "fill",stat = "identity") + 
+    scale_y_continuous(labels = percent_format())
+
+```
+
+##Wyniki w pañstwach
+
+Pobraliœmy dane na temat œrednich wyników w wybranych krajach oraz procentach uczniów w danych krajach, których wyniki by³y bardzo dobre lub bardzo s³abe. Sprawdziliœmy korelacje miêdzy tymi trzema wartoœciami, a procentowym udzia³em grup w krajach. W tabelce przedstawiliœmy otrzymane wspó³czynniki korelacji. Kolorem ciemno-zielonym oznaczyliœmy te korelacje, które by³y statystycznie istotne( p<0.05, po poprawce Bonferoniego). Dodatkowo jasnym zielonym kolorem zaznaczyliœmy jedn¹ z korelacji, która by³a blisko wyznaczonego progu istotnoœci. 
+
+```{r ,message=FALSE, warning=FALSE,echo=FALSE}
+load("~/datpr3.rda")
+wynikiKrajow <- as.data.frame(matrix(, nrow=0, ncol=6))
+colnames(wynikiKrajow) <- c("Panstwo","MeanScore","MeanScoreR", "MeanScoreM", "TopPerf", "LowPerf")
+nrowJap <- data.frame(Panstwo = "Japan", MeanScore=538, MeanScoreR=516, MeanScoreM=532, TopPerf=25.8, LowPerf=5.6 )
+nrowPol <- data.frame(Panstwo = "Poland", MeanScore=501, MeanScoreR=506, MeanScoreM=504, TopPerf=15.8, LowPerf=8.3 )
+nrowQat <- data.frame(Panstwo = "Qatar", MeanScore=418, MeanScoreR=402, MeanScoreM=402, TopPerf=3.4, LowPerf=42.0 )
+nrowBra <- data.frame(Panstwo = "Brazil", MeanScore=401, MeanScoreR=407, MeanScoreM=377, TopPerf=2.2, LowPerf=44.1 )
+nrowPer <- data.frame(Panstwo = "Peru", MeanScore=397, MeanScoreR=398, MeanScoreM=387, TopPerf=0.6, LowPerf=46.7 )
+nrowKor <- data.frame(Panstwo = "Korea", MeanScore=516, MeanScoreR=517, MeanScoreM=524, TopPerf=25.6, LowPerf=7.7 )
+nrowSin <- data.frame(Panstwo = "Singapore", MeanScore=556, MeanScoreR=535, MeanScoreM=564, TopPerf=39.1, LowPerf=4.8 )
+nrowIre <- data.frame(Panstwo = "Ireland", MeanScore=503, MeanScoreR=521, MeanScoreM=504, TopPerf=15.5, LowPerf=6.8 )
+nrowSpa <- data.frame(Panstwo = "Spain", MeanScore=493, MeanScoreR=496, MeanScoreM=486, TopPerf=10.9, LowPerf=10.6 )
+nrowCan <- data.frame(Panstwo = "Canada", MeanScore=528, MeanScoreR=527, MeanScoreM=516, TopPerf=22.7, LowPerf=5.9 )
+nrowChi <- data.frame(Panstwo = "Chinese Taipei", MeanScore=532, MeanScoreR=497, MeanScoreM=542, TopPerf=29.9, LowPerf=8.3 )
+nrowFin <- data.frame(Panstwo = "Finland", MeanScore=531, MeanScoreR=526, MeanScoreM=511, TopPerf=21.4, LowPerf=6.3 )
+
+wynikiKrajow<-rbind(wynikiKrajow, nrowIre, nrowJap, nrowSpa, nrowPol, nrowSin, nrowChi, nrowCan,  nrowFin, nrowQat, nrowKor, nrowBra, nrowPer)
+
+wyniki_plus_grupy <- cbind(wynikiKrajow, t(dat))
+
+
+tabelka_p <- as.data.frame(matrix(,nrow=3, ncol=3))
+colnames(tabelka_p) <- c("1", "2", "3")
+rownames(tabelka_p) <- c("MeanScore", "TopPerf", "LowPerf")
+tabelka_p[1,1] <- min(9* cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`YOLO`)$p.value,1)
+tabelka_p[1,2] <- min(9*cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`Klepsydra`)$p.value,1)
+tabelka_p[1,3] <- min(9*cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`Po Pó³`)$p.value,1)
+tabelka_p[2,1] <- min(9*cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`YOLO`)$p.value,1)
+tabelka_p[2,2] <- min(9*cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`Klepsydra`)$p.value,1)
+tabelka_p[2,3] <- min(9*cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`Po Pó³`)$p.value,1)
+tabelka_p[3,1] <- min(9*cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`YOLO`)$p.value,1)
+tabelka_p[3,2] <- min(9*cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`Klepsydra`)$p.value,1)
+tabelka_p[3,3] <- min(9*cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`Po Pó³`)$p.value,1)
+
+tabelka_c <- as.data.frame(matrix(,nrow=3, ncol=3))
+colnames(tabelka_c) <- c("YOLO", "Klepsydra", "Po Pó³")
+rownames(tabelka_c) <- c("MeanScore", "TopPerf", "LowPerf")
+tabelka_c[1,1] <- cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`YOLO`)$statistic
+tabelka_c[1,2] <- cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`Klepsydra`)$statistic
+tabelka_c[1,3] <- cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`Po Pó³`)$statistic
+tabelka_c[2,1] <- cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`YOLO`)$statistic
+tabelka_c[2,2] <- cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`Klepsydra`)$statistic
+tabelka_c[2,3] <- cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`Po Pó³`)$statistic
+tabelka_c[3,1] <- cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`YOLO`)$statistic
+tabelka_c[3,2] <- cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`Klepsydra`)$statistic
+tabelka_c[3,3] <- cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`Po Pó³`)$statistic
+
+tabelka_c <- round(tabelka_c, 2)
+
+plot_table <- function(d, colors, marginColor,main="", text.cex=1.0) {
+  plot(c(-1,ncol(d)),c(0,nrow(d)+1), type="n", xaxt="n", yaxt="n", xlab="",ylab="",main=main, bty="n")
+  for (c in 1:ncol(d)) {
+    rect(c-1, nrow(d), c, nrow(d) + 1, col=marginColor)
+    text(c-.5,nrow(d) +.5,colnames(d)[c], cex=text.cex)
+  }
+  for (r in 1:nrow(d)) {
+    rect(-1, r-1, 0, r, col=marginColor)
+    text(-.5, r-.5,rownames(d)[nrow(d) - r + 1], cex=text.cex)
+  }
+  for (r in 1:nrow(d))
+    for (c in 1:ncol(d)) {
+      rect(c-1, r-1, c, r, col=colors[nrow(d) - r + 1,c])
+      text(c-.5,r-.5,d[nrow(d) - r + 1,c], cex=text.cex)
+    }
+}
+
+colors <- matrix(sapply(tabelka_p, function(x) ifelse(x < 0.05, "palegreen3","white")),ncol=ncol(tabelka_p))
+colors[1,3] <- "palegreen"
+plot_table(tabelka_c, colors, "azure2", text.cex=1.2)
+```
+
+
+#Podsumowanie
+
+Na podstawie analizy danych wyznaczyliœmy 3 ró¿ne grupy szkó³ odpowiadaj¹ce trzem ró¿nym sposob¹ dysponowania czasem podczas pisania testu PISA. Najbardziej efektywn¹ strategia okaza³a siê **Po Pó³**, natomiast niewiele gorsz¹ strategi¹ okaza³a siê **Klepsydra**. Naszym zdaniem efektywnoœæ strategii **Po Pó³** jest wynikiem tego, ¿e nie zmusza studenta do pospiesznego i niedok³adnego rozwi¹zywania zadañ w dalszej czêsci testu, jednoczeœnie daj¹c mu mo¿liwoœæ spêdzenia wiêkszej iloœæi czasu na trudniejszych zadaniach. Strategia **Klepsydra** posiada pierwsz¹ z tych zalet jednak brakuje jej elastycznoœci w organizacji czasu. 
