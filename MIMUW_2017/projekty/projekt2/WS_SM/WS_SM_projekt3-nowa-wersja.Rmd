@@ -52,7 +52,6 @@ library(reshape2)
 ##Obróbka danych
 Aby zacz¹æ prace z naszymi danymi musieliœmy je wstêpnie przetworzyæ. Czas, który by³ podany w tysiêcznych sekundy zosta³ przeliczony na minuty. Ponadto zosta³y wyrzucone rekordy z pozycj¹ oznaczon¹ jako -1. Nastêpnie odrzuciliœmy wiersze w których czas rozwi¹zywania zadania by³ wiêkszy od 15 minut oraz mniejszy ni¿  1 sekunda. Wi¹¿e siê to najpewniej z nag³ym opuszczeniem sali i pozostawieniem przez ucznia stanowiska na d³u¿szy czas, b¹dŸ z b³êdem systemu. Jak widaæ zdarza³o siê, ¿e uczeñ rozwi¹zywa³ pojedyncze zadanie d³u¿ej ni¿ 2 godziny. Z kolei odrzucenie czasów mniejszych ni¿ 1 sekunda jest spowodowane tym, ¿e uczeñ najprawdopodobniej nie zd¹¿y³ zapoznaæ siê z treœci¹ zadania w tym czasie, wybieraj¹c niezamierzenie jedn¹ z odpowiedzi.
 
-
 ```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=FALSE}
 
 onlyTimingsLong$Czas<- onlyTimingsLong$Czas*0.001/60
@@ -67,7 +66,7 @@ dane<-dane[!nierealne,]
 ```
 
 
-#Statystyki dla szkól
+#Statystyki dla szkó³
 
 Dla ka¿dej ze szko³y stworzyliœmy nastêpuj¹ce statystyki:
 
@@ -91,7 +90,6 @@ Dla ka¿dej ze szko³y stworzyliœmy nastêpuj¹ce statystyki:
 Ponadto postanowiliœmy odrzuciæ szko³y, które mia³y mniej ni¿ 25 studentów, a z pozosta³ych szkó³ wybraliœmy te pochodz¹ce z nastêpuj¹cych Pañstw:
 Polska, Korea, Peru, Singapur, Irlandia, Brazylia, Katar, Japonia, Hiszpania, Kanada, Chinese Taipei.
 Pojawiaj¹ce siê  wartoœci **NA** w statystykach zosta³y usuniête przez wyrzucenie danego rekordu (³¹cznie jeden wiersz).
-
 
 ```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=FALSE}
 
@@ -251,7 +249,6 @@ dotplot(allmean,
                          space = "right"))
 
 ```
-
 Poni¿szy wykres obrazuje œrednie czasy rozwi¹zywania zadañ w poszczególnych czêœciach testu w zale¿noœci od kraju. Aby wykres by³ czytelniejszy wartoœci œrednich zosta³y uporz¹dkowane malej¹co w zale¿noœci od pozycji 1. 
 Analizuj¹c wynik mo¿emy przedstawiæ pewn¹ hipotezê na temat strategii rozwi¹zywania zadañ. Widzimy, ¿e pierwsza czêœæ testu charakteryzuje siê najwiêksz¹ œrednia czasu, natomiast patrz¹c na 4 zosta³a ona rozwi¹zana najszybciej. Zatem czy oznacza to, ¿e studenci na pocz¹tku testu bêd¹c skupieni na zadaniu i chc¹c rozwi¹zaæ je najlepiej poœwiêcali na nie œrednio wiêcej czasu, a na koniec pod presja czasu wybierali losowo odpowiedzi? Niekoniecznie, poniewa¿ patrz¹c na wczeœniejszy wynik mog³o zdarzyæ siê tak, ¿e pierwszymi zadaniami by³y zadania z matematyki, które charakteryzuj¹ siê d³u¿szym czasem rozwiazywania, dlatego by³y po prostu dla uczniów trudniejsze. 
 Zauwa¿my równie¿ ze kraje takie jak Chinise Taipei, Irlandia czy Korea charakteryzuj¹ siê wzglêdnie ma³¹ ró¿nic¹ œrednich czasów w czterech pozycjach, natomiast Katar wyró¿nia siê a tle innych pañstw najni¿sza œrednia z ostatniej czêœci oraz relatywnie du¿a z pierwszej. Mo¿e to wskazywaæ na istnienie grup charakteryzuj¹cych siê równomiernym gospodarowaniem czasu na ka¿da z czêœci oraz takich którzy spêdzaj¹ najmniej czasu na ostatni¹ czêœæ poniewa¿ poœwiêcaj¹ swoja uwagê pierwszym zadaniom.
@@ -279,7 +276,6 @@ dotplot(mean.kraj.poz,
 
 Aby podzieliæ nasz zbiór na odpowiednie klastry pos³u¿yliœmy siê analiz¹ hierarchiczn¹ i k-means. Natomiast by znaleŸæ ich optymaln¹ liczbê skorzystaliœmy z **gap statistic**.
 
-
 ```{r,message=FALSE, warning=FALSE,echo=FALSE,eval=F}
 scaled_resSzkoly <- scale(nowe[,3:ncol(nowe)])
 
@@ -296,6 +292,7 @@ save(dorysgap_mean,file="dorysgap_meanpr3.rda")
 ```
 
 Na poni¿szym wykresie widaæ, ¿e "optymalna" liczba klastrów dla **analizy hierarchicznej** to 3.
+
 
 ```{r,message=FALSE, warning=FALSE,echo=FALSE}
 load("~/dorysgappr3.rda")
@@ -329,7 +326,7 @@ randIndex(tab,correct=F)
 #Redukcja wymiaru - PCA
 
 Poni¿szy rysunki  przedstawiaj¹ procent wyjaœnionej zmiennoœci, podsumowanie PCA oraz autplot, na którym umieszczone s¹ dwa wykresy. Jeden przedstawia indeksy obserwacji przedstawione na uk³adzie wspó³rzêdnych okreœlonych przez dwie pierwsze sk³adowe g³ówne (w tym przypadku dwie wspó³rzêdne wyjaœniaj¹ oko³o 55% ca³ej zmiennoœci). Drugi rysunek przedstawia kierunki w których dzia³aj¹ oryginalne zmienne, innymi s³owy przedstawiaj¹ jak wartoœæ danej zmiennej wp³ywa na wartoœci dwóch pierwszych sk³adowych g³ównych.
-Je¿eli wektory maj¹ przeciwne zwroty to dane zmienne s¹ ujemnie skorelowane (nie mo¿na jednak oceniæ wartoœci korelacji), je¿eli zwroty s¹ prostopad³e to zmienne s¹ nieskorelowane, a je¿eli zwroty s¹ bliskie to zmienne s¹ dodatnio skorelowane. Ponadto kolorami zosta³ oznaczony na nim podzia³ na klastry metoda kmeans. Z wykresu mo¿emy wyczytaæ, ¿e statystykami które dobrze odró¿niaj¹ grupy s¹ na przyk³ad P13_24_rel, MeanSD_P2, MeanSD_P4, M2_sr, R2_sr, MeanStudMax_M.
+Je¿eli wektory maj¹ przeciwne zwroty to dane zmienne s¹ ujemnie skorelowane (nie mo¿na jednak oceniæ wartoœci korelacji), je¿eli zwroty s¹ prostopad³e to zmienne s¹ nieskorelowane, a je¿eli zwroty s¹ bliskie to zmienne s¹ dodatnio skorelowane. Ponadto kolorami zosta³ oznaczony na nim podzia³ na klastry metod¹ **kmeans**. Z wykresu mo¿emy wyczytaæ, ¿e statystykami które dobrze odró¿niaj¹ grupy s¹, na przyk³ad P13_24_rel (stosunek œredniego czasu spêdzonego w czêœciach 1 i 3 do œredniego czasu spêdzonego we wszystkich czêœciach), MeanSD_P2, MeanSD_P4 (œrednie odchylenia standardowe czasów w czêœci drugiej i czwartej), M2_sr, R2_sr (procentowy udzia³‚ czasu rozwi¹zywania zada z matematyki i czytania w czêœci drugiej, w ca³ym czasie rozwi¹zywania zadñ z matematyki i czytania), MeanStudMax_M (œredni maksymalny czas rozwi¹zywania zadania przez studenta danej szko³y).
 
 
 
@@ -355,11 +352,11 @@ Zaprezentowane wy¿ej algorytmy pozwoli³y na okreœlenie nastêpuj¹cych grup:
 <ul>
 
 
-<li> **Klepsydra** Grupa postawi³a przed sob¹ jasny cel - nie marnowaæ swojego czasu na zadania, których nie potrafi¹ rozwi¹zaæ. Wynika to z najni¿szego œredniego odchylenia jakim charakteryzuj¹ siê cz³onkowie grupy.  </li> 
+<li> **Klepsydra** Jest to grupa szkó³, które promowa³y strategiê polegaj¹c¹ na ograniczaniu czasu przeznaczonego na ka¿de zadanie. Mo¿emy wyobraziæ sobie, ¿e student takiej szko³y na pocz¹tku ka¿dego zadania przekrêca klepsydrê, a gdy piasek siê przesypie, próbuje mo¿liwie szybko zakoñczyæ rozwi¹zywanie danego zadania. Dziêki temu, studenci tych szkó³‚ nie znajdywali siê w sytuacji w której nie mieli czasu na rozwi¹zywanie póŸniejszych czêœci testu. Studenci tych szkó³‚ mieli niskie maksymalne czasy rozwi¹zywania zadania i niskie odchylenia standardowe czasów rozwi¹zywania zadañ.  </li> 
 
-<li> **Po Pó³**  Grupa kieruj¹ca siê zdrowym rozs¹dkiem, ich motto brzmi - "dla wszystkich po równo", co znajduje odzwierciedlenie w ich strategii, która polega na równomiernym roz³o¿eniu swojego czasu na ka¿d¹ z czêœci. Pozwala to na skupienie siê na zadaniach, które wymagaj¹ wiêcej uwagi. </li>
+<li> **Po Pó³**  Szko³y w tej grupie promowa³y strategiê polegaj¹c¹ na równym podziale czasu pomiêdzy dwie po³owy ka¿dej z dwóch czêœci testu (czyli równy podzia³‚ czasu rozwi¹zywania zadañ miêdzy pozycjami 1 i 2 oraz miêdzy pozycjami 3 i 4). Jest to alternatywny sposób dysponowania czasem, który jest trudniejszy w realizacji, ale jednoczeœnie daje studentowi wiêksz¹ elastycznoœæ. </li>
 
-<li> **YOLO** - Grupa charakteryzuj¹ca siê jedn¹ z najbardziej oczywistych strategii, czyli jej brakiem. Cz³onkowie grupy nie potrafi¹ zorganizowaæ czasu, którym dysponuj¹ aby rozwi¹zaæ test bezstresowo. W pierwszej pozycji testu oraz w trzeciej odznaczaj¹ siê na tle pozosta³ych grup  najd³u¿szym ³¹cznym czasem rozwi¹zywania danej czêœci, natomiast w drugiej i czwartej - najkrótszym. Ponadto ich œrednie maksymalne czasy, oraz odchylenia s¹ stosunkowo du¿e co wskazuje na brak skupienia i poœwiêcanie d³u¿szej chwili na zadanie, które mogliby pomin¹æ i skupiæ siê bardziej na swoich dobrych stronach. </li>
+<li> **YOLO** - Grupa charakteryzuj¹ca siê jedn¹ z najbardziej oczywistych strategii, czyli jej brakiem. Cz³onkowie grupy nie potrafi¹ zorganizowaæ czasu, którym dysponuj¹ aby rozwi¹zaæ test bezstresowo. W pierwszej pozycji testu oraz w trzeciej odznaczaj¹ siê na tle pozosta³ych grup  najd³u¿szym ³¹cznym czasem rozwi¹zywania danej czêœci, natomiast w drugiej i czwartej - najkrótszym. Ponadto ich œrednie maksymalne czasy, oraz odchylenia s¹ stosunkowo du¿e co wskazuje na poœwiêcanie du¿ych iloœci czasu na zadania, które mogliby pomin¹æ, dziêki czemu mogliby rozwi¹zaæ wiêcej zadañ w dalszych czêœciach testu. </li>
 </ul>
 
 
@@ -394,10 +391,10 @@ dattime <- melt(cbind(proptottime, ind = rownames(proptottime), id.vars = c('ind
 save(dattime,file="dattimepr3.rda")
 ```
 
-Poni¿ej znajduje siê tabela przedstawiaj¹ca procentowy udzia³ œrednich ³¹cznych czasów rozwi¹zywania zadañ z ka¿dej pozycji w ka¿dej z grup. Widzimy ¿e grupa **YOLO** spêdzi³a najmniej czasu na czêœci 2 i 4 oraz najwiêcej na 1 i 3. Pamiêtaj¹c, ¿e miêdzy 2, a 3 pozycj¹ odby³a siê przerwa dla uczniów wskazuje to na skupienie siê na pierwszej czêœci kosztem nastêpnej. **Po Pó³** natomiast rozdzieli³o swój czas relatywnie równomiernie pomiêdzy pozycje. Trochê gorzej od Po Pó³ wypad³a **Klepsydra**, równie¿ staraj¹c siê zachowaæ jednolity podzia³ dysponowanym czasem.
+Poni¿ej znajduje siê tabela przedstawiaj¹ca procentowy udzia³ œrednich ³¹cznych czasów rozwi¹zywania zadañ z ka¿dej pozycji w ka¿dej z grup. Widzimy, ¿e grupa **YOLO** spêdzi³a najmniej czasu na czêœci 2 i 4 oraz najwiêcej na 1 i 3. Pamiêtaj¹c, ¿e miêdzy 2, a 3 pozycj¹ odby³a siê przerwa dla uczniów wskazuje to na nierozs¹dne dysponowanie czasem, przez które uczniom zabrak³o czasu. **Po Pó³** natomiast rozdzieli³o swój czas relatywnie równomiernie pomiêdzy czêœciami 1 i 2 oraz pomiêdzy czêœciami 3 i 4. Rozdzia³‚ czasu pomiêdzy czêœciami w grupie **Klepsydra** jest bardziej równomierny ni¿ w grupie **YOLO**, ale mniej równomierny ni¿ w grupie **Po Pó³**.
 
 
-```{r}
+```{r,message=FALSE, warning=FALSE,echo=FALSE}
 
 load("~/dattimepr3.rda")
 ggplot(dattime,aes(x = variable, y = value,fill = ind)) + 
@@ -408,7 +405,7 @@ ggplot(dattime,aes(x = variable, y = value,fill = ind)) +
 
 Matematyka i Czytanie
 
-Widzimy na wykresach, ¿e grupa **Klepsydra** ma najni¿sze œrednie odchylenia przy najni¿szym œrednim maksymalnym czasie rozwiazywania zadania. Oznacza to, ¿e cz³onkowie grupy staraj¹ siê nie spêdziæ du¿o czasu nad ¿adnym zadaniem. Natomiast w  **YOLO** wystêpuj¹ najwiêksze odchylenia standardowe czasów rozwi¹zywania zadañ przy najwy¿szych œrednich maksymalnych czasach rozwi¹zywania zadañ. 
+Widzimy na wykresach, ¿e grupa **Klepsydra** ma najni¿sze œrednie odchylenia przy najni¿szym œrednim maksymalnym czasie rozwiazywania zadania. St¹d nasza interpretacja, ¿e cz³onkowie grupy starali siê spêdziæ podobn¹ iloœæ czasu na ka¿de zadanie, oraz unikaæ sytuacji w których spêdziliby bardzo du¿o czasu nad jednym zadaniem, przez co zabrak³oby im czasu na kolejne. Natomiast w  **YOLO** wystêpuj¹ du¿e odchylenia standardowe czasów rozwi¹zywania zadañ oraz du¿e œrednie maksymalne czasy rozwi¹zywania zadañ. St¹d nasza interpretacja, ¿e cz³onkowie tej grupy nie dbali o rozs¹dne zarz¹dzanie czasem. Spêdzali na niektórych zadaniach wiele czasu (du¿e maksymalne czasy) przez co musieli póŸniejsze zadania rozwi¹zywaæ du¿o szybciej (du¿e standardowe odchylenia czasów rozwi¹zywania).
 
 
 ```{r,message=FALSE, warning=FALSE,echo=FALSE}
@@ -416,7 +413,7 @@ load("~/nowepr3.rda")
 a<-data.frame(nowe[,c(9,11,28)])
 a[which(a[,3]=="1"),3]<-"YOLO"
 a[which(a[,3]=="2"),3]<-"Klepsydra"
-a[which(a[,3]=="3"),3]<-"Po pó³"
+a[which(a[,3]=="3"),3]<-"Po Pó³"
 Grupy<-factor(a[,3])
 # color by groups
 scatterPlot <- ggplot(a[,1:2],aes(MeanStudMax_M, MeanStudSD_M, color=Grupy)) + 
@@ -457,17 +454,15 @@ load("~/nowepr3.rda")
 a<-data.frame(nowe[,c(10,12,28)])
 a[which(a[,3]=="1"),3]<-"YOLO"
 a[which(a[,3]=="2"),3]<-"Klepsydra"
-a[which(a[,3]=="3"),3]<-"Po pó³"
+a[which(a[,3]=="3"),3]<-"Po Pó³"
 Grupy<-factor(a[,3])
-# color by groups
+
 scatterPlot <- ggplot(a[,1:2],aes(MeanStudMax_R, MeanStudSD_R, color=Grupy)) + 
   geom_point() + 
   scale_color_manual(values = c('#377eb8','#e41a1c','#4daf4a','#984ea3','#ff7f00')) +
   theme(legend.position=c(0,1), legend.justification=c(0,1))
   
 
-
-# Marginal density plot of x (top panel)
 xdensity <- ggplot(a[,1:2], aes(MeanStudMax_R, fill=Grupy)) + 
   geom_density(alpha=.5) + 
   scale_fill_manual(values = c('#377eb8','#e41a1c','#4daf4a','#984ea3','#ff7f00'))+
@@ -503,7 +498,7 @@ load("~/nowepr3.rda")
 a<-data.frame(nowe[,c(27,12,28)])
 a[which(a[,3]=="1"),3]<-"YOLO"
 a[which(a[,3]=="2"),3]<-"Klepsydra"
-a[which(a[,3]=="3"),3]<-"Po pó³"
+a[which(a[,3]=="3"),3]<-"Po Pó³"
 Grupy<-factor(a[,3])
 
 xdensity <- ggplot(a[,1:2], aes(P13_P24_rel, fill=Grupy)) + 
@@ -532,6 +527,7 @@ ggplot(datm,aes(x = variable, y = value,fill = ind)) +
 
 Pobraliœmy dane na temat œrednich wyników w wybranych krajach oraz procentach uczniów w danych krajach, których wyniki by³y bardzo dobre lub bardzo s³abe. Sprawdziliœmy korelacje miêdzy tymi trzema wartoœciami, a procentowym udzia³em grup w krajach. W tabelce przedstawiliœmy otrzymane wspó³czynniki korelacji. Kolorem ciemno-zielonym oznaczyliœmy te korelacje, które by³y statystycznie istotne( p<0.05, po poprawce Bonferoniego). Dodatkowo jasnym zielonym kolorem zaznaczyliœmy jedn¹ z korelacji, która by³a blisko wyznaczonego progu istotnoœci. 
 
+
 ```{r ,message=FALSE, warning=FALSE,echo=FALSE}
 load("~/datpr3.rda")
 wynikiKrajow <- as.data.frame(matrix(, nrow=0, ncol=6))
@@ -555,7 +551,7 @@ wyniki_plus_grupy <- cbind(wynikiKrajow, t(dat))
 
 
 tabelka_p <- as.data.frame(matrix(,nrow=3, ncol=3))
-colnames(tabelka_p) <- c("1", "2", "3")
+colnames(tabelka_p) <- c("YOLO", "Klepsydra", "Pó³")
 rownames(tabelka_p) <- c("MeanScore", "TopPerf", "LowPerf")
 tabelka_p[1,1] <- min(9* cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`YOLO`)$p.value,1)
 tabelka_p[1,2] <- min(9*cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`Klepsydra`)$p.value,1)
@@ -570,15 +566,15 @@ tabelka_p[3,3] <- min(9*cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`P
 tabelka_c <- as.data.frame(matrix(,nrow=3, ncol=3))
 colnames(tabelka_c) <- c("YOLO", "Klepsydra", "Po Pó³")
 rownames(tabelka_c) <- c("MeanScore", "TopPerf", "LowPerf")
-tabelka_c[1,1] <- cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`YOLO`)$statistic
-tabelka_c[1,2] <- cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`Klepsydra`)$statistic
-tabelka_c[1,3] <- cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`Po Pó³`)$statistic
-tabelka_c[2,1] <- cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`YOLO`)$statistic
-tabelka_c[2,2] <- cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`Klepsydra`)$statistic
-tabelka_c[2,3] <- cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`Po Pó³`)$statistic
-tabelka_c[3,1] <- cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`YOLO`)$statistic
-tabelka_c[3,2] <- cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`Klepsydra`)$statistic
-tabelka_c[3,3] <- cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`Po Pó³`)$statistic
+tabelka_c[1,1] <- cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`YOLO`)$estimate
+tabelka_c[1,2] <- cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`Klepsydra`)$estimate
+tabelka_c[1,3] <- cor.test(wyniki_plus_grupy$MeanScore, wyniki_plus_grupy$`Po Pó³`)$estimate
+tabelka_c[2,1] <- cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`YOLO`)$estimate
+tabelka_c[2,2] <- cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`Klepsydra`)$estimate
+tabelka_c[2,3] <- cor.test(wyniki_plus_grupy$TopPerf, wyniki_plus_grupy$`Po Pó³`)$estimate
+tabelka_c[3,1] <- cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`YOLO`)$estimate
+tabelka_c[3,2] <- cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`Klepsydra`)$estimate
+tabelka_c[3,3] <- cor.test(wyniki_plus_grupy$LowPerf, wyniki_plus_grupy$`Po Pó³`)$estimate
 
 tabelka_c <- round(tabelka_c, 2)
 
@@ -607,4 +603,4 @@ plot_table(tabelka_c, colors, "azure2", text.cex=1.2)
 
 #Podsumowanie
 
-Na podstawie analizy danych wyznaczyliœmy 3 ró¿ne grupy szkó³ odpowiadaj¹ce trzem ró¿nym sposob¹ dysponowania czasem podczas pisania testu PISA. Najbardziej efektywn¹ strategia okaza³a siê **Po Pó³**, natomiast niewiele gorsz¹ strategi¹ okaza³a siê **Klepsydra**. Naszym zdaniem efektywnoœæ strategii **Po Pó³** jest wynikiem tego, ¿e nie zmusza studenta do pospiesznego i niedok³adnego rozwi¹zywania zadañ w dalszej czêsci testu, jednoczeœnie daj¹c mu mo¿liwoœæ spêdzenia wiêkszej iloœæi czasu na trudniejszych zadaniach. Strategia **Klepsydra** posiada pierwsz¹ z tych zalet jednak brakuje jej elastycznoœci w organizacji czasu. 
+Na podstawie analizy danych wyznaczyliœmy 3 ró¿ne grupy szkó³ odpowiadaj¹ce trzem ró¿nym sposobom dysponowania czasem podczas pisania testu PISA. Najbardziej efektywn¹ strategi¹ okaza³a siê **Po Pó³**, natomiast niewiele gorsz¹ strategi¹ okaza³a siê **Klepsydra**. Naszym zdaniem efektywnoœæ strategii **Po Pó³** jest wynikiem tego, ¿e nie zmusza studenta do pospiesznego i niedok³adnego rozwi¹zywania zadañ w dalszej czêœci testu, jednoczeœnie daj¹c mu mo¿liwoœæ spêdzenia wiêkszej iloœci czasu na trudniejszych zadaniach. Strategia **Klepsydra** posiada pierwsz¹ z tych zalet jednak brakuje jej elastycznoœci w organizacji czasu. 
