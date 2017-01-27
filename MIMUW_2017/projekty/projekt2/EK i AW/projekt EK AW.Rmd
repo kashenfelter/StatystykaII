@@ -1,0 +1,777 @@
+---
+title: "Projekt 2"
+author: "Ewelina Karbowiak, Adrianna Wlazło"
+date: "24 stycznia 2017"
+output:
+    html_document:
+         toc: true
+         toc_float:
+          collapsed: false
+          smooth_scroll: false
+---
+
+```{r biblioteki,message=FALSE,warning=FALSE, echo=FALSE}
+library("ggplot2")
+library("tidyr")
+library("dplyr")
+library("knitr")
+library("rworldmap")
+library("countrycode")
+library("RColorBrewer")
+library("MASS")
+library("cluster")
+library("caret")
+library("grid")
+library("gridExtra")
+library("ggdendro")
+library("plotly")
+```
+
+**Temat** 
+Celem projektu jest zbadanie, jaki wpływ na końcowe wyniku testu ma przyjęta strategia rozwiązywania zadań przez uczniów.
+
+#Faza I
+
+###Dane
+Dane pochodzą z projektu PISA 2015. Zawierały 8 557 694 wierszy opisujących czas rozwiązywania danego zadania przez danego ucznia. Dane zawierają informacje o kraju i szkole, z której pochodził uczeń, numer rozwiązywanego zestawu, typ zadania (czytanie, matematyka) oraz numer części testu, w której to zadanie się znajdowało.
+Aby ułatwić prace nad danymi zamieniłyśmy czas podany w tysięcznych sekundy na minuty.
+
+```{r, echo=FALSE}
+load("C:/Users/adawl/Documents/eRowe rzeczy/statystyka II/projekt 2/onlyTimingsLong.rda")
+
+```
+
+```{r}
+dane <- onlyTimingsLong
+head(dane)
+```
+
+```{r, echo=FALSE}
+#poprawki dla wygody
+rm(onlyTimingsLong)
+dane$Czas <- dane$Czas/1000/60
+dane$Obszar <- as.factor(dane$Obszar)
+dane$Pozycja <- as.factor(dane$Pozycja)
+dane$Kraj <- as.factor(as.character(dane$Kraj))
+```
+
+
+###Wstępna analiza danych
+W tabeli zostały zamieszczone dane z 58 krajów. Zadania znajdowały się w 63 zestawach. Liczba zadań z matematyki i czytania jest różna. Ponadto jest bardzo mało uczniów, którzy pisali jednocześnie zadania z matematyki i czytania. Liczba pozycji jest także rożna i nie ma uczniów, którzy rozwiązywali więcej niż 2 pozycje. W danych spodziewałyśmy się znalezienia 4 pozycji, ponieważ tak skonstruowany jest test, jednak pojawia się też pozycja "-1"- być może są to dane testowe, nie jest to liczna grupa zadań (dla 4118 studentów). Jednak są uczniowie, dla których dysponujemy tylko danymi z tej pozycji. Postanowiłyśmy usunąć takie rekordy.
+```{r}
+
+length(levels(as.factor(dane$Zestaw)))
+
+summary(dane$Obszar)
+                   
+summary(dane$Pozycja)
+
+table(dane$Obszar,dane$Pozycja)
+```
+
+
+Poniżej prezentujemy, jakich danych dotyczą kraje
+```{r echo=FALSE, message=FALSE, warning=FALSE, results="hide"}
+#Podstawowe statystyki dot. czasu rozwiązywania zadań
+statystyki_kraje<-group_by(dane,Kraj) %>%
+summarise(mediana=median(Czas), srednia=mean(Czas), min=min(Czas),max=max(Czas))
+
+#dane do mapki
+dane3<-data.frame(Kraj=statystyki_kraje$Kraj, srednia=rep("1",58))
+
+kod=countrycode(dane3$Kraj,"country.name","iso3c")
+dane3$Kraj=kod
+
+
+sPDF <- joinCountryData2Map( dane3,
+                            joinCode = "ISO3",
+                            nameJoinColumn = "Kraj")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+mapCountryData(sPDF, nameColumnToPlot="srednia", catMethod = "categorical",
+               colourPalette = brewer.pal(5,"Spectral"),
+               missingCountryCol="#EEF0E2", oceanCol="#8AE1FC", addLegend='FALSE',
+               mapTitle = "Kraje")
+
+
+```
+
+
+
+```{r}
+
+summary(dane$Czas)
+```
+
+
+
+```{r, echo=FALSE}
+stats_uczen_poz <- dane %>% dplyr::group_by(Kraj,Student,Obszar,Pozycja) %>%
+  dplyr::summarize(srednia=mean(Czas),suma=sum(Czas))
+
+
+uczniowie_sum <- spread(stats_uczen_poz[,c("Pozycja", "Obszar","suma","Student")],key=Pozycja,value=suma)
+
+
+uczniowie_sum$razem <- ifelse(is.na(uczniowie_sum$'-1')==TRUE,0,uczniowie_sum$'-1')+
+ifelse(is.na(uczniowie_sum$'1')==TRUE,0,uczniowie_sum$'1') +
+ifelse(is.na(uczniowie_sum$'2')==TRUE,0,uczniowie_sum$'2')+
+ifelse(is.na(uczniowie_sum$'3')==TRUE,0,uczniowie_sum$'3')+
+ifelse(is.na(uczniowie_sum$'4')==TRUE,0,uczniowie_sum$'4')
+
+uczniowie_sum$ile_pozycji <- ifelse(is.na(uczniowie_sum$'-1')==TRUE,0,1)+
+  ifelse(is.na(uczniowie_sum$'1')==TRUE,0,1) +
+  ifelse(is.na(uczniowie_sum$'2')==TRUE,0,1)+
+  ifelse(is.na(uczniowie_sum$'3')==TRUE,0,1)+
+  ifelse(is.na(uczniowie_sum$'4')==TRUE,0,1)
+
+uczniowie_sum$ile_pozycji4 <- 
+  ifelse(is.na(uczniowie_sum$'1')==TRUE,0,1) +
+  ifelse(is.na(uczniowie_sum$'2')==TRUE,0,1)+
+  ifelse(is.na(uczniowie_sum$'3')==TRUE,0,1)+
+  ifelse(is.na(uczniowie_sum$'4')==TRUE,0,1)
+
+
+cat("Liczba pozycji na studenta przy pozycjach -1,1,2,3,4\n")
+summary(as.factor(uczniowie_sum$ile_pozycji))
+cat("Liczba pozycji na studenta przy pozycjach 1,2,3,4\n")
+summary(as.factor(uczniowie_sum$ile_pozycji4))
+```
+jest 4118 uczniów, którzy mają uzupełnioną tylko pozycję -1.
+
+###Czyszczenie danych
+Z danych usunęłyśmy tych studentów, których suma czasu jaki poświęcili na zadania była większa niż 120 (bo tyle minut trwał test), oraz tych uczniów, którzy rozwiązali mniej niż 10 zadań. Usunęłyśmy również zadania z Pozycją -1.
+```{r, echo=FALSE}
+duze_czasy <- uczniowie_sum[uczniowie_sum$razem>60,c("Student","Obszar", "razem")]
+
+
+studenci <- as.data.frame(table(dane$Student))
+posortowani <- sort(studenci$Freq, index.return=TRUE)
+d <- studenci[posortowani$ix,]
+malo_zadan <- d[d$Freq<10,"Var1"]
+
+```
+
+```{r, echo=FALSE}
+cat("Rekordów do usunięcia z powodu za dużego czasu: ",
+    length(dane[(dane$Student %in% as.matrix(duze_czasy$Student) &
+                   dane$Obszar %in% as.matrix(duze_czasy$Obszar)),"Zadanie"]),
+    "\n",
+    "Rekordów do usunięci z powodu błędnej pozycji: ",
+    length(dane[dane$Pozycja=="-1","Zadanie"]),
+    "\n",
+    "Rekordów do usunięcia z powodu małej ilości zadań: ",
+    length(malo_zadan)
+)
+```
+
+
+
+
+```{r, echo=FALSE}
+dane <- dane[!(dane$Student %in% as.matrix(duze_czasy$Student) &
+                   dane$Obszar %in% as.matrix(duze_czasy$Obszar)),]
+
+dane <- dane[!dane$Pozycja=="-1",]
+
+dane <- dane[!dane$Student %in% as.matrix(malo_zadan),]
+
+dane <- dane[dane$Czas<10,]
+
+```
+
+
+
+###Zadania matematyczne i z rozumienia tekstu w zależności od kraju
+
+Poniżej zamieszczamy wykres średniego czasu wykonywania zadań w poszczególnych krajach w zależności od obszaru testu.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+statystyki_kraje_obszary<- group_by(dane,Kraj,Obszar) %>%
+  summarise( min=min(Czas),mediana=median(Czas), srednia=mean(Czas),max=max(Czas))
+
+kolejnosc<- reorder(statystyki_kraje_obszary$Kraj,statystyki_kraje_obszary$mediana)
+
+w1<-ggplot(statystyki_kraje_obszary, aes(x=Kraj, y=mediana, fill=Obszar))+
+  geom_bar(stat="identity",position="stack", alpha=1)+
+  theme_bw()+
+  labs(title="Czas przeznaczany na zadanie wg. kraju")+
+  scale_y_continuous(name="Mediana czasu [min]", expand=c(0,0))+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        panel.grid.major.x = element_blank())+
+  scale_x_discrete(limits= levels(kolejnosc))
+ggplotly()
+  
+```
+Z wykresu wyraźnie widzimy, że na zadania matematyczne uczniowie średnio poświęcali więcej czasu niż na zadania dotyczące czytania.
+
+Na poniższej mapie mamy rozróżnione kraje względem średniego czasu rozwiązywania jednego zadania. W pliku napotykamy też bardzo duże wartości czasu, które znacznie odbiegają od realiów testu.
+```{r echo=FALSE, message=FALSE, warning=FALSE, results="hide"}
+
+#podtrzeby kod kraju w ISO3)
+dane2<-data.frame(Kraj=statystyki_kraje$Kraj, srednia=statystyki_kraje$srednia)
+
+kod=countrycode(dane2$Kraj,"country.name","iso3c")
+dane2$Kraj=kod
+
+
+sPDF2 <- joinCountryData2Map( dane2
+                             , joinCode = "ISO3"
+                             , nameJoinColumn = "Kraj")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+mapCountryData(sPDF2, nameColumnToPlot="srednia", colourPalette=brewer.pal(7,"YlOrRd"),
+               missingCountryCol="#EEF0E2", oceanCol="#8AE1FC",
+               mapTitle="Średni czas wykonywania zadania wg krajów")
+
+```
+
+
+Postanowiłyśmy zbadać średni czas rozwiązywania zadania przez przeciętnego ucznia dla każdego kraju.
+Poniżej wykres otrzymanych wartości dla wszystkich krajów
+```{r, echo=FALSE}
+stats_uczen_poz <- dane %>% dplyr::group_by(Kraj,Szkola,Student,Obszar,Pozycja) %>%
+  dplyr::summarize(srednia=mean(Czas),suma=sum(Czas))
+
+szkoly <- stats_uczen_poz %>% dplyr::group_by(Kraj,Szkola,Pozycja,Obszar) %>%
+  dplyr::summarize(sredni_czas=mean(srednia))
+
+kraje <- stats_uczen_poz %>% dplyr::group_by(Kraj,Pozycja,Obszar) %>%
+  dplyr::summarize(sredni_czas=mean(srednia))
+
+
+ggplot(szkoly, aes(x = Pozycja, y = sredni_czas)) +
+  geom_violin(aes(fill=Obszar))+
+  scale_y_continuous(name="Średni czas [min]", limits = quantile(szkoly$sredni_czas, c(0.001, 0.998)))+
+  theme_bw()+
+  labs(title="Rozkład średniego czasu rozw. zadania przez przeciętnego ucznia \nróżnych szkół")
+
+
+
+ggplot(kraje, aes(x = Pozycja, y = sredni_czas)) +
+  geom_violin(aes(fill=Obszar))+
+  theme_bw()+
+  scale_y_continuous(name="Średni czas [min]")+
+  labs(title="Rozkład średniego czasu rozw. zadania przez przeciętnego ucznia \nróżnych krajów")
+```
+  
+
+#Faza II
+W raporcie posłużymy się danymi oczyszczonymi w fazie 1. Spróbujemy zróżnicować zachowania studentów różnych szkół w zależności od czasu rozwiązywania zadań w różnych pozycjach testu oraz zależnie od obszaru.
+
+
+
+```{r dane,message=FALSE,warning=FALSE, echo=FALSE}
+#setwd('C:/Users/Key/Documents')
+setwd('C:/Users/adawl/Documents/eRowe rzeczy/statystyka II/projekt 2/faza2/pliki')
+
+set.seed(102)
+
+load(file=paste0(getwd(),"/dane.rda"))
+
+
+load(file=paste0(getwd(),"/odl2.rda"))
+load(file=paste0(getwd(),"/pl.rda"))
+load(file=paste0(getwd(),"/drzewo2.rda"))
+load(file=paste0(getwd(),"/szer2.rda"))
+load(file=paste0(getwd(),"/p2.rda"))
+
+
+load(file=paste0(getwd(),"/odl3.rda"))
+load(file=paste0(getwd(),"/szer3.rda"))
+load(file=paste0(getwd(),"/puste.rda"))
+load(file=paste0(getwd(),"/drzewo3.rda"))
+load(file=paste0(getwd(),"/p3.rda"))
+
+load(file=paste0(getwd(),"/ranking.rda"))
+
+nowa_paleta <- c(brewer.pal(9,"Set1"),"#000000")
+paleta_4 <- c(brewer.pal(11,"Spectral")[c(4,5,8,10)])
+paleta_kraje7 <- c(brewer.pal(11,"Spectral")[c(1,3,4,6,8,10,11)])
+paleta_kraje8 <- c(brewer.pal(11,"Spectral")[c(1,3,4,5,7,8,10,11)])
+
+```
+
+
+###Szkoła- rozróżnienie względem pozycji testu
+
+Analizując strategie uczniów, warto zbadać średni czas wykonywania zadań w każdej z pozycji zależnie od szkoły. Szybkość rozwiązywania poszczególnych pozycji może być istotnym elementem strategii.
+
+```{r poz1,message=FALSE,warning=FALSE}
+szkoly_pozycje <- dane %>% group_by(Kraj,Szkola,Pozycja) %>%
+  summarise(srednia=mean(Czas))
+
+szer2 <- spread(szkoly_pozycje, key=Pozycja, value=srednia)
+
+kable(head(szer2))
+```
+
+Brakujące statystyki zastąpimy średnim czasem reszty szkół. 
+Na tak przygotowanych danych przeprowadzamy analizę hierarchiczną metodą **Warda**. Poniżej przedstawiamy dendrogram.
+
+```{r poz2,message=FALSE,warning=FALSE, eval = FALSE,echo=FALSE}
+szer2 <- spread(szkoly_pozycje, key=Pozycja, value=srednia)
+
+#1800 szkol ma braki w jakiejs pozycji- uzupelnamy te braki srednimi z reszty szkol
+for (i in 3:6){
+szer2[is.na(szer2[,i]),i] <- mean(t(szer2[,i]), na.rm=TRUE)
+}
+
+save(szer2, file=paste0(getwd(),"/szer2.rda"))
+odl2 <- dist(szer2[,-c(1,2)])
+
+save(odl2, file=paste0(getwd(),"/odl2.rda"))
+
+drzewo2 <- hclust(odl2, method="ward")
+save(drzewo2, file=paste0(getwd(),"/drzewo2.rda"))
+
+dhc2 <- as.dendrogram(drzewo2)
+ddata2 <- dendro_data(dhc2, type = "rectangle")
+p2 <- ggplot(segment(ddata2)) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) + 
+  coord_flip() + 
+  scale_y_reverse(expand = c(0.2, 0))
+
+save(p2, file=paste0(getwd(),"/p2.rda"))
+
+```
+
+
+```{r poz_p2_dend,message=FALSE,warning=FALSE, echo=FALSE}
+p2+labs(title="szkoły-pozycje:Dendrogram")
+```
+
+Nie jest jasne, ile grup należy wyróżnić. Poniżej wykresy dla podziałów na 2-9 grup zmapowanych na płaszczyznę. Rozkład punktów różni się między wykresami, ze względów obliczeniowych (rzutowanie na płaszczyznę tylu obserwacji i zachowanie ich struktury jest trudne obliczeniowo)- są to reprezentacje najbardziej uwydatniające dany podział. Dla każdego wylosowana została reprezentatywna względem wyróżnionych grup próbka z danych, a w kolejnym kroku przeprowadzone zostało mapowanie.
+
+```{r poz_plaskie,message=FALSE,warning=FALSE, eval=FALSE, echo=FALSE}
+#mapowanie na plaszczyzne
+pl <- cmdscale(odl2,k=2)
+save(pl, file=paste0(getwd(),"/pl.rda"))
+```
+
+```{r poz_facet2,message=FALSE,warning=FALSE, echo=FALSE}
+
+#wykresy podziałów
+g2<-c()
+for (i in 2:10){
+  d <- cutree(drzewo2, k=i)
+  szer2$grupa <- as.factor(d)
+  summary(szer2$grupa)
+  
+  ndf <- data.frame(pl, col=szer2$grupa)
+
+  g2[[i]]=ggplot(ndf, aes(X1, X2, color=factor(col))) +
+    geom_point(alpha=0.45, size=1) + 
+    theme_bw()+ 
+    theme(legend.position="none", 
+          axis.title.x=element_blank(),
+          axis.title.y=element_blank()) +
+    scale_color_manual(values=nowa_paleta[1:i])+
+    labs(title=paste0("k=",i))    
+}
+
+
+grid.arrange(g2[[2]],g2[[3]],g2[[4]],g2[[5]],g2[[6]],g2[[7]],g2[[8]],g2[[9]],g2[[10]], ncol=3, nrow=3)
+```
+
+Dla podziałów większych niż k=5 widać duże rozbieżności wewnątrz grup, co sugeruje, że nie są to optymalne podziały.
+
+```{r poz3, message=FALSE,warning=FALSE, echo=FALSE}
+
+d2 <- cutree(drzewo2, k=4)
+szer2$grupa <- d2
+razem <- szer2[,c("Szkola","grupa")]
+
+cat("Liczność poszczególnych grup\n")
+summary(as.factor(szer2$grupa))
+
+```
+
+Spróbujmy rozróżnić zachowania szkół wśród wyróżnionych grup względem średniego czasu spędzanego nad zadaniem z każdej pozycji.
+
+```{r poz4, message=FALSE,warning=FALSE, echo=FALSE}
+dowykresu2 <- merge(szkoly_pozycje,szer2[,c("Szkola","grupa")], by="Szkola")
+
+w2 <- ggplot(dowykresu2, aes(x=Pozycja, y=srednia))+
+  geom_violin(aes(fill=Pozycja), alpha=0.7)+geom_boxplot(outlier.shape = NA, fill=NA)+
+  scale_y_continuous(limits = quantile(dowykresu2$srednia,na.rm=TRUE, c(0.02, 0.98)))+
+  theme_bw()+ 
+  scale_fill_manual(values=nowa_paleta[1:4])+
+  facet_wrap(~grupa)
+
+w2
+
+
+```
+
+Na powyższych wykresach bardzo wyraźnie widać różnice między grupami. Na ich podstawie możemy nazwać zachowania poszczególnych grup szkół:
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+nazwy_pozycje <- data.frame(nr_grupy <- 1:4,
+           czasy <- c("coraz szybciej","dość równe", "1 i 3 dłużej","dość równe-wersja szybsza"))
+colnames(nazwy_pozycje) <- c("grupa","nazwa_grupa_p")
+razem <- merge(nazwy_pozycje,razem,by="grupa")
+kable(nazwy_pozycje)
+```
+
+
+Ciekawym jest pytanie, czy w obrębie krajów szkoły pozostają w tych samych grupach. Na poniższym wykresie widzimy, że kraje, które znalazły się wysoko w rankingu średnich czasów rozwiązywania wszystkich zadań przeważa strategia **dość równo - wersja szybsza**, dla krajów z końca rankingu strategia **1 i 3 dłużej**. Pozostałe dwie strategie są stosowane dość równomiernie w każdym z badanych krajów, poza skrajnymi krajami, w których zdecydowanie dominują strategie opisane powyżej.
+Kolejność krajów na wykresie jest zgodna ze rankingiem średnich czasów, który wykonałyśmy w I fazie.
+
+
+```{r poz5, message=FALSE,warning=FALSE, echo=FALSE}
+dowykresu2 <- merge(szkoly_pozycje,szer2[,c("Szkola","grupa")], by="Szkola")
+dowykresu2 <- merge(dowykresu2,nazwy_pozycje,by="grupa")
+
+statystyki_obszary<- group_by(dane,Kraj,Obszar) %>%
+  summarise(mediana=median(Czas))
+kolejnosc<- reorder(statystyki_obszary$Kraj,statystyki_kraje_obszary$mediana)
+
+
+dowykresu2$grupa <- reorder(dowykresu2$grupa,dowykresu2$grupa)
+w3<-ggplot(dowykresu2, aes(x=Kraj, fill=nazwa_grupa_p))+ 
+  geom_bar(stat="count", position=position_fill())+
+  theme_bw()+
+  theme(legend.position = "top")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  #scale_fill_discrete(name="Grupa P")+
+  scale_fill_manual(values=paleta_4, name="Grupa P")+
+  scale_x_discrete(limits= levels(kolejnosc))+
+  labs(title="Rozkład grup w poszczególnych krajach")
+
+
+ggplotly()
+
+```
+
+
+
+###Szkoły- rozróżnienie względem obszarów testu
+Kolejnym interesującym nas zagadnieniem była zależność czasu rozwiązywania zadań od obszarów. Szybkość rozwiazywania zadań z danego obszaru może być spowodowana systemem edukacji, jaki panuje w danym kraju i podejściem do danego obszaru w tym kraju.
+
+```{r, message=FALSE,warning=FALSE, eval=FALSE}
+szkoly_obszary<- dane %>% group_by(Kraj,Szkola,Obszar) %>%
+  summarise(srednia=mean(Czas))
+
+szer3 <- spread(szkoly_obszary, key=Obszar, value=srednia)
+```
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+head(szer3)
+```
+W zbiorze jest 252 szkoły, dla których brakuje danych dla jednej z tych kategorii- jest to niewielka część naszego zbioru, ponadto taki brak świadczy o małej ilości danych dla takiej szkoły. Takie kraje pominiemy w naszej analizie.
+
+
+```{r obsz1,message=FALSE,warning=FALSE,echo=FALSE, eval=FALSE}
+sum(is.na(szer3))
+
+#wyrzucamy szkoly tylko z jednym obszarem
+puste <- c()
+for (i in 1:nrow(szer3)){
+  if(is.na(szer3[i,"M"]) | is.na(szer3[i,"R"])){
+    puste <- c(puste,i)
+  }
+}
+
+save(puste,file=paste0(getwd(),"/puste.rda"))
+
+szer3 <- szer3[-puste,]
+save(szer3, file=paste0(getwd(),"/szer3.rda"))
+
+odl3 <- dist(szer3[,c("M","R")])
+save(odl3, file=paste0(getwd(),"/odl3.rda"))
+
+drzewo3 <- hclust(odl3, method="ward")
+plot(drzewo3)
+save(drzewo3, file=paste0(getwd(),"/drzewo3.rda"))
+
+dhc3 <- as.dendrogram(drzewo3)
+ddata3 <- dendro_data(dhc3, type = "rectangle")
+p3 <- ggplot(segment(ddata3)) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) + 
+  coord_flip() + 
+  scale_y_reverse(expand = c(0.2, 0))
+save(p3, file=paste0(getwd(),"/p3.rda"))
+```
+
+Poniżej przedstawiamy dendrogram podziałów.
+
+```{r obsz2,message=FALSE,warning=FALSE, echo=FALSE}
+p3+labs(title="szkoły-obszary:Dendrogram")
+
+```
+
+```{r obsz_facet, message=FALSE,warning=FALSE, echo=FALSE}
+g<-c()
+for (i in 2:10){
+  d <- cutree(drzewo3, k=i)
+  szer3$grupa <- as.factor(d)
+  
+  g[[i]]=ggplot(szer3, aes(M, R, color=grupa)) +
+    geom_point(alpha=0.3, size=1) + 
+    theme_bw()+ 
+    theme(legend.position="none", 
+          axis.title.x=element_blank(),
+          axis.title.y=element_blank()) +
+    scale_color_manual(values=nowa_paleta[1:i])+
+    labs(title=paste0("k=",i))    
+}
+```
+
+Wykresy podziału Szkół na grupy- ponieważ mamy tylko dwie zmienne, nie potrzebujemy mapowania na płaszczyznę.
+```{r, echo=FALSE, message=FALSE,warning=FALSE}
+grid.arrange(g[[2]],g[[3]],g[[4]],g[[5]],g[[6]],g[[7]],g[[8]],g[[9]],g[[10]], ncol=3, nrow=3)
+
+```
+
+Analiza dendrogramu i wykresów dla podziałów na 2-9 grup zmapowanych na płaszczyznę skłoniła nas do wybrania 4 grup.
+
+```{r obsz3, message=FALSE,warning=FALSE, echo=FALSE}
+
+d3 <- cutree(drzewo3, k=4)
+szer3$grupa <- d3
+
+colnames(razem)[1] <- "grupa_pozycje"
+razem<- merge(szer3[,c("Szkola","grupa")],razem, by="Szkola")
+
+cat("Liczności grup")
+summary(as.factor(szer3$grupa))
+
+
+dowykresu <- gather(szer3,key=Obszar,value= sr.Czas,
+              M,R)
+
+w4 <- ggplot(dowykresu, aes(x=Obszar, y=sr.Czas))+
+  geom_violin(aes(fill=Obszar), alpha=0.7)+geom_boxplot(outlier.shape = NA, fill=NA)+
+  theme_bw()+
+  scale_y_continuous(limits = quantile(dowykresu$sr.Czas,na.rm=TRUE, c(0.02, 0.98)))+
+  scale_fill_manual(values=nowa_paleta[1:2])+
+  facet_wrap(~grupa)
+
+w4
+```
+
+Powyższe wykresy skrzypcowe potwierdzają zróżnicowanie wybranych grup pod względem średniego czasu rozwiązywania zadań dla obszaru matematycznego i czytania. Na podstawie tych wykresów możemy nazwać zachowania poszczególnych grup szkół:
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+nazwy_obszary <- data.frame(nr_grupy <- 1:4,
+           nazwa_grupa_o <- c("M_srednio_R_srednio","M_wolno_R_srednio",
+                              "M_wolno_R_wolno","M_szybko_R_szybko"))
+colnames(nazwy_obszary) <- c("grupa","nazwa_grupa_o")
+
+razem <- merge(nazwy_obszary,razem,by="grupa")
+colnames(razem)[1] <- "grupa_obszary"
+kable(nazwy_obszary)
+
+
+```
+
+Po raz kolejny warto spojrzeć jak poszczególne grupy mają się do poszczególnych krajów. Na poniższym wykresie widzimy, że kraje, które znalazły się wysoko w rankingu średnich czasów rozwiązywania wszystkich zadań rozwiązują test zgodnie ze strategia**M_srednie_R_srednio** i **M_szybko_R_szybko**, przy czym druga strategia dominuje dla dwóch pierwszych krajów w rankingu. Kraje z końca rankingu rozwiązywały test, zgodnie z oczekiwaniami, za pomocą strategii **M_wolno_R_wolno** .Ostatnia strategia stosowana jest dość równomiernie w krajach ze środka rankingu.
+Kolejność krajów na wykresie jest zgodna ze rankingiem średnich czasów, który wykonałyśmy w I fazie. 
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+szkoly_obszary<- dane %>% group_by(Kraj,Szkola,Obszar) %>%
+  summarise(srednia=mean(Czas))
+
+dowykresu3 <- merge(szkoly_obszary,szer3[,c("Szkola","grupa")], by="Szkola")
+dowykresu3 <- merge(dowykresu3,nazwy_obszary,by="grupa")
+
+w5<-ggplot(dowykresu3, aes(x=Kraj, fill=nazwa_grupa_o))+ 
+  geom_bar(stat="count", position=position_fill())+
+  theme_bw()+
+  theme(legend.position = "top")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  scale_x_discrete(limits= levels(kolejnosc))+
+  scale_fill_manual(values=paleta_4, name="Grupa O")+
+  labs(title="Rozkład grup w poszczególnych krajach")
+
+ggplotly()
+```
+
+###Połączenie dwóch podejść i podsumowanie
+Ostateczne grupy chcemy połączyć przez przecięcie grup odpowiadających pozycjom i obszarom. Mało liczne przecięcia, tj. poniżej 800 szkół uznamy za niepasujące do żadnego większego wzorca. Liczność przecięć przedstawia się następująco:
+
+```{r, echo=FALSE}
+table(razem$nazwa_grupa_p,razem$nazwa_grupa_o)
+```
+
+<center>**Udział procentowy poszczególnych pozycji w obszarach**</center>
+```{r bp,message=FALSE,warning=FALSE, echo=FALSE}
+bp<-ggplot(razem,  aes(x=factor(1), fill=nazwa_grupa_p))+ 
+  geom_bar(stat="count", width = 1,position=position_fill(),color='grey',alpha=0.8)+
+  coord_polar("y")+theme_void()+
+  scale_fill_manual(values=paleta_4, name="Grupa (pozycje)")+
+  facet_wrap(~nazwa_grupa_o)
+
+bp
+```
+
+Zgodnie z oczekiwaniami, grupy rozwiązujące zadania z M i R szybciej są grupami "przespieszającymi".
+
+```{r koniec_f2, message=FALSE,warning=FALSE, echo=FALSE, results="hide"}
+razem$kod_gr <- as.numeric(razem$grupa_pozycje*10 + razem$grupa_obszary)
+table(razem$kod_gr)
+
+# 11 rosnące tempo M średnio R średnio
+# 12 rosnące tempo M wolno R średnio
+# 13 nie
+# 14 nie
+# 21 ? 661- malo charakterystyczna
+# 22 równo M wolno R średnio
+# 23 równo M wolno R wolno
+# 24 nie
+# 31 nie
+# 32 ? 817 -ok
+# 33 1i3 dłużej M wolno R wolno
+# 34 nie
+# 41 równo(w. szybsza) M średnio R średnio
+# 42 nie
+# 43 nie
+# 44 równo(w. szybsza) M szybko R szybko
+
+
+razem$grupa_nazwa <- paste(razem$nazwa_grupa_p, razem$nazwa_grupa_o, sep=" ")
+razem$kod_gr <- ifelse(razem$kod_gr %in% c(13,14,21,24,31,34,42,43),
+                            NA,razem$kod_gr)
+razem$grupa_nazwa <- ifelse(is.na(razem$kod_gr), NA, razem$grupa_nazwa)
+
+#dołączenie 252 szkol bez M/R 
+szer3 <- spread(szkoly_obszary, key=Obszar, value=srednia)
+
+
+bezMR <- szer3[puste,"Szkola"]
+bezMR$grupa_nazwa <- NA
+bezMR$kod_gr <- NA
+razem2 <- rbind(razem[,c("Szkola","grupa_nazwa","kod_gr")],bezMR)
+
+```
+
+
+Przedstawiamy ostateczne nazwy wraz z licznościami grup. Łącznie 1522 szkół uznajemy jako niepasujące do żadnego większego wzorca.
+<center>**Udział procentowy poszczgólnych grup-P w grupach-O**</center>
+```{r bw,message=FALSE,warning=FALSE, echo=FALSE}
+razem2$grupa_nazwa <- reorder(razem2$grupa_nazwa,razem2$kod_gr)
+bw<-ggplot(razem2,  aes(x=factor(1), fill=grupa_nazwa))+ 
+  geom_bar(stat="count", width = 1,position=position_fill(),color='grey',alpha=0.8)+
+  coord_polar("y")+
+  theme_void()+
+  #scale_fill_manual(values=paleta_kraje8[c(5,1,2,6,7,4,3,8)], na.value="grey70")
+  scale_fill_manual(values=paleta_kraje8, na.value="grey70")
+
+bw
+```
+
+```{r message=FALSE,warning=FALSE, echo=FALSE}
+summary(as.factor(razem2$grupa_nazwa))
+```
+
+#Faza III
+
+W III fazie miałyśmy sprawdzić jakie wzorce zachowań występują w różnych krajach.
+Głównym wynikiem III fazy jest poniższy wykres. W tabelce pod wykresem znajduje się opis legendy, która jest uproszczona ze względów technicznych. Pierwsza część nazwy grupy opisuje sposób rozwiazywania testu ze względu na pozycje, a druga ze względu na obszary (matematyka- M i czytanie-R).Kolejność krajów na wykresie jest zgodna ze rankingiem średnich czasów, który wykonałyśmy w I fazie. Pozycje North Carolina (USA) i Massachusettes (USA) są jednolite ze względu na bardzo małą liczbę szkół dostępnych w danych.
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+razem2 <- merge(razem2,szkoly_obszary[,c("Szkola","Kraj")], by="Szkola")
+razem2$kod_gr <- as.factor(razem2$kod_gr)
+
+w6 <- ggplot(razem2, aes(x=Kraj, fill=kod_gr))+ 
+  geom_bar(stat="count", position=position_fill())+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  scale_x_discrete(limits= levels(kolejnosc))+
+  scale_fill_manual(values=paleta_kraje8, na.value="grey70")+
+  labs(title="Udział poszczgólnych grup w krajach - kolejność wg śr. czasu")
+
+ggplotly()
+```
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+#tabela z kodami, bo legenda sie nie chce zmiescic
+tabelka <- razem2 %>% group_by(kod_gr,grupa_nazwa) %>% summarize(cos=mean(1))
+
+kable(tabelka[,-3])
+```
+
+Z wykresu możemy zaobserwować następujące zależności:
+
+* Strategie **coraz szybciej M_srednio_R_srednio**, **coraz szybciej M_wolno_R_srednio** i **dość równe M_wolno_R_srednio** (na wykresie 11,12,22) są równomiernie rozłożone we wszystkich krajach wewnątrz rankingu (bez skrajnych). Przy drugiej z wymienionych w tym paragrafie strategii obserwujemy minimalnie częstsze stosowanie w krajach z drugiej połowy rankingu. 
+
+* Strategie **dość równe M_wolno_R_wolno**, **1 i 3 dłużej M_wolno_R_srednio**(na wykresie 23, 32)są stosowane w krajach z drugiej połowy rankingu.
+
+* Strategia **1 i 3 dłużej M_wolno_R_wolno** (na wykresie 33) jest stosowana zgodnie z regułą: im niżej w rankingu czasów, tym częściej.
+
+* Strategie **dość równe-wersja szybsza M_srednio_R_srednio** i **dość równe-wersja szybsza M_szybko_R_szybko** (na wykresie 41, 44)są stosowane zgodnie z regułą: im wyżej w rankingu czasów, tym częściej, przy czym dwa pierwsze kraje zdecydowanie częściej stosują drugą z wymienionych.
+
+* Grupa szkół niezaliczonych do żadnej z opisanych powyżej grup, ze względu na kraje rozkłada się dość równomiernie.
+
+##Porównanie strategii czasowej z wynikami
+
+Kolejną rzeczą, którą chciałyśmy sprawdzić jest zależność średnich czasów i rozkładu wyznaczonych przez nas grup od wyników uzyskanych przez badane kraje. Na podstawie danych ze strony [PISA](https://www.oecd.org/pisa/) stworzyłyśmy ranking wyników. Rozważamy tutaj sumę punktów uzyskanych w dwóch rozważanych przez nas częściach testów- Czytanie i Matematyka.
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE, eval=FALSE}
+ranking<-read.table("ranking.csv", sep=";", dec=".", header=FALSE)
+save(ranking,file=paste0(getwd(),"/ranking.rda"))
+```
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+indeks<-levels(as.factor(levels(dane$Kraj)))
+ranking2<- ranking[ranking$V1 %in% indeks,]
+ranking_indeksy<-order(ranking2$V2,decreasing = TRUE)
+ranking2<-ranking2[ranking_indeksy,]
+kolejnosc2<-ranking2$V1
+head(ranking2)
+
+w1<-ggplot(statystyki_kraje_obszary, aes(x=Kraj, y=mediana, fill=Obszar))+
+  geom_bar(stat="identity",position="stack", alpha=1)+
+  theme_bw()+
+  labs(title="Czas przeznaczany na zadanie wg. kraju")+
+  scale_y_continuous(name="Mediana czasu [min]", expand=c(0,0))+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        panel.grid.major.x = element_blank())+
+  scale_x_discrete(limits= kolejnosc2)
+ggplotly()
+```
+
+Widzimy, że nie ma dużej zależności między średnim czasem rozwiązywania całego testu, a wynikami. Są kraje, które mimo wysokiej pozycji w rankingu średnich czasów miały bardzo słabe wyniki np. Katar, oraz takie, które mimo dużych czasów rozwiazywanie zadań dość dobrze wypadły w rankingu punktowym np. Estonia.
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+w6 <- ggplot(razem2, aes(x=Kraj, fill=kod_gr))+ 
+  geom_bar(stat="count", position=position_fill())+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  scale_x_discrete(limits= kolejnosc2)+
+  scale_fill_manual(values=paleta_kraje8, na.value="grey70")+
+  labs(title="Udział poszczgólnych grup w krajach - kolejność wg wyniku")
+
+
+ggplotly()
+``` 
+
+
+Z wykresu możemy zaobserwować podobne zależności jak na wykresie z poprzedniego paragrafu, jednak bywają odstępstwa, spowodowane tym, ze niektóre kraje mimo wolniejszego rozwiązywanie zadań uzyskały wysokie wyniki. Na największą uwagę zasługują grupy:**1 i 3 dłużej M_wolno_R_wolno** (na wykresie 33), która zdecydowanie przeważa w krajach z niskimi wynikami, oraz **dość równe-wersja szybsza M_srednio_R_srednio** i **dość równe-wersja szybsza M_szybko_R_szybko** (na wykresie 41, 44), które ponownie wyznaczają najlepsze grupy
+
+#Podsumowanie
+Nasze podejście, czyli przecięcie grup ze względu na obszary z grupami ze względu na pozycje, nie dało znaczących rezultatów. Grupy utworzone w ten sposób mają podobne związki z wynikami jak ich grupy-matki odpowiadające pozycjom. Dlatego poniżej przedstawiamy udziały poszczególnych grup w krajach.
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+razem3 <- merge(razem,szkoly_obszary[,c("Szkola","Kraj")], by="Szkola")
+
+w7 <- ggplot(razem3, aes(x=Kraj, fill=as.factor(nazwa_grupa_p)))+ 
+  geom_bar(stat="count", position=position_fill())+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  scale_x_discrete(limits= kolejnosc2)+
+  scale_fill_manual(values=paleta_kraje8[c(5,6,7,8)], na.value="grey70", name="nazwa grupy")+
+  labs(title="Udział poszczgólnych grup w krajach - kolejność wg wyniku")
+
+
+ggplotly()
+```
+
+Na podstawie przeprowadzonej analizy możemy opisać 3 główne grupy strategii rozwiązywania zadań:
+
+* Strategie wygrywające, czyli takie, które utrzymywały równe tempo rozwiązywanie zadań przez cały czas test i dobrze rozplanowały sobie czas poświęcony na jego pisanie
+
+* Strategia przegrywająca, czyli taka, w której uczniowie dłużej spędzali na pierwszej i trzeciej część testu, czyli źle rozplanowali czas (test odbywa się w dwóch etapach: 1 i 2 część-przerwa-3 i 4 część)
+
+* Strategia średnia, czyli taka, w której zauważalne jest coraz szybsze rozwiązywanie zadań w kolejnych pozycjach.
