@@ -1,9 +1,0 @@
-Main results are brief, and that’s ok.
-The four R lines before ‘Introduction’ are not needed. You should remove it.
-The cartogram is good, however you could include intervals for each level in the plot.
-The plot with ‘mean profile’ could be replaced with correspondence analysis. Sorting x axis along some fraction/average is a good idea. You should do the same for smokers (fig 4)
-In Fig 5 you are presenting the same data but on two different levels of aggregation, no need for using two different colour keys.
-The model for predictions and predictions itself are the most important things. So it should be presented with greater care. Here for model you have only table with coefficients. What about validation / diagnostic?
-Instead of adding 7 digits after coma you could fit CI for coefficients. And the stage1/stage2/stage4 fractions – still it is hard for me to understand why you have selected fraction of patients in stage 3 as baseline.
-
-Btw: Latin should be italic. And note that the term ‘ceteris paribus‘ is not that common outside econometricians.  

@@ -1,9 +1,0 @@
-Prezentacja efekty interakcji wieku i płci jest bardzo ciekawa. Mapa jest poprawna i analiza korelacji też interesująca (choć nie jest oczywiste, czy zależność jest tutaj liniowa, można by porównać ją też z jakimś lokalnym gładkim uśrednieniem).
-
-Wskaźniki zachorowalności lepiej przedstawiać na np. 1000 mieszkańców lub 100 000. Będzie mniej zer.
-
-To czego brakuje to model biorący pod uwagę wszystkie te efekty. Oraz diagnostyka reszt modelu.
-Nawet jeżeli te zmienne są ważne to pytanie czy jak na ich podstawie zbudować model predykcyjny. I jak porównać różne możliwe modele.
-
-
-Btw: Zgłosili panowie dwa pliki, nie wiem dlaczego. W drugim do wyboru modelu jest używane R^2 ale to bardzo złe kryterium. A sam drugi plik html jest bardzo słabo przygotowany. 
